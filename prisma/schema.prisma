@@ -32,7 +32,7 @@ model Product {
   compareAtPrice  Float? // Original price for discount display
   images          String[] // Array of image URLs
   category        String
-  tags            String[]
+  tags            String[] @default([])
   rating          Float?
   reviewCount     Int      @default(0)
   source          String? // 'ebay', 'aliexpress', 'temu', 'mock'
