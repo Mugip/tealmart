@@ -379,19 +379,27 @@ def import_products(products: List[Dict], conn) -> IngestionResult:
     updated = 0
     errors = []
     categories_used = set()
-
+    
     for product in products:
         try:
             categories_used.add(product["category"])
-            
             cursor.execute(
                 'SELECT id FROM "Product" WHERE "externalId" = %s',
                 (product.get("externalId"),)
             )
             existing = cursor.fetchone()
             
-            # Ensure tags is proper list
-            tags_array = [tag for tag in product.get("tags", []) if tag and tag.strip()]
+            # Ensure tags is proper list and never null
+            tags_array = product.get("tags", [])
+            if tags_array is None:
+                tags_array = []
+            else:
+                tags_array = [tag for tag in tags_array if tag and tag.strip()]
+            
+            # Ensure images is proper array
+            images_array = product.get("images", [])
+            if images_array is None:
+                images_array = []
             
             if existing:
                 cursor.execute('''
@@ -404,7 +412,7 @@ def import_products(products: List[Dict], conn) -> IngestionResult:
                 ''', (
                     product["title"], product["description"], product["price"],
                     product.get("costPrice"), product.get("compareAtPrice"),
-                    product["images"], product["category"], tags_array,
+                    images_array, product["category"], tags_array,
                     product.get("rating"), product["reviewCount"],
                     product.get("externalId")
                 ))
@@ -423,7 +431,7 @@ def import_products(products: List[Dict], conn) -> IngestionResult:
                 ''', (
                     product.get("externalId"), product["title"], product["description"],
                     product["price"], product.get("costPrice"), product.get("compareAtPrice"),
-                    product["images"], product["category"], tags_array,
+                    images_array, product["category"], tags_array,
                     product.get("rating"), product["reviewCount"], product["source"]
                 ))
                 added += 1
