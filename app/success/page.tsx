@@ -1,96 +1,14 @@
 'use client'
 
+import { Suspense } from 'react'
+import SuccessContent from './SuccessContent'
+
 export const dynamic = 'force-dynamic'
 
-import { useEffect, useState } from 'react'
-import { useSearchParams, useRouter } from 'next/navigation'
-import { CheckCircle, Package } from 'lucide-react'
-import Link from 'next/link'
-import { useCart } from '@/lib/contexts/CartContext'
-
 export default function SuccessPage() {
-  const searchParams = useSearchParams()
-  const router = useRouter()
-  const { clearCart } = useCart()
-
-  const [orderNumber, setOrderNumber] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    const order = searchParams.get('order')
-
-    if (!order) {
-      router.replace('/')
-      return
-    }
-
-    setOrderNumber(order)
-    clearCart()
-    setLoading(false)
-  }, [searchParams, clearCart, router])
-
-  if (loading) {
-    return null
-  }
-
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-      <div className="max-w-md w-full">
-        <div className="bg-white rounded-lg shadow-md p-8 text-center">
-          <div className="mb-6">
-            <CheckCircle size={64} className="text-green-500 mx-auto" />
-          </div>
-
-          <h1 className="text-3xl font-bold text-gray-900 mb-4">
-            Payment Successful!
-          </h1>
-
-          <p className="text-gray-600 mb-6">
-            Thank you for your purchase. Your order has been confirmed.
-          </p>
-
-          <div className="bg-gray-50 rounded-lg p-4 mb-6">
-            <p className="text-sm text-gray-600 mb-1">Order Number</p>
-            <p className="text-xl font-bold text-gray-900">
-              {orderNumber}
-            </p>
-          </div>
-
-          <div className="space-y-4 text-left mb-6">
-            <div className="flex items-start gap-3">
-              <Package
-                className="text-tiffany-600 flex-shrink-0 mt-1"
-                size={20}
-              />
-              <div>
-                <h3 className="font-semibold text-gray-900">
-                  What's Next?
-                </h3>
-                <p className="text-sm text-gray-600">
-                  You'll receive an email confirmation shortly with your
-                  order details and tracking information.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            <Link
-              href="/products"
-              className="btn-primary w-full block text-center"
-            >
-              Continue Shopping
-            </Link>
-
-            <Link
-              href="/"
-              className="block text-center text-tiffany-600 hover:text-tiffany-700 font-semibold"
-            >
-              Back to Home
-            </Link>
-          </div>
-        </div>
-      </div>
-    </div>
+    <Suspense fallback={null}>
+      <SuccessContent />
+    </Suspense>
   )
 }
