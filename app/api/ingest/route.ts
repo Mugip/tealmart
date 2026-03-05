@@ -5,7 +5,6 @@ const prisma = new PrismaClient()
 
 const CJ_API_URL = "https://developers.cjdropshipping.com/api2.0/v1"
 const CJ_API_KEY = process.env.CJ_API_KEY!
-const INGEST_API_KEY = process.env.INGESTION_API_KEY!
 
 /* ======================================================
 TOKEN CACHE
@@ -152,7 +151,7 @@ function extractImages(detail: any): string[] {
 }
 
 /* ======================================================
-VARIANT EXTRACTION (STORES OPTIONS INSIDE VARIANTS)
+VARIANT EXTRACTION
 ====================================================== */
 
 function extractVariants(detail: any) {
@@ -217,7 +216,7 @@ function extractVariants(detail: any) {
 }
 
 /* ======================================================
-SAVE PRODUCT (FIXED: NO options FIELD)
+SAVE PRODUCT (FIXED)
 ====================================================== */
 
 async function saveProduct(detail: any) {
@@ -241,11 +240,7 @@ async function saveProduct(detail: any) {
   console.log("🖼 Images:", images.length)
   console.log("📦 Variants:", variants.length)
 
-  // STORE BOTH variants AND options INSIDE variants JSON
-  const variantData = {
-    variants,
-    options,
-  }
+  const variantData = { variants, options }
 
   await prisma.product.upsert({
     where: { externalId: pid },
@@ -272,20 +267,11 @@ async function saveProduct(detail: any) {
 }
 
 /* ======================================================
-API ROUTE
+API ROUTE (NO AUTH FOR TESTING)
 ====================================================== */
 
 export async function POST(req: NextRequest) {
   try {
-    const apiKey = req.headers.get("x-api-key")
-
-    if (!INGEST_API_KEY || apiKey !== INGEST_API_KEY) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      )
-    }
-
     const body = await req.json()
 
     const count = body.count || 5
@@ -297,11 +283,9 @@ export async function POST(req: NextRequest) {
 
     for (const p of baseProducts) {
       const detail = await fetchProductDetail(p.id)
-
       if (!detail) continue
 
       await saveProduct(detail)
-
       saved++
 
       await new Promise((r) => setTimeout(r, 1100))
@@ -319,4 +303,4 @@ export async function POST(req: NextRequest) {
       { status: 500 }
     )
   }
-    }
+      }
