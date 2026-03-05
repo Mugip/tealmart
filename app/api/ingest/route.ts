@@ -5,11 +5,11 @@ const prisma = new PrismaClient()
 
 const CJ_API_URL = "https://developers.cjdropshipping.com/api2.0/v1"
 const CJ_API_KEY = process.env.CJ_API_KEY!
-const INGEST_API_KEY = process.env.INGESTION_API_KEY!
+const INGESTION_API_KEY = process.env.INGESTION_API_KEY!
 
-/* ======================================================
+/* =========================
 TOKEN CACHE
-====================================================== */
+========================= */
 
 let cachedToken: string | null = null
 let tokenExpiry = 0
@@ -30,12 +30,10 @@ async function fetchNewToken() {
   cachedToken = data.data.accessToken
   tokenExpiry = new Date(data.data.accessTokenExpiryDate).getTime()
 
-  console.log("🔑 New CJ token cached")
-
   return cachedToken!
 }
 
-async function getCJAccessToken(): Promise<string> {
+async function getCJToken() {
   const now = Date.now()
 
   if (cachedToken && now < tokenExpiry - 60000) {
@@ -45,12 +43,12 @@ async function getCJAccessToken(): Promise<string> {
   return fetchNewToken()
 }
 
-/* ======================================================
-MARKUP
-====================================================== */
+/* =========================
+MARKUP ENGINE
+========================= */
 
 function applyMarkup(cost: number) {
-  if (!cost || cost <= 0) return 0
+  if (!cost) return 0
 
   if (cost < 5) return +(cost * 3).toFixed(2)
   if (cost < 15) return +(cost * 2.2).toFixed(2)
@@ -59,18 +57,16 @@ function applyMarkup(cost: number) {
   return +(cost * 1.5).toFixed(2)
 }
 
-/* ======================================================
+/* =========================
 FETCH PRODUCT LIST
-====================================================== */
+========================= */
 
 async function fetchCJProducts(keyword?: string, count = 10) {
-  const token = await getCJAccessToken()
-
-  const size = Math.min(count, 10)
+  const token = await getCJToken()
 
   const params = new URLSearchParams({
     page: "1",
-    size: size.toString(),
+    size: String(Math.min(count, 10)),
   })
 
   if (keyword) params.append("keyWord", keyword)
@@ -83,18 +79,18 @@ async function fetchCJProducts(keyword?: string, count = 10) {
   const data = await res.json()
 
   if (data.code !== 200) {
-    throw new Error("CJ product fetch failed: " + JSON.stringify(data))
+    throw new Error("CJ product list error: " + JSON.stringify(data))
   }
 
   return data.data?.content?.[0]?.productList ?? []
 }
 
-/* ======================================================
+/* =========================
 FETCH PRODUCT DETAIL
-====================================================== */
+========================= */
 
 async function fetchProductDetail(pid: string) {
-  const token = await getCJAccessToken()
+  const token = await getCJToken()
 
   const res = await fetch(
     `${CJ_API_URL}/product/query?pid=${pid}`,
@@ -104,45 +100,38 @@ async function fetchProductDetail(pid: string) {
   const data = await res.json()
 
   if (data.code !== 200) {
-    console.log("❌ CJ detail error", data)
     return null
   }
 
   return data.data
 }
 
-/* ======================================================
+/* =========================
 IMAGE PARSER
-====================================================== */
+========================= */
 
-function parsePossibleJSON(value: any): string[] {
+function parseImages(value: any): string[] {
   if (!value) return []
 
   if (Array.isArray(value)) return value
 
   if (typeof value === "string") {
-    const v = value.trim()
+    try {
+      const parsed = JSON.parse(value)
+      if (Array.isArray(parsed)) return parsed
+    } catch {}
 
-    if (v.startsWith("[")) {
-      try {
-        const parsed = JSON.parse(v)
-        if (Array.isArray(parsed)) return parsed
-      } catch {
-        return []
-      }
-    }
-
-    return [v]
+    return [value]
   }
 
   return []
 }
 
 function extractImages(detail: any): string[] {
-  let images: string[] = []
-
-  images.push(...parsePossibleJSON(detail.productImage))
-  images.push(...parsePossibleJSON(detail.productImageList))
+  const images = [
+    ...parseImages(detail.productImage),
+    ...parseImages(detail.productImageList),
+  ]
 
   const cleaned = images.filter(
     (img) => typeof img === "string" && img.startsWith("http")
@@ -151,169 +140,174 @@ function extractImages(detail: any): string[] {
   return [...new Set(cleaned)]
 }
 
-/* ======================================================
-VARIANT EXTRACTION
-====================================================== */
+/* =========================
+VARIANT PARSER
+========================= */
 
 function extractVariants(detail: any) {
-  const raw = detail.variants
+  if (!detail.variants) return { variants: [], stock: 0, cost: 0 }
 
-  if (!raw) return { variants: [], options: [] }
-
-  let variantsRaw = raw
+  let raw = detail.variants
 
   if (typeof raw === "string") {
     try {
-      variantsRaw = JSON.parse(raw)
+      raw = JSON.parse(raw)
     } catch {
-      return { variants: [], options: [] }
+      return { variants: [], stock: 0, cost: 0 }
     }
   }
 
-  if (!Array.isArray(variantsRaw)) {
-    return { variants: [], options: [] }
+  if (!Array.isArray(raw)) {
+    return { variants: [], stock: 0, cost: 0 }
   }
 
   const variants: any[] = []
-  const optionGroups: Record<string, Set<string>> = {}
+  let totalStock = 0
+  let cheapestCost = Number.MAX_VALUE
 
-  for (const v of variantsRaw) {
-    const key = v.variantKey || ""
-    const parts = key.split("-")
+  for (const v of raw) {
+    const cost = Number(v.variantSellPrice || v.sellPrice || 0)
 
-    const structured: any = {}
+    const price = applyMarkup(cost)
 
-    if (parts[0]) {
-      structured.Color = parts[0]
-      optionGroups.Color ??= new Set()
-      optionGroups.Color.add(parts[0])
-    }
+    const stock = Number(v.variantStock || 0)
 
-    if (parts[1]) {
-      structured.Size = parts[1]
-      optionGroups.Size ??= new Set()
-      optionGroups.Size.add(parts[1])
-    }
+    totalStock += stock
 
-    const price = applyMarkup(
-      Number(v.variantSellPrice || v.sellPrice || 0)
-    )
+    if (cost < cheapestCost) cheapestCost = cost
 
     variants.push({
-      externalId: v.vid,
+      id: v.vid,
       price,
-      stock: v.variantStock || 0,
+      cost,
+      stock,
       image: v.variantImage,
-      options: structured,
+      key: v.variantKey
     })
   }
 
-  const options = Object.entries(optionGroups).map(([name, values]) => ({
-    name,
-    values: Array.from(values),
-  }))
-
-  return { variants, options }
+  return {
+    variants,
+    stock: totalStock,
+    cost: cheapestCost === Number.MAX_VALUE ? 0 : cheapestCost
+  }
 }
 
-/* ======================================================
+/* =========================
 SAVE PRODUCT
-====================================================== */
+========================= */
 
 async function saveProduct(detail: any) {
   const pid = detail.pid
-  if (!pid) return
+  if (!pid) return "skip"
 
   const images = extractImages(detail)
-  const { variants, options } = extractVariants(detail)
 
-  let basePrice = Number(detail.sellPrice || 0)
+  const { variants, stock, cost } = extractVariants(detail)
+
+  let price = applyMarkup(cost)
 
   if (variants.length > 0) {
-    const prices = variants.map((v) => v.price)
-    basePrice = Math.min(...prices)
+    price = Math.min(...variants.map((v) => v.price))
   }
 
-  basePrice = applyMarkup(basePrice)
+  const data = {
+    externalId: pid,
+    title: detail.productNameEn || "Untitled",
+    description: detail.description || "",
+    price,
+    costPrice: cost,
+    compareAtPrice: +(price * 1.3).toFixed(2),
+    images,
+    category: detail.categoryName || "general",
+    tags: [],
+    source: "CJ",
+    stock,
+    variants
+  }
 
-  console.log("💾 Saving:", detail.productNameEn)
-  console.log("🖼 Images:", images.length)
-  console.log("📦 Variants:", variants.length)
-
-  await prisma.product.upsert({
-    where: { externalId: pid },
-
-    create: {
-      externalId: pid,
-      title: detail.productNameEn || "Untitled",
-      description: detail.description || "",
-      price: basePrice,
-      images,
-      category: detail.categoryName || "general",
-      variants,
-      options,
-      source: "CJ",
-    },
-
-    update: {
-      title: detail.productNameEn || "Untitled",
-      description: detail.description || "",
-      price: basePrice,
-      images,
-      category: detail.categoryName || "general",
-      variants,
-      options,
-      source: "CJ",
-    },
+  const existing = await prisma.product.findUnique({
+    where: { externalId: pid }
   })
+
+  if (!existing) {
+    await prisma.product.create({ data })
+    return "created"
+  }
+
+  await prisma.product.update({
+    where: { externalId: pid },
+    data
+  })
+
+  return "updated"
 }
 
-/* ======================================================
+/* =========================
 API ROUTE
-====================================================== */
+========================= */
 
 export async function POST(req: NextRequest) {
-  try {
-    const apiKey = req.headers.get("x-api-key")
+  const start = Date.now()
 
-    if (!INGEST_API_KEY || apiKey !== INGEST_API_KEY) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      )
+  try {
+    const key = req.headers.get("x-api-key")
+
+    if (!INGESTION_API_KEY || key !== INGESTION_API_KEY) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
     const body = await req.json()
 
-    const count = body.count || 5
     const keyword = body.keyword
+    const count = body.count || 5
 
-    const baseProducts = await fetchCJProducts(keyword, count)
+    const list = await fetchCJProducts(keyword, count)
 
-    let saved = 0
+    let created = 0
+    let updated = 0
 
-    for (const p of baseProducts) {
+    for (const p of list) {
       const detail = await fetchProductDetail(p.id)
 
       if (!detail) continue
 
-      await saveProduct(detail)
+      const result = await saveProduct(detail)
 
-      saved++
+      if (result === "created") created++
+      if (result === "updated") updated++
 
-      await new Promise((r) => setTimeout(r, 1100))
+      await new Promise((r) => setTimeout(r, 1000))
     }
+
+    await prisma.ingestionLog.create({
+      data: {
+        source: "CJ",
+        productsAdded: created,
+        productsUpdated: updated,
+        status: "SUCCESS"
+      }
+    })
 
     return NextResponse.json({
       success: true,
-      saved,
+      created,
+      updated,
+      time: Date.now() - start
     })
   } catch (err: any) {
-    console.error(err)
+
+    await prisma.ingestionLog.create({
+      data: {
+        source: "CJ",
+        status: "FAILED",
+        errors: err.message
+      }
+    })
 
     return NextResponse.json(
       { error: err.message },
       { status: 500 }
     )
   }
-      }
+                     }
