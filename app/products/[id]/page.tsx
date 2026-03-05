@@ -168,8 +168,8 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
 
             {/* Description */}
             <div
-                 className="prose"
-                 dangerouslySetInnerHTML={{ __html: product.description }}
+              className="prose"
+              dangerouslySetInnerHTML={{ __html: product.description }}
             />
 
             {/* Variants */}
@@ -212,15 +212,16 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
               </div>
             )}
 
-            {/* Add to Cart */}
+            {/* Add to Cart (FIXED: no variant field) */}
             <button
-              onClick={() => addItem({
-                id: product.id,
-                title: product.title,
-                price: activePrice,
-                image: activeImage,
-                variant: selectedVariant,
-              })}
+              onClick={() =>
+                addItem({
+                  id: product.id,
+                  title: product.title,
+                  price: activePrice,
+                  image: activeImage,
+                })
+              }
               className="btn-primary w-full py-4 text-lg mb-6 flex items-center justify-center gap-2"
             >
               <ShoppingCart size={24} />
@@ -251,4 +252,4 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
       </div>
     </div>
   )
-}
+        }
