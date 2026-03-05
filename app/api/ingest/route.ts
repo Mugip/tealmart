@@ -69,6 +69,7 @@ async function fetchProductDetail(pid: string) {
 function parseImages(value: any): string[] {
   if (!value) return []
   if (Array.isArray(value)) return value
+
   if (typeof value === "string") {
     try {
       const parsed = JSON.parse(value)
@@ -154,6 +155,7 @@ async function saveProduct(detail: any) {
     images,
     category: detail.categoryName || "general",
     variants,
+    options: [], // required by schema (non-null)
     source: "CJ",
     stock,
   }
@@ -214,6 +216,7 @@ export async function POST(req: NextRequest) {
         else created++
       }
 
+      // rate-limit friendly
       await new Promise((r) => setTimeout(r, 1100))
     }
 
@@ -230,4 +233,4 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
-  }
+}
