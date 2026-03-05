@@ -8,12 +8,12 @@ const CJ_API_URL = "https://developers.cjdropshipping.com/api2.0/v1"
 const INGESTION_API_KEY = process.env.INGESTION_API_KEY!
 
 /* =========================
-MARKUP ENGINE
+MARKUP
 ========================= */
 
 function applyMarkup(cost: number) {
 
-  if (!cost) return 0
+  if (!cost || cost <= 0) return 0
 
   if (cost < 5) return +(cost * 3).toFixed(2)
   if (cost < 15) return +(cost * 2.2).toFixed(2)
@@ -22,8 +22,13 @@ function applyMarkup(cost: number) {
   return +(cost * 1.5).toFixed(2)
 }
 
+function safeFloat(v: any) {
+  const n = Number(v)
+  return isNaN(n) ? 0 : n
+}
+
 /* =========================
-FETCH PRODUCT LIST
+CJ PRODUCT LIST (ROBUST)
 ========================= */
 
 async function fetchCJProducts(keyword?: string, count = 10) {
@@ -38,7 +43,7 @@ async function fetchCJProducts(keyword?: string, count = 10) {
   if (keyword) params.append("keyword", keyword)
 
   const res = await fetch(
-    `${CJ_API_URL}/product/list?${params.toString()}`,
+    `${CJ_API_URL}/product/list?${params}`,
     {
       headers: {
         "CJ-Access-Token": token
@@ -49,14 +54,18 @@ async function fetchCJProducts(keyword?: string, count = 10) {
   const data = await res.json()
 
   if (data.code !== 200) {
-    throw new Error("CJ product list error: " + JSON.stringify(data))
+    throw new Error("CJ LIST ERROR: " + JSON.stringify(data))
   }
 
-  return data.data?.content?.productList ?? []
+  const list = data?.data?.content?.productList ?? []
+
+  console.log("CJ fetched:", list.length)
+
+  return list
 }
 
 /* =========================
-FETCH PRODUCT DETAIL
+CJ PRODUCT DETAIL
 ========================= */
 
 async function fetchProductDetail(pid: string) {
@@ -74,13 +83,18 @@ async function fetchProductDetail(pid: string) {
 
   const data = await res.json()
 
-  if (data.code !== 200) return null
+  if (data.code !== 200) {
+
+    console.log("DETAIL ERROR", data)
+
+    return null
+  }
 
   return data.data
 }
 
 /* =========================
-IMAGE PARSER
+IMAGE EXTRACTION
 ========================= */
 
 function parseImages(value: any): string[] {
@@ -92,11 +106,8 @@ function parseImages(value: any): string[] {
   if (typeof value === "string") {
 
     try {
-
       const parsed = JSON.parse(value)
-
       if (Array.isArray(parsed)) return parsed
-
     } catch {}
 
     return [value]
@@ -105,11 +116,14 @@ function parseImages(value: any): string[] {
   return []
 }
 
-function extractImages(detail: any): string[] {
+function extractImages(detail: any) {
 
   const images = [
+
     ...parseImages(detail.productImage),
-    ...parseImages(detail.productImageList)
+    ...parseImages(detail.productImageList),
+    ...parseImages(detail.productImageSet)
+
   ]
 
   const cleaned = images.filter(
@@ -120,59 +134,125 @@ function extractImages(detail: any): string[] {
 }
 
 /* =========================
-VARIANT PARSER
+VARIANT EXTRACTION
 ========================= */
 
 function extractVariants(detail: any) {
 
-  if (!detail.variants) {
-    return { variants: [], stock: 0, cost: 0 }
-  }
-
   let raw = detail.variants
+
+  console.log("VARIANT RAW TYPE:", typeof raw)
+
+  if (!raw) {
+    return {
+      variants: [],
+      options: [],
+      stock: 0,
+      cost: 0
+    }
+  }
 
   if (typeof raw === "string") {
 
     try {
       raw = JSON.parse(raw)
     } catch {
-      return { variants: [], stock: 0, cost: 0 }
+
+      console.log("VARIANT PARSE FAILED")
+
+      return {
+        variants: [],
+        options: [],
+        stock: 0,
+        cost: 0
+      }
     }
   }
 
   if (!Array.isArray(raw)) {
-    return { variants: [], stock: 0, cost: 0 }
+
+    console.log("VARIANT NOT ARRAY")
+
+    return {
+      variants: [],
+      options: [],
+      stock: 0,
+      cost: 0
+    }
   }
 
   const variants: any[] = []
+
+  const optionGroups: Record<string, Set<string>> = {}
 
   let totalStock = 0
   let cheapestCost = Number.MAX_VALUE
 
   for (const v of raw) {
 
-    const cost = Number(v.variantSellPrice || v.sellPrice || 0)
+    const cost =
+      safeFloat(v.variantSellPrice) ||
+      safeFloat(v.sellPrice)
 
     const price = applyMarkup(cost)
 
-    const stock = Number(v.variantStock || 0)
+    const stock =
+      safeFloat(v.variantStock) ||
+      safeFloat(v.stock)
 
     totalStock += stock
 
     if (cost < cheapestCost) cheapestCost = cost
 
+    /* =========================
+       OPTION PARSING
+    ========================= */
+
+    const key = v.variantKey || ""
+
+    const options: Record<string, string> = {}
+
+    for (const part of key.split(";")) {
+
+      if (!part.includes("-")) continue
+
+      const [name, value] = part.split("-")
+
+      const n = name.trim()
+      const val = value.trim()
+
+      options[n] = val
+
+      if (!optionGroups[n]) {
+        optionGroups[n] = new Set()
+      }
+
+      optionGroups[n].add(val)
+    }
+
     variants.push({
-      id: v.vid,
+      id: v.vid || "",
       price,
       cost,
       stock,
-      image: v.variantImage,
-      key: v.variantKey
+      image: v.variantImage || null,
+      options
     })
   }
 
+  const options = Object.entries(optionGroups).map(
+    ([name, values]) => ({
+      name,
+      values: Array.from(values)
+    })
+  )
+
+  console.log("Variants:", variants.length)
+  console.log("Option groups:", options.length)
+
   return {
     variants,
+    options,
     stock: totalStock,
     cost: cheapestCost === Number.MAX_VALUE ? 0 : cheapestCost
   }
@@ -188,30 +268,60 @@ async function saveProduct(detail: any) {
 
   if (!pid) return "skip"
 
+  const title =
+    detail.productNameEn ||
+    detail.productName ||
+    "Untitled"
+
+  const description = detail.description || ""
+
+  const category = detail.categoryName || "general"
+
   const images = extractImages(detail)
 
-  const { variants, stock, cost } = extractVariants(detail)
+  const { variants, options, stock, cost } =
+    extractVariants(detail)
 
   let price = applyMarkup(cost)
 
-  if (variants.length > 0) {
-    price = Math.min(...variants.map((v) => v.price))
+  if (variants.length) {
+
+    const prices = variants
+      .map((v) => v.price)
+      .filter((p) => p > 0)
+
+    if (prices.length) {
+      price = Math.min(...prices)
+    }
   }
 
   const data = {
+
     externalId: pid,
-    title: detail.productNameEn || "Untitled",
-    description: detail.description || "",
+    title,
+    description,
     price,
+
     costPrice: cost,
+
     compareAtPrice: +(price * 1.3).toFixed(2),
-    images,
-    category: detail.categoryName || "general",
+
+    images: images ?? [],
+
+    category,
+
     tags: [],
+
     source: "CJ",
+
     stock,
-    variants
+
+    variants: variants ?? [],
+
+    options: options ?? []
   }
+
+  console.log("Saving:", title)
 
   const existing = await prisma.product.findUnique({
     where: { externalId: pid }
@@ -219,7 +329,9 @@ async function saveProduct(detail: any) {
 
   if (!existing) {
 
-    await prisma.product.create({ data })
+    await prisma.product.create({
+      data
+    })
 
     return "created"
   }
@@ -273,8 +385,9 @@ export async function POST(req: NextRequest) {
       if (result === "created") created++
       if (result === "updated") updated++
 
-      // prevent API rate limits
-      await new Promise((r) => setTimeout(r, 1000))
+      /* RATE LIMIT PROTECTION */
+
+      await new Promise((r) => setTimeout(r, 1200))
     }
 
     await prisma.ingestionLog.create({
@@ -287,13 +400,19 @@ export async function POST(req: NextRequest) {
     })
 
     return NextResponse.json({
+
       success: true,
+
       created,
+
       updated,
+
       time: Date.now() - start
     })
 
   } catch (err: any) {
+
+    console.error("INGEST ERROR:", err)
 
     await prisma.ingestionLog.create({
       data: {
@@ -308,4 +427,4 @@ export async function POST(req: NextRequest) {
       { status: 500 }
     )
   }
-    }
+}
