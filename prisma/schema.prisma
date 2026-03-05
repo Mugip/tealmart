@@ -1,3 +1,4 @@
+// prisma/schema.prisma
 generator client {
   provider = "prisma-client-js"
 }
@@ -23,7 +24,7 @@ model Product {
   id             String      @id @default(cuid())
   externalId     String?     @unique
   title          String
-  description    String
+  description    String      @db.Text
   price          Float
   costPrice      Float?
   compareAtPrice Float?
@@ -105,11 +106,20 @@ model IngestionLog {
   source          String
   productsAdded   Int      @default(0)
   productsUpdated Int      @default(0)
-  errors          String?
+  errors          String?  @db.Text
   status          String
   createdAt       DateTime @default(now())
 
   @@index([createdAt])
+}
+
+model CJTokenCache {
+  key       String   @id
+  value     String   @db.Text
+  expiresAt DateTime
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@index([expiresAt])
 }
 
 enum OrderStatus {
