@@ -2,10 +2,6 @@ generator client {
   provider = "prisma-client-js"
 }
 
-generator pyclient {
-  provider = "prisma-client-py"
-}
-
 datasource db {
   provider  = "postgresql"
   url       = env("DATABASE_URL")
