@@ -1,6 +1,6 @@
-//  app/api/ingest/route.ts
+// Fixed app/api/ingest/route.ts
 import { NextRequest, NextResponse } from "next/server"
-import { PrismaClient } from "@prisma/client"
+import { PrismaClient, Prisma } from "@prisma/client"
 import { getCJToken } from "@/lib/cjToken"
 
 const prisma = new PrismaClient()
@@ -174,7 +174,7 @@ async function saveProduct(product: any, keyword?: string) {
     source: "cj-dropshipping",
     isActive: true,
     stock,
-    variants
+    variants: variants || Prisma.JsonNull // FIX: Use Prisma.JsonNull instead of null
   }
 
   return await prisma.product.upsert({
