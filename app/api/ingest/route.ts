@@ -8,7 +8,7 @@ const CJ_API_URL = "https://developers.cjdropshipping.com/api2.0/v1"
 const INGESTION_API_KEY = process.env.INGESTION_API_KEY!
 
 /* =========================
-MARKUP
+MARKUP ENGINE
 ========================= */
 
 function applyMarkup(cost: number) {
@@ -22,50 +22,58 @@ function applyMarkup(cost: number) {
   return +(cost * 1.5).toFixed(2)
 }
 
-function safeFloat(v: any) {
-  const n = Number(v)
-  return isNaN(n) ? 0 : n
-}
-
 /* =========================
-CJ PRODUCT LIST (ROBUST)
+FETCH PRODUCT LIST (PAGINATED)
 ========================= */
 
 async function fetchCJProducts(keyword?: string, count = 10) {
 
   const token = await getCJToken()
 
-  const params = new URLSearchParams({
-    pageNum: "1",
-    pageSize: String(Math.min(count, 10))
-  })
+  let page = 1
+  let remaining = count
+  const products: any[] = []
 
-  if (keyword) params.append("keyword", keyword)
+  while (remaining > 0) {
 
-  const res = await fetch(
-    `${CJ_API_URL}/product/list?${params}`,
-    {
-      headers: {
-        "CJ-Access-Token": token
+    const size = Math.min(remaining, 10)
+
+    const params = new URLSearchParams({
+      page: String(page),
+      size: String(size)
+    })
+
+    if (keyword) params.append("keyWord", keyword)
+
+    const res = await fetch(
+      `${CJ_API_URL}/product/listV2?${params.toString()}`,
+      {
+        headers: { "CJ-Access-Token": token }
       }
-    }
-  )
+    )
 
-  const data = await res.json()
+    const data = await res.json()
 
-  if (data.code !== 200) {
-    throw new Error("CJ LIST ERROR: " + JSON.stringify(data))
+    const content = data?.data?.content
+
+    if (!content || content.length === 0) break
+
+    const list = content[0]?.productList || []
+
+    if (!list.length) break
+
+    products.push(...list)
+
+    remaining -= list.length
+    page++
+
   }
 
-  const list = data?.data?.content?.productList ?? []
-
-  console.log("CJ fetched:", list.length)
-
-  return list
+  return products.slice(0, count)
 }
 
 /* =========================
-CJ PRODUCT DETAIL
+FETCH PRODUCT DETAIL
 ========================= */
 
 async function fetchProductDetail(pid: string) {
@@ -75,26 +83,19 @@ async function fetchProductDetail(pid: string) {
   const res = await fetch(
     `${CJ_API_URL}/product/query?pid=${pid}`,
     {
-      headers: {
-        "CJ-Access-Token": token
-      }
+      headers: { "CJ-Access-Token": token }
     }
   )
 
   const data = await res.json()
 
-  if (data.code !== 200) {
-
-    console.log("DETAIL ERROR", data)
-
-    return null
-  }
+  if (data.code !== 200) return null
 
   return data.data
 }
 
 /* =========================
-IMAGE EXTRACTION
+IMAGE PARSER
 ========================= */
 
 function parseImages(value: any): string[] {
@@ -116,14 +117,11 @@ function parseImages(value: any): string[] {
   return []
 }
 
-function extractImages(detail: any) {
+function extractImages(detail: any): string[] {
 
   const images = [
-
     ...parseImages(detail.productImage),
-    ...parseImages(detail.productImageList),
-    ...parseImages(detail.productImageSet)
-
+    ...parseImages(detail.productImageList)
   ]
 
   const cleaned = images.filter(
@@ -134,214 +132,135 @@ function extractImages(detail: any) {
 }
 
 /* =========================
-VARIANT EXTRACTION
+VARIANT PARSER (OPTIONS SUPPORTED)
 ========================= */
 
 function extractVariants(detail: any) {
 
-  let raw = detail.variants
-
-  console.log("VARIANT RAW TYPE:", typeof raw)
-
-  if (!raw) {
-    return {
-      variants: [],
-      options: [],
-      stock: 0,
-      cost: 0
-    }
+  if (!detail.variants) {
+    return { variants: [], options: [], stock: 0 }
   }
 
-  if (typeof raw === "string") {
+  let raw = detail.variants
 
+  if (typeof raw === "string") {
     try {
       raw = JSON.parse(raw)
     } catch {
-
-      console.log("VARIANT PARSE FAILED")
-
-      return {
-        variants: [],
-        options: [],
-        stock: 0,
-        cost: 0
-      }
+      return { variants: [], options: [], stock: 0 }
     }
   }
 
   if (!Array.isArray(raw)) {
-
-    console.log("VARIANT NOT ARRAY")
-
-    return {
-      variants: [],
-      options: [],
-      stock: 0,
-      cost: 0
-    }
+    return { variants: [], options: [], stock: 0 }
   }
 
   const variants: any[] = []
-
   const optionGroups: Record<string, Set<string>> = {}
 
-  let totalStock = 0
-  let cheapestCost = Number.MAX_VALUE
+  let stock = 0
 
   for (const v of raw) {
 
-    const cost =
-      safeFloat(v.variantSellPrice) ||
-      safeFloat(v.sellPrice)
-
-    const price = applyMarkup(cost)
-
-    const stock =
-      safeFloat(v.variantStock) ||
-      safeFloat(v.stock)
-
-    totalStock += stock
-
-    if (cost < cheapestCost) cheapestCost = cost
-
-    /* =========================
-       OPTION PARSING
-    ========================= */
-
     const key = v.variantKey || ""
 
-    const options: Record<string, string> = {}
+    const options: any = {}
 
-    for (const part of key.split(";")) {
+    key.split(";").forEach((part: string) => {
+      if (!part.includes("-")) return
 
-      if (!part.includes("-")) continue
+      const [name, value] = part.split("-", 1)
+      if (!name || !value) return
 
-      const [name, value] = part.split("-")
+      options[name] = value
 
-      const n = name.trim()
-      const val = value.trim()
+      optionGroups[name] ??= new Set()
+      optionGroups[name].add(value)
+    })
 
-      options[n] = val
+    const cost = Number(v.variantSellPrice || v.sellPrice || 0)
+    const price = applyMarkup(cost)
+    const s = Number(v.variantStock || 0)
 
-      if (!optionGroups[n]) {
-        optionGroups[n] = new Set()
-      }
-
-      optionGroups[n].add(val)
-    }
+    stock += s
 
     variants.push({
-      id: v.vid || "",
+      id: v.vid,
       price,
-      cost,
-      stock,
-      image: v.variantImage || null,
+      stock: s,
+      image: v.variantImage,
       options
     })
   }
 
-  const options = Object.entries(optionGroups).map(
-    ([name, values]) => ({
-      name,
-      values: Array.from(values)
-    })
-  )
+  const options = Object.entries(optionGroups).map(([name, values]) => ({
+    name,
+    values: Array.from(values)
+  }))
 
-  console.log("Variants:", variants.length)
-  console.log("Option groups:", options.length)
-
-  return {
-    variants,
-    options,
-    stock: totalStock,
-    cost: cheapestCost === Number.MAX_VALUE ? 0 : cheapestCost
-  }
+  return { variants, options, stock }
 }
 
 /* =========================
-SAVE PRODUCT
+SAVE PRODUCT (PRISMA SAFE)
 ========================= */
 
 async function saveProduct(detail: any) {
 
   const pid = detail.pid
-
   if (!pid) return "skip"
-
-  const title =
-    detail.productNameEn ||
-    detail.productName ||
-    "Untitled"
-
-  const description = detail.description || ""
-
-  const category = detail.categoryName || "general"
 
   const images = extractImages(detail)
 
-  const { variants, options, stock, cost } =
-    extractVariants(detail)
+  const { variants, options, stock } = extractVariants(detail)
 
-  let price = applyMarkup(cost)
+  let price = 0
 
-  if (variants.length) {
-
-    const prices = variants
-      .map((v) => v.price)
-      .filter((p) => p > 0)
-
-    if (prices.length) {
-      price = Math.min(...prices)
-    }
+  if (variants.length > 0) {
+    price = Math.min(...variants.map(v => v.price))
   }
 
   const data = {
-
     externalId: pid,
-    title,
-    description,
+    title: detail.productNameEn || "Untitled",
+    description: detail.description || "",
     price,
-
-    costPrice: cost,
-
-    compareAtPrice: +(price * 1.3).toFixed(2),
-
-    images: images ?? [],
-
-    category,
-
-    tags: [],
-
+    images,
+    category: detail.categoryName || "general",
+    variants,
+    options,
     source: "CJ",
-
-    stock,
-
-    variants: variants ?? [],
-
-    options: options ?? []
+    stock
   }
 
-  console.log("Saving:", title)
-
-  const existing = await prisma.product.findUnique({
-    where: { externalId: pid }
-  })
-
-  if (!existing) {
-
-    await prisma.product.create({
-      data
-    })
-
-    return "created"
-  }
-
-  await prisma.product.update({
+  await prisma.product.upsert({
     where: { externalId: pid },
-    data
+    update: data,
+    create: data
   })
 
-  return "updated"
+  return "saved"
+}
+
+/* =========================
+INGEST LOG
+========================= */
+
+async function logIngest(status: string, added = 0, updated = 0, error?: string) {
+
+  try {
+    await prisma.ingestionLog.create({
+      data: {
+        source: "CJ",
+        productsAdded: added,
+        productsUpdated: updated,
+        status,
+        errors: error
+      }
+    })
+  } catch (e) {
+    console.error("Log failed", e)
+  }
 }
 
 /* =========================
@@ -357,7 +276,6 @@ export async function POST(req: NextRequest) {
     const key = req.headers.get("x-api-key")
 
     if (!INGESTION_API_KEY || key !== INGESTION_API_KEY) {
-
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }
@@ -382,49 +300,35 @@ export async function POST(req: NextRequest) {
 
       const result = await saveProduct(detail)
 
-      if (result === "created") created++
-      if (result === "updated") updated++
+      if (result === "saved") {
+        const exists = await prisma.product.findUnique({
+          where: { externalId: p.id }
+        })
 
-      /* RATE LIMIT PROTECTION */
+        if (exists) updated++
+        else created++
+      }
 
-      await new Promise((r) => setTimeout(r, 1200))
+      // prevent rate limits
+      await new Promise(r => setTimeout(r, 1100))
     }
 
-    await prisma.ingestionLog.create({
-      data: {
-        source: "CJ",
-        productsAdded: created,
-        productsUpdated: updated,
-        status: "SUCCESS"
-      }
-    })
+    await logIngest("SUCCESS", created, updated)
 
     return NextResponse.json({
-
       success: true,
-
       created,
-
       updated,
-
       time: Date.now() - start
     })
 
   } catch (err: any) {
 
-    console.error("INGEST ERROR:", err)
-
-    await prisma.ingestionLog.create({
-      data: {
-        source: "CJ",
-        status: "FAILED",
-        errors: err.message
-      }
-    })
+    await logIngest("FAILED", 0, 0, err.message)
 
     return NextResponse.json(
       { error: err.message },
       { status: 500 }
     )
   }
-}
+      }
