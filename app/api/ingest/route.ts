@@ -112,7 +112,7 @@ async function fetchProductDetail(pid: string) {
 }
 
 /* ======================================================
-IMAGE PARSER (CRITICAL FIX)
+IMAGE PARSER
 ====================================================== */
 
 function parsePossibleJSON(value: any): string[] {
@@ -152,7 +152,7 @@ function extractImages(detail: any): string[] {
 }
 
 /* ======================================================
-VARIANT EXTRACTION
+VARIANT EXTRACTION (STORES OPTIONS INSIDE VARIANTS)
 ====================================================== */
 
 function extractVariants(detail: any) {
@@ -217,7 +217,7 @@ function extractVariants(detail: any) {
 }
 
 /* ======================================================
-SAVE PRODUCT
+SAVE PRODUCT (FIXED: NO options FIELD)
 ====================================================== */
 
 async function saveProduct(detail: any) {
@@ -241,6 +241,12 @@ async function saveProduct(detail: any) {
   console.log("🖼 Images:", images.length)
   console.log("📦 Variants:", variants.length)
 
+  // STORE BOTH variants AND options INSIDE variants JSON
+  const variantData = {
+    variants,
+    options,
+  }
+
   await prisma.product.upsert({
     where: { externalId: pid },
     create: {
@@ -250,8 +256,7 @@ async function saveProduct(detail: any) {
       price: basePrice,
       images,
       category: detail.categoryName || "general",
-      variants,
-      options,
+      variants: variantData,
       source: "CJ",
     },
     update: {
@@ -260,8 +265,7 @@ async function saveProduct(detail: any) {
       price: basePrice,
       images,
       category: detail.categoryName || "general",
-      variants,
-      options,
+      variants: variantData,
       source: "CJ",
     },
   })
@@ -315,4 +319,4 @@ export async function POST(req: NextRequest) {
       { status: 500 }
     )
   }
-}
+    }
