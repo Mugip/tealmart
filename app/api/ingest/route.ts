@@ -5,6 +5,7 @@ const prisma = new PrismaClient()
 
 const CJ_API_URL = "https://developers.cjdropshipping.com/api2.0/v1"
 const CJ_API_KEY = process.env.CJ_API_KEY!
+const INGEST_API_KEY = process.env.INGESTION_API_KEY!
 
 /* ======================================================
 TOKEN CACHE
@@ -216,7 +217,7 @@ function extractVariants(detail: any) {
 }
 
 /* ======================================================
-SAVE PRODUCT (FIXED)
+SAVE PRODUCT
 ====================================================== */
 
 async function saveProduct(detail: any) {
@@ -224,7 +225,6 @@ async function saveProduct(detail: any) {
   if (!pid) return
 
   const images = extractImages(detail)
-
   const { variants, options } = extractVariants(detail)
 
   let basePrice = Number(detail.sellPrice || 0)
@@ -240,10 +240,9 @@ async function saveProduct(detail: any) {
   console.log("🖼 Images:", images.length)
   console.log("📦 Variants:", variants.length)
 
-  const variantData = { variants, options }
-
   await prisma.product.upsert({
     where: { externalId: pid },
+
     create: {
       externalId: pid,
       title: detail.productNameEn || "Untitled",
@@ -251,27 +250,39 @@ async function saveProduct(detail: any) {
       price: basePrice,
       images,
       category: detail.categoryName || "general",
-      variants: variantData,
+      variants,
+      options,
       source: "CJ",
     },
+
     update: {
       title: detail.productNameEn || "Untitled",
       description: detail.description || "",
       price: basePrice,
       images,
       category: detail.categoryName || "general",
-      variants: variantData,
+      variants,
+      options,
       source: "CJ",
     },
   })
 }
 
 /* ======================================================
-API ROUTE (NO AUTH FOR TESTING)
+API ROUTE
 ====================================================== */
 
 export async function POST(req: NextRequest) {
   try {
+    const apiKey = req.headers.get("x-api-key")
+
+    if (!INGEST_API_KEY || apiKey !== INGEST_API_KEY) {
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      )
+    }
+
     const body = await req.json()
 
     const count = body.count || 5
@@ -283,9 +294,11 @@ export async function POST(req: NextRequest) {
 
     for (const p of baseProducts) {
       const detail = await fetchProductDetail(p.id)
+
       if (!detail) continue
 
       await saveProduct(detail)
+
       saved++
 
       await new Promise((r) => setTimeout(r, 1100))
