@@ -419,7 +419,7 @@ async function saveProduct(product: any, keyword?: string) {
   }
 
   // Tags - include source
-  const tags = ["cj-dropshipping", "verified", "cj-source"]
+  const tags = ["tealmart", "verified", "cj-source"]
   if (category !== "general") tags.push(category)
   if (keyword) tags.push(keyword.toLowerCase())
 
