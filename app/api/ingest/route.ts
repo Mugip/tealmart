@@ -33,6 +33,44 @@ function applyMarkup(cost: number): number {
 }
 
 // ============================================
+// VALIDATION FUNCTIONS
+// ============================================
+
+/**
+ * Check if a variant name looks like an SKU code
+ * Returns true if it matches patterns like: CJYD196698201AZ, AB123456789CD, etc.
+ */
+function isSkuLikeVariant(variantName: string): boolean {
+  if (!variantName) return false
+  
+  const normalized = variantName.trim()
+  
+  // Pattern 1: Starts with letters, contains numbers, ends with letters (e.g., CJYD196698201AZ)
+  const pattern1 = /^[A-Z]{2,6}\d{8,15}[A-Z]{1,3}$/i
+  
+  // Pattern 2: All caps with numbers, no spaces (e.g., ABC123456DEF)
+  const pattern2 = /^[A-Z0-9]{10,20}$/
+  
+  // Pattern 3: Contains "CJ" prefix (CJ Dropshipping SKU format)
+  const pattern3 = /^CJ[A-Z]{2}\d+[A-Z]+$/i
+  
+  return pattern1.test(normalized) || pattern2.test(normalized) || pattern3.test(normalized)
+}
+
+/**
+ * Check if variant has meaningful option names (Color, Size, etc.)
+ */
+function hasValidVariantOptions(options: Record<string, string>): boolean {
+  if (Object.keys(options).length === 0) return false
+  
+  const validOptionNames = ['color', 'size', 'style', 'material', 'pattern', 'type', 'model']
+  
+  return Object.keys(options).some(key => 
+    validOptionNames.includes(key.toLowerCase())
+  )
+}
+
+// ============================================
 // CATEGORY MAPPING FROM CJ CATEGORIES
 // ============================================
 
@@ -168,7 +206,7 @@ async function fetchCJProducts(keyword?: string, count = 10) {
   let remaining = count
   const products: any[] = []
 
-  while (remaining > 0 && page <= 10) { // Max 10 pages
+  while (remaining > 0 && page <= 10) {
     const size = Math.min(remaining, MAX_BATCH)
     const params = new URLSearchParams({
       page: String(page),
@@ -186,7 +224,7 @@ async function fetchCJProducts(keyword?: string, count = 10) {
     remaining -= list.length
     page++
 
-    await sleep(1100) // Rate limit safety
+    await sleep(1100)
   }
 
   return products.slice(0, count)
@@ -223,7 +261,7 @@ function extractImages(product: any, detail?: any): string[] {
 
 function extractVariants(detail: any) {
   if (!detail?.variants) {
-    return { variants: null, totalStock: randomStock() }
+    return { variants: null, totalStock: randomStock(), skipped: false }
   }
 
   let raw = detail.variants
@@ -231,17 +269,18 @@ function extractVariants(detail: any) {
     try {
       raw = JSON.parse(raw)
     } catch {
-      return { variants: null, totalStock: randomStock() }
+      return { variants: null, totalStock: randomStock(), skipped: false }
     }
   }
 
   if (!Array.isArray(raw) || raw.length === 0) {
-    return { variants: null, totalStock: randomStock() }
+    return { variants: null, totalStock: randomStock(), skipped: false }
   }
 
   const variants: any[] = []
   const optionNames: Set<string> = new Set()
   let totalStock = 0
+  let hasSkuLikeVariants = false
 
   for (const v of raw) {
     const sellPrice = parsePrice(v.variantSellPrice || v.sellPrice)
@@ -275,8 +314,30 @@ function extractVariants(detail: any) {
         optionNames.add("Color")
         optionNames.add("Size")
       } else if (parts.length === 1 && parts[0]) {
+        // Check if this looks like an SKU
+        if (isSkuLikeVariant(parts[0])) {
+          hasSkuLikeVariants = true
+          continue // Skip this variant
+        }
         options["Option"] = parts[0]
         optionNames.add("Option")
+      }
+    }
+
+    // Check if variant name itself is SKU-like (even with options)
+    const variantName = v.variantName || Object.values(options).join("-")
+    if (isSkuLikeVariant(variantName)) {
+      hasSkuLikeVariants = true
+      continue // Skip this variant
+    }
+
+    // Check if options are valid (not just generic labels)
+    if (!hasValidVariantOptions(options) && Object.keys(options).length > 0) {
+      // If options exist but aren't meaningful, check values
+      const allValuesSkuLike = Object.values(options).every(val => isSkuLikeVariant(val))
+      if (allValuesSkuLike) {
+        hasSkuLikeVariants = true
+        continue // Skip this variant
       }
     }
 
@@ -296,6 +357,12 @@ function extractVariants(detail: any) {
     })
   }
 
+  // If ALL variants look like SKUs, skip the entire product
+  if (hasSkuLikeVariants && variants.length === 0) {
+    console.log(`⚠️ Skipping product - all variants are SKU-like`)
+    return { variants: null, totalStock: 0, skipped: true }
+  }
+
   if (totalStock <= 0) totalStock = randomStock()
 
   return {
@@ -304,6 +371,7 @@ function extractVariants(detail: any) {
       items: variants,
     } : null,
     totalStock,
+    skipped: false,
   }
 }
 
@@ -335,8 +403,14 @@ async function saveProduct(product: any, keyword?: string) {
   const cjCategory = detail.categoryName || product.threeCategoryName || ""
   const category = mapCJCategory(cjCategory)
 
-  // Extract variants
-  const { variants, totalStock } = extractVariants(detail)
+  // Extract variants (with SKU filtering)
+  const { variants, totalStock, skipped } = extractVariants(detail)
+
+  // Skip products with only SKU-like variants
+  if (skipped) {
+    console.log(`❌ Skipped product ${pid} - SKU-like variants only`)
+    return null
+  }
 
   // Use lowest variant price if available
   if (variants?.items?.length) {
@@ -344,8 +418,8 @@ async function saveProduct(product: any, keyword?: string) {
     if (lowestPrice > 0) price = lowestPrice
   }
 
-  // Tags
-  const tags = ["cj-dropshipping", "verified"]
+  // Tags - include source
+  const tags = ["cj-dropshipping", "verified", "cj-source"]
   if (category !== "general") tags.push(category)
   if (keyword) tags.push(keyword.toLowerCase())
 
@@ -396,6 +470,7 @@ export async function POST(req: NextRequest) {
     const batches = Math.ceil(requested / MAX_BATCH)
     let created = 0
     let updated = 0
+    let skipped = 0
     const errors: string[] = []
 
     for (let b = 0; b < batches; b++) {
@@ -415,6 +490,8 @@ export async function POST(req: NextRequest) {
           if (result) {
             if (existing) updated++
             else created++
+          } else {
+            skipped++
           }
 
           await sleep(1100)
@@ -435,12 +512,13 @@ export async function POST(req: NextRequest) {
       },
     })
 
-    console.log(`✅ Completed: ${created} created, ${updated} updated, ${errors.length} errors`)
+    console.log(`✅ Completed: ${created} created, ${updated} updated, ${skipped} skipped, ${errors.length} errors`)
 
     return NextResponse.json({
       success: true,
       created,
       updated,
+      skipped,
       totalFetched: created + updated,
       errors,
       time: `${Date.now() - start}ms`,
