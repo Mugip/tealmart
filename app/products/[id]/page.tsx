@@ -3,14 +3,9 @@
 
 import { useEffect, useState } from 'react'
 import Image from 'next/image'
-import { Star, ShoppingCart, Truck, Shield, ArrowLeft, Check, Package } from 'lucide-react'
+import { Star, ShoppingCart, Truck, Shield, ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useCart } from '@/lib/contexts/CartContext'
 import { useRouter } from 'next/navigation'
-
-interface VariantOption {
-  name: string
-  value: string
-}
 
 interface Variant {
   id: string
@@ -281,51 +276,78 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
               )}
             </div>
 
-            {/* Variant Selection */}
-            {product.variants?.options && product.variants.options.length > 0 && (
-              <div className="space-y-4 bg-white rounded-2xl p-6 shadow-sm border border-gray-200">
-                <h3 className="font-bold text-gray-900 text-lg">Select Options</h3>
+            {/* Horizontal Scrollable Variants */}
+            {product.variants?.items && product.variants.items.length > 0 && (
+              <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-200">
+                <h3 className="font-bold text-gray-900 text-lg mb-4">
+                  Select Variant {selectedVariant && `(${selectedVariant.name})`}
+                </h3>
                 
-                {product.variants.options.map(optionName => {
-                  const values = getOptionValues(optionName)
+                <div className="relative">
+                  <div className="overflow-x-auto pb-2 scrollbar-hide">
+                    <div className="flex gap-3" style={{ minWidth: 'min-content' }}>
+                      {product.variants.items.map((variant) => {
+                        const isSelected = selectedVariant?.id === variant.id
+                        const hasStock = variant.stock > 0
+                        
+                        return (
+                          <button
+                            key={variant.id}
+                            onClick={() => {
+                              setSelectedVariant(variant)
+                              setSelectedOptions(variant.options)
+                              if (variant.image && product.images.includes(variant.image)) {
+                                setSelectedImage(product.images.indexOf(variant.image))
+                              }
+                            }}
+                            disabled={!hasStock}
+                            className={`flex-shrink-0 w-32 p-3 rounded-xl border-2 transition-all ${
+                              isSelected
+                                ? 'border-tiffany-500 bg-tiffany-50 shadow-md'
+                                : hasStock
+                                ? 'border-gray-200 hover:border-tiffany-300 hover:shadow-sm'
+                                : 'border-gray-200 bg-gray-50 opacity-50 cursor-not-allowed'
+                            }`}
+                          >
+                            {variant.image && (
+                              <div className="relative w-full aspect-square mb-2 rounded-lg overflow-hidden">
+                                <Image
+                                  src={variant.image}
+                                  alt={variant.name}
+                                  fill
+                                  className="object-cover"
+                                />
+                              </div>
+                            )}
+                            <div className="text-xs font-semibold text-gray-900 truncate mb-1">
+                              {Object.values(variant.options).join(' / ') || variant.name}
+                            </div>
+                            <div className="text-sm font-bold text-tiffany-600">
+                              ${variant.price.toFixed(2)}
+                            </div>
+                            <div className={`text-xs mt-1 ${hasStock ? 'text-green-600' : 'text-red-600'}`}>
+                              {hasStock ? `${variant.stock} left` : 'Out of stock'}
+                            </div>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
                   
-                  return (
-                    <div key={optionName}>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        {optionName}
-                      </label>
-                      <div className="flex flex-wrap gap-2">
-                        {values.map(value => {
-                          const isSelected = selectedOptions[optionName] === value
-                          
-                          return (
-                            <button
-                              key={value}
-                              onClick={() => handleOptionSelect(optionName, value)}
-                              className={`px-4 py-2 rounded-lg border-2 font-medium transition-all ${
-                                isSelected
-                                  ? 'border-tiffany-500 bg-tiffany-500 text-white shadow-md'
-                                  : 'border-gray-300 bg-white text-gray-700 hover:border-tiffany-300 hover:bg-tiffany-50'
-                              }`}
-                            >
-                              {value}
-                            </button>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  )
-                })}
-                
+                  {/* Scroll indicators */}
+                  <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-white to-transparent pointer-events-none"></div>
+                  <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white to-transparent pointer-events-none"></div>
+                </div>
+
                 {selectedVariant && (
-                  <div className="mt-4 pt-4 border-t border-gray-200">
-                    <div className="flex items-center justify-between text-sm">
+                  <div className="mt-4 pt-4 border-t border-gray-200 grid grid-cols-2 gap-4 text-sm">
+                    <div>
                       <span className="text-gray-600">SKU:</span>
-                      <span className="font-mono text-gray-900">{selectedVariant.sku}</span>
+                      <span className="ml-2 font-mono text-gray-900">{selectedVariant.sku}</span>
                     </div>
-                    <div className="flex items-center justify-between text-sm mt-2">
+                    <div>
                       <span className="text-gray-600">Stock:</span>
-                      <span className={`font-bold ${isInStock ? 'text-green-600' : 'text-red-600'}`}>
+                      <span className={`ml-2 font-bold ${isInStock ? 'text-green-600' : 'text-red-600'}`}>
                         {isInStock ? `${activeStock} available` : 'Out of stock'}
                       </span>
                     </div>
@@ -360,14 +382,17 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
             <button
               onClick={() => {
                 if (!isInStock) return
-                for (let i = 0; i < quantity; i++) {
-                  addItem({
-                    id: product.id,
-                    title: product.title,
-                    price: activePrice,
-                    image: activeImage,
-                  })
-                }
+                
+                // Add the specific variant to cart
+                addItem({
+                  id: selectedVariant ? `${product.id}-${selectedVariant.id}` : product.id,
+                  title: selectedVariant 
+                    ? `${product.title} (${selectedVariant.name})` 
+                    : product.title,
+                  price: activePrice,
+                  image: activeImage,
+                  quantity: quantity,
+                })
               }}
               disabled={!isInStock}
               className={`w-full py-4 rounded-xl text-lg font-bold flex items-center justify-center gap-3 transition-all shadow-lg ${
@@ -377,7 +402,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
               }`}
             >
               <ShoppingCart size={24} />
-              {isInStock ? 'Add to Cart' : 'Out of Stock'}
+              {isInStock ? `Add ${quantity} to Cart` : 'Out of Stock'}
             </button>
 
             {/* Trust Badges */}
@@ -424,6 +449,16 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
           </div>
         </div>
       </div>
+
+      <style jsx global>{`
+        .scrollbar-hide::-webkit-scrollbar {
+          display: none;
+        }
+        .scrollbar-hide {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+      `}</style>
     </div>
   )
 }
