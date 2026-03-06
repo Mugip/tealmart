@@ -33,62 +33,45 @@ function applyMarkup(cost: number): number {
 }
 
 // ============================================
-// VALIDATION FUNCTIONS
+// VALIDATION FUNCTIONS (More Permissive)
 // ============================================
 
 /**
- * Check if a string looks like an SKU code
+ * Only reject OBVIOUS SKU patterns
+ * Be permissive - only filter clear SKU codes
  */
-function isSkuLikeVariant(str: string): boolean {
-  if (!str) return false
+function isObviousSkuCode(str: string): boolean {
+  if (!str || str.length < 10) return false
   
   const normalized = str.trim().toUpperCase()
   
-  // Pattern 1: CJYD196698201AZ - CJ prefix + letters + numbers + letters
-  if (/^CJ[A-Z]{2}\d{8,15}[A-Z]{1,3}$/.test(normalized)) return true
+  // Only reject very specific CJ SKU patterns
+  // Pattern: CJYD196698201AZ (CJ + 2 letters + 8-15 digits + 1-3 letters)
+  if (/^CJ[A-Z]{2}\d{9,15}[A-Z]{1,3}$/.test(normalized)) {
+    return true
+  }
   
-  // Pattern 2: Starts with 2-6 letters, 8-15 numbers, ends with 1-3 letters
-  if (/^[A-Z]{2,6}\d{8,15}[A-Z]{1,3}$/.test(normalized)) return true
-  
-  // Pattern 3: All caps alphanumeric, 10-20 chars, mixed letters and numbers
-  if (/^[A-Z0-9]{10,20}$/.test(normalized) && /\d/.test(normalized) && /[A-Z]/.test(normalized)) return true
-  
-  // Pattern 4: Contains "SKU" or "ITEM" or "CODE"
-  if (/SKU|ITEM|CODE/i.test(normalized)) return true
+  // Pattern: 4+ letters, 9+ consecutive digits, 2+ letters (very SKU-like)
+  if (/^[A-Z]{4,}\d{9,}[A-Z]{2,}$/.test(normalized)) {
+    return true
+  }
   
   return false
 }
 
 /**
- * Check if ALL variant names in a set look like SKUs
+ * Check if ALL variants are obvious SKU codes
  */
-function allVariantsAreSKUs(variants: any[]): boolean {
+function allVariantsAreSkus(variants: any[]): boolean {
   if (variants.length === 0) return false
   
-  return variants.every(v => {
-    const name = v.variantName || v.sku || v.vid || ""
-    return isSkuLikeVariant(name)
-  })
-}
-
-/**
- * Check if options have meaningful names
- */
-function hasValidVariantOptions(options: Record<string, string>): boolean {
-  if (Object.keys(options).length === 0) return false
+  // Need at least 80% to be SKUs to reject entire product
+  const skuCount = variants.filter(v => {
+    const name = v.variantName || ""
+    return isObviousSkuCode(name)
+  }).length
   
-  const validOptionNames = ['color', 'size', 'style', 'material', 'pattern', 'type', 'model', 'version']
-  
-  const hasValidKey = Object.keys(options).some(key => 
-    validOptionNames.includes(key.toLowerCase())
-  )
-  
-  // Also check if values are meaningful (not SKU-like)
-  const hasValidValue = Object.values(options).some(value => 
-    !isSkuLikeVariant(value) && value.length < 20
-  )
-  
-  return hasValidKey && hasValidValue
+  return skuCount / variants.length >= 0.8
 }
 
 // ============================================
@@ -101,27 +84,20 @@ function mapCJCategory(cjCategory: string): string {
   const cat = cjCategory.toLowerCase()
   
   const categoryMap: Record<string, string> = {
-    "phone": "phone", "mobile": "phone", "smartphone": "phone", "cell phone": "phone",
-    "computer": "computer", "laptop": "computer", "tablet": "computer", "pc": "computer",
-    "audio": "audio", "headphone": "audio", "earphone": "audio", "speaker": "audio",
-    "camera": "camera", "photography": "camera",
-    "gaming": "gaming", "game": "gaming", "console": "gaming",
-    "shoes": "shoes", "footwear": "shoes", "sneaker": "shoes", "boot": "shoes",
-    "bag": "bags", "backpack": "bags", "handbag": "bags", "luggage": "bags",
-    "watch": "watches", "timepiece": "watches",
-    "jewelry": "jewelry", "necklace": "jewelry", "bracelet": "jewelry", "ring": "jewelry",
-    "accessory": "accessories", "accessories": "accessories",
-    "men": "mens-fashion", "women": "womens-fashion", "ladies": "womens-fashion",
-    "home": "home-garden", "garden": "home-garden",
-    "furniture": "furniture", "kitchen": "kitchen", "cookware": "kitchen",
-    "bedding": "bedding", "decor": "decor", "decoration": "decor",
-    "beauty": "beauty", "cosmetic": "beauty", "makeup": "beauty",
-    "skincare": "skincare", "skin care": "skincare",
-    "health": "health", "fitness": "fitness", "exercise": "fitness",
-    "toy": "toys", "kids": "toys", "baby": "baby", "infant": "baby",
-    "sport": "sports", "athletic": "sports",
-    "pet": "pets", "dog": "pets", "cat": "pets",
-    "automotive": "automotive", "car": "automotive",
+    "phone": "phone", "mobile": "phone", "smartphone": "phone",
+    "computer": "computer", "laptop": "computer", "tablet": "computer",
+    "audio": "audio", "headphone": "audio", "speaker": "audio",
+    "camera": "camera", "gaming": "gaming",
+    "shoes": "shoes", "footwear": "shoes",
+    "bag": "bags", "backpack": "bags",
+    "watch": "watches", "jewelry": "jewelry",
+    "accessory": "accessories", "men": "mens-fashion",
+    "women": "womens-fashion", "home": "home-garden",
+    "furniture": "furniture", "kitchen": "kitchen",
+    "beauty": "beauty", "skincare": "skincare",
+    "health": "health", "fitness": "fitness",
+    "toy": "toys", "baby": "baby", "sport": "sports",
+    "pet": "pets", "automotive": "automotive",
   }
   
   for (const [key, value] of Object.entries(categoryMap)) {
@@ -241,16 +217,15 @@ function extractVariants(detail: any) {
     return { variants: null, totalStock: randomStock(), skipped: false }
   }
 
-  // FIRST: Check if ALL variants are SKU-like
-  if (allVariantsAreSKUs(raw)) {
-    console.log(`⚠️ All variants are SKU-like - skipping product`)
+  // Check if product should be skipped (80%+ obvious SKUs)
+  if (allVariantsAreSkus(raw)) {
+    console.log(`⚠️ Product has 80%+ SKU-like variants - skipping`)
     return { variants: null, totalStock: 0, skipped: true }
   }
 
   const variants: any[] = []
   const optionNames: Set<string> = new Set()
   let totalStock = 0
-  let skippedCount = 0
 
   for (const v of raw) {
     const sellPrice = parsePrice(v.variantSellPrice || v.sellPrice)
@@ -268,7 +243,7 @@ function extractVariants(detail: any) {
     if (v.variantKey) {
       v.variantKey.split(";").forEach((part: string) => {
         const [name, value] = part.split("-").map((s: string) => s.trim())
-        if (name && value && !isSkuLikeVariant(value)) {
+        if (name && value) {
           options[name] = value
           optionNames.add(name)
         }
@@ -277,35 +252,28 @@ function extractVariants(detail: any) {
     
     // Fallback to variantName
     if (Object.keys(options).length === 0 && v.variantName) {
-      // Skip if variantName is SKU-like
-      if (isSkuLikeVariant(v.variantName)) {
-        skippedCount++
-        continue
+      // Only skip if it's an OBVIOUS SKU code
+      if (isObviousSkuCode(v.variantName)) {
+        continue // Skip this specific variant
       }
 
       const parts = v.variantName.split("-").map((s: string) => s.trim())
-      if (parts.length === 2 && !isSkuLikeVariant(parts[0]) && !isSkuLikeVariant(parts[1])) {
+      if (parts.length === 2) {
         options["Color"] = parts[0]
         options["Size"] = parts[1]
         optionNames.add("Color")
         optionNames.add("Size")
-      } else if (parts.length === 1 && parts[0] && !isSkuLikeVariant(parts[0])) {
+      } else if (parts.length === 1 && parts[0]) {
         options["Option"] = parts[0]
         optionNames.add("Option")
-      } else {
-        skippedCount++
-        continue
       }
     }
 
-    // Validate options
-    if (!hasValidVariantOptions(options)) {
-      skippedCount++
-      continue
-    }
-
+    // Create label - use variant name or build from options
     const label = Object.keys(options).length > 0
       ? Object.entries(options).map(([k, v]) => `${k}: ${v}`).join(", ")
+      : (v.variantName && !isObviousSkuCode(v.variantName))
+      ? v.variantName
       : `Variant ${variants.length + 1}`
 
     variants.push({
@@ -320,9 +288,10 @@ function extractVariants(detail: any) {
     })
   }
 
-  // If we skipped all variants, reject the product
-  if (variants.length === 0 && skippedCount > 0) {
-    console.log(`⚠️ All ${skippedCount} variants were SKU-like - skipping product`)
+  // Accept product even if some variants were filtered
+  // Only reject if we have NO valid variants
+  if (variants.length === 0) {
+    console.log(`⚠️ No valid variants after filtering - skipping`)
     return { variants: null, totalStock: 0, skipped: true }
   }
 
@@ -364,16 +333,13 @@ async function saveProduct(product: any, keyword?: string) {
   const cjCategory = detail.categoryName || product.threeCategoryName || ""
   const category = mapCJCategory(cjCategory)
 
-  // Extract variants with SKU filtering
   const { variants, totalStock, skipped } = extractVariants(detail)
 
-  // Skip products with only SKU-like variants
   if (skipped) {
-    console.log(`❌ Skipped product ${pid} - SKU-like variants only`)
+    console.log(`❌ Skipped product ${pid}`)
     return null
   }
 
-  // Use lowest variant price if available
   if (variants?.items?.length) {
     const lowestPrice = Math.min(...variants.items.map((v: any) => v.price))
     if (lowestPrice > 0) price = lowestPrice
@@ -471,7 +437,7 @@ export async function POST(req: NextRequest) {
       },
     })
 
-    console.log(`✅ Completed: ${created} created, ${updated} updated, ${skipped} skipped, ${errors.length} errors`)
+    console.log(`✅ Completed: ${created} created, ${updated} updated, ${skipped} skipped`)
 
     return NextResponse.json({
       success: true,
