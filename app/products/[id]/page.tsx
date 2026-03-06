@@ -61,26 +61,25 @@ const COLOR_MAP: Record<string, string> = {
   'cyan': '#06B6D4',
   'lime': '#84CC16',
   'indigo': '#6366F1',
-  'chocolate':'#7B3F00',
-  'coffee':'#6F4E37',
-  'camel':'#C19A6B',
-  'navy':'#1E3A8A',
-  'skyblue':'#38BDF8',
-  'royalblue':'#4169E1',
-  'olive':'#556B2F',
-  'armygreen':'#4B5320',
-  'mint':'#98FF98',
-  'wine':'#722F37',
-  'winered':'#8B0000',
-  'ivory':'#FFFFF0',
-  'cream':'#FFFDD0',
-  'khaki':'#C3B091',
-  'rosegold':'#B76E79',
-  'bronze':'#CD7F32',
-  'lavender':'#E6E6FA',
-  'violet':'#8F00FF',
-  'turquoise':'#40E0D0',
-  'aqua':'#00FFFF'
+  'chocolate': '#7B3F00',
+  'coffee': '#6F4E37',
+  'camel': '#C19A6B',
+  'skyblue': '#38BDF8',
+  'royalblue': '#4169E1',
+  'olive': '#556B2F',
+  'armygreen': '#4B5320',
+  'mint': '#98FF98',
+  'wine': '#722F37',
+  'winered': '#8B0000',
+  'ivory': '#FFFFF0',
+  'cream': '#FFFDD0',
+  'khaki': '#C3B091',
+  'rosegold': '#B76E79',
+  'bronze': '#CD7F32',
+  'lavender': '#E6E6FA',
+  'violet': '#8F00FF',
+  'turquoise': '#40E0D0',
+  'aqua': '#00FFFF'
 }
 
 function getColorHex(colorName: string): string | null {
@@ -376,6 +375,8 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                     </span>
                   </div>
                 )}
+              </div>
+            )}
 
             {/* Quantity Selector */}
             {isInStock && (
@@ -458,7 +459,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
             {/* Tags */}
             {product.tags && product.tags.length > 0 && (
               <div className="flex flex-wrap gap-2">
-                {product.tags.map(tag => (
+                {product.tags.filter(tag => !tag.includes('cj')).map(tag => (
                   <span
                     key={tag}
                     className="px-3 py-1 bg-gray-100 text-gray-700 text-sm rounded-full font-medium"
