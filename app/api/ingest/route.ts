@@ -1,4 +1,4 @@
-// Fixed app/api/ingest/route.ts
+// app/api/ingest/route.ts
 import { NextRequest, NextResponse } from "next/server"
 import { PrismaClient, Prisma } from "@prisma/client"
 import { getCJToken } from "@/lib/cjToken"
@@ -96,6 +96,7 @@ function extractVariants(detail: any) {
 
   const variants: any[] = []
   let totalStock = 0
+  const variantNames: Set<string> = new Set()
 
   for (const v of raw) {
     const sellPrice = parsePrice(v.variantSellPrice || v.sellPrice || 0)
@@ -106,17 +107,43 @@ function extractVariants(detail: any) {
     const stock = Number(v.variantStock || 0)
     totalStock += stock
 
+    // Parse variant options from variantKey or variantName
     const options: Record<string, string> = {}
+    
+    // Try variantKey first (format: "Color-Red;Size-M")
     if (v.variantKey) {
       v.variantKey.split(";").forEach((part: string) => {
-        const [name, value] = part.split("-")
-        if (name && value) options[name] = value
+        const [name, value] = part.split("-").map((s: string) => s.trim())
+        if (name && value) {
+          options[name] = value
+          variantNames.add(name)
+        }
       })
     }
+    
+    // Try variantName as fallback (format: "Red-M" or just "Red")
+    if (Object.keys(options).length === 0 && v.variantName) {
+      const parts = v.variantName.split("-").map((s: string) => s.trim())
+      if (parts.length === 2) {
+        options["Color"] = parts[0]
+        options["Size"] = parts[1]
+        variantNames.add("Color")
+        variantNames.add("Size")
+      } else if (parts.length === 1 && parts[0]) {
+        options["Option"] = parts[0]
+        variantNames.add("Option")
+      }
+    }
+
+    // If still no options, use SKU as label
+    const label = Object.keys(options).length > 0 
+      ? Object.entries(options).map(([k, v]) => `${k}: ${v}`).join(", ")
+      : v.variantSku || `Variant ${variants.length + 1}`
 
     variants.push({
       id: v.vid,
       sku: v.variantSku || v.vid,
+      name: label,
       price,
       costPrice,
       stock,
@@ -125,7 +152,13 @@ function extractVariants(detail: any) {
     })
   }
 
-  return { variants: variants.length > 0 ? variants : null, totalStock }
+  return { 
+    variants: variants.length > 0 ? {
+      options: Array.from(variantNames),
+      items: variants
+    } : null, 
+    totalStock 
+  }
 }
 
 async function saveProduct(product: any, keyword?: string) {
@@ -152,8 +185,8 @@ async function saveProduct(product: any, keyword?: string) {
 
   const { variants, totalStock } = extractVariants(detail)
   
-  if (variants && variants.length > 0) {
-    const lowestPrice = Math.min(...variants.map(v => v.price))
+  if (variants && variants.items && variants.items.length > 0) {
+    const lowestPrice = Math.min(...variants.items.map((v: any) => v.price))
     if (lowestPrice > 0) price = lowestPrice
   }
 
@@ -174,7 +207,7 @@ async function saveProduct(product: any, keyword?: string) {
     source: "cj-dropshipping",
     isActive: true,
     stock,
-    variants: variants || Prisma.JsonNull // FIX: Use Prisma.JsonNull instead of null
+    variants: variants || Prisma.JsonNull
   }
 
   return await prisma.product.upsert({
