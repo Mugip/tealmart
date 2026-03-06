@@ -2,6 +2,7 @@
 import { prisma } from '@/lib/db'
 import ProductCard from '@/components/products/ProductCard'
 import ProductFilters from '@/components/products/ProductFilters'
+import SortDropdown from '@/components/products/SortDropdown'
 import { Search, SlidersHorizontal } from 'lucide-react'
 
 type SearchParams = {
@@ -188,24 +189,10 @@ export default async function ProductsPage({
                 </p>
               </div>
               
-              <form action="/products" method="get" className="flex items-center gap-2">
+              <div className="flex items-center gap-2">
                 <label className="text-sm font-medium text-gray-700">Sort by:</label>
-                <select
-                  name="sort"
-                  defaultValue={sort || 'newest'}
-                  onChange={(e) => e.currentTarget.form?.submit()}
-                  className="px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-tiffany-500 focus:ring-2 focus:ring-tiffany-100 outline-none transition-all font-medium"
-                >
-                  <option value="newest">Newest</option>
-                  <option value="price-asc">Price: Low to High</option>
-                  <option value="price-desc">Price: High to Low</option>
-                  <option value="rating">Top Rated</option>
-                  <option value="popular">Most Popular</option>
-                </select>
-                {category && <input type="hidden" name="category" value={category} />}
-                {search && <input type="hidden" name="search" value={search} />}
-                {featured && <input type="hidden" name="featured" value={featured} />}
-              </form>
+                <SortDropdown currentSort={sort} />
+              </div>
             </div>
 
             {/* Products Grid */}
@@ -231,16 +218,13 @@ export default async function ProductsPage({
               </div>
             )}
 
-            {/* Load More / Pagination Placeholder */}
+            {/* Load More Placeholder */}
             {products.length >= 100 && (
               <div className="mt-12 text-center">
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-200 px-8 py-6 inline-block">
                   <p className="text-gray-600 mb-4">
                     Showing first 100 products. Refine your search for more specific results.
                   </p>
-                  <button className="px-6 py-3 bg-gray-100 text-gray-700 font-bold rounded-xl hover:bg-gray-200 transition-all">
-                    Refine Search
-                  </button>
                 </div>
               </div>
             )}
