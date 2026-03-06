@@ -16,7 +16,7 @@ const CATEGORY_MAP: Record<string, string> = {
   shoes: "shoes",
   bag: "bags",
   watch: "watches",
-  jewelry: "jewelry",
+  jewellery: "jewellery",
   electronics: "electronics",
   computer: "computer",
   audio: "audio",
