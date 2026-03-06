@@ -61,6 +61,26 @@ const COLOR_MAP: Record<string, string> = {
   'cyan': '#06B6D4',
   'lime': '#84CC16',
   'indigo': '#6366F1',
+  'chocolate':'#7B3F00',
+  'coffee':'#6F4E37',
+  'camel':'#C19A6B',
+  'navy':'#1E3A8A',
+  'skyblue':'#38BDF8',
+  'royalblue':'#4169E1',
+  'olive':'#556B2F',
+  'armygreen':'#4B5320',
+  'mint':'#98FF98',
+  'wine':'#722F37',
+  'winered':'#8B0000',
+  'ivory':'#FFFFF0',
+  'cream':'#FFFDD0',
+  'khaki':'#C3B091',
+  'rosegold':'#B76E79',
+  'bronze':'#CD7F32',
+  'lavender':'#E6E6FA',
+  'violet':'#8F00FF',
+  'turquoise':'#40E0D0',
+  'aqua':'#00FFFF'
 }
 
 function getColorHex(colorName: string): string | null {
@@ -68,7 +88,7 @@ function getColorHex(colorName: string): string | null {
   return COLOR_MAP[normalized] || null
 }
 
-export default function ProductDetailPage({ params }: { params: { id: string } }) {
+ex'port default function ProductDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter()
   const { addItem } = useCart()
 
@@ -349,21 +369,13 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                 </div>
 
                 {selectedVariant && (
-                  <div className="mt-4 pt-4 border-t border-gray-200 grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <span className="text-gray-600">SKU:</span>
-                      <span className="ml-2 font-mono text-gray-900">{selectedVariant.sku}</span>
-                    </div>
-                    <div>
-                      <span className="text-gray-600">Stock:</span>
-                      <span className={`ml-2 font-bold ${isInStock ? 'text-green-600' : 'text-red-600'}`}>
-                        {isInStock ? `${activeStock} available` : 'Out of stock'}
-                      </span>
-                    </div>
+                  <div className="mt-4 pt-4 border-t border-gray-200 text-sm">
+                    <span className="text-gray-600">Stock:</span>
+                    <span className={`ml-2 font-bold ${isInStock ? 'text-green-600' : 'text-red-600'}`}>
+                      {isInStock ? `${activeStock} available` : 'Out of stock'}
+                    </span>
                   </div>
                 )}
-              </div>
-            )}
 
             {/* Quantity Selector */}
             {isInStock && (
