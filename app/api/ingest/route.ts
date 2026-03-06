@@ -17,11 +17,11 @@ function sleep(ms: number) {
 }
 
 function randomDiscount() {
-  return Math.floor(Math.random() * 25) + 10 // 10-35% discount
+  return Math.floor(Math.random() * 25) + 10
 }
 
 function randomStock() {
-  return Math.floor(Math.random() * 500) + 200 // 200-700 stock
+  return Math.floor(Math.random() * 500) + 200
 }
 
 function applyMarkup(cost: number): number {
@@ -37,41 +37,62 @@ function applyMarkup(cost: number): number {
 // ============================================
 
 /**
- * Check if a variant name looks like an SKU code
- * Returns true if it matches patterns like: CJYD196698201AZ, AB123456789CD, etc.
+ * Check if a string looks like an SKU code
  */
-function isSkuLikeVariant(variantName: string): boolean {
-  if (!variantName) return false
+function isSkuLikeVariant(str: string): boolean {
+  if (!str) return false
   
-  const normalized = variantName.trim()
+  const normalized = str.trim().toUpperCase()
   
-  // Pattern 1: Starts with letters, contains numbers, ends with letters (e.g., CJYD196698201AZ)
-  const pattern1 = /^[A-Z]{2,6}\d{8,15}[A-Z]{1,3}$/i
+  // Pattern 1: CJYD196698201AZ - CJ prefix + letters + numbers + letters
+  if (/^CJ[A-Z]{2}\d{8,15}[A-Z]{1,3}$/.test(normalized)) return true
   
-  // Pattern 2: All caps with numbers, no spaces (e.g., ABC123456DEF)
-  const pattern2 = /^[A-Z0-9]{10,20}$/
+  // Pattern 2: Starts with 2-6 letters, 8-15 numbers, ends with 1-3 letters
+  if (/^[A-Z]{2,6}\d{8,15}[A-Z]{1,3}$/.test(normalized)) return true
   
-  // Pattern 3: Contains "CJ" prefix (CJ Dropshipping SKU format)
-  const pattern3 = /^CJ[A-Z]{2}\d+[A-Z]+$/i
+  // Pattern 3: All caps alphanumeric, 10-20 chars, mixed letters and numbers
+  if (/^[A-Z0-9]{10,20}$/.test(normalized) && /\d/.test(normalized) && /[A-Z]/.test(normalized)) return true
   
-  return pattern1.test(normalized) || pattern2.test(normalized) || pattern3.test(normalized)
+  // Pattern 4: Contains "SKU" or "ITEM" or "CODE"
+  if (/SKU|ITEM|CODE/i.test(normalized)) return true
+  
+  return false
 }
 
 /**
- * Check if variant has meaningful option names (Color, Size, etc.)
+ * Check if ALL variant names in a set look like SKUs
+ */
+function allVariantsAreSKUs(variants: any[]): boolean {
+  if (variants.length === 0) return false
+  
+  return variants.every(v => {
+    const name = v.variantName || v.sku || v.vid || ""
+    return isSkuLikeVariant(name)
+  })
+}
+
+/**
+ * Check if options have meaningful names
  */
 function hasValidVariantOptions(options: Record<string, string>): boolean {
   if (Object.keys(options).length === 0) return false
   
-  const validOptionNames = ['color', 'size', 'style', 'material', 'pattern', 'type', 'model']
+  const validOptionNames = ['color', 'size', 'style', 'material', 'pattern', 'type', 'model', 'version']
   
-  return Object.keys(options).some(key => 
+  const hasValidKey = Object.keys(options).some(key => 
     validOptionNames.includes(key.toLowerCase())
   )
+  
+  // Also check if values are meaningful (not SKU-like)
+  const hasValidValue = Object.values(options).some(value => 
+    !isSkuLikeVariant(value) && value.length < 20
+  )
+  
+  return hasValidKey && hasValidValue
 }
 
 // ============================================
-// CATEGORY MAPPING FROM CJ CATEGORIES
+// CATEGORY MAPPING
 // ============================================
 
 function mapCJCategory(cjCategory: string): string {
@@ -79,90 +100,34 @@ function mapCJCategory(cjCategory: string): string {
   
   const cat = cjCategory.toLowerCase()
   
-  // Direct mappings
   const categoryMap: Record<string, string> = {
-    // Electronics
-    "phone": "phone",
-    "mobile": "phone",
-    "smartphone": "phone",
-    "cell phone": "phone",
-    "computer": "computer",
-    "laptop": "computer",
-    "tablet": "computer",
-    "pc": "computer",
-    "audio": "audio",
-    "headphone": "audio",
-    "earphone": "audio",
-    "speaker": "audio",
-    "camera": "camera",
-    "photography": "camera",
-    "gaming": "gaming",
-    "game": "gaming",
-    "console": "gaming",
-    
-    // Fashion
-    "shoes": "shoes",
-    "footwear": "shoes",
-    "sneaker": "shoes",
-    "boot": "shoes",
-    "bag": "bags",
-    "backpack": "bags",
-    "handbag": "bags",
-    "luggage": "bags",
-    "watch": "watches",
-    "timepiece": "watches",
-    "jewelry": "jewelry",
-    "necklace": "jewelry",
-    "bracelet": "jewelry",
-    "ring": "jewelry",
-    "accessory": "accessories",
-    "accessories": "accessories",
-    "men": "mens-fashion",
-    "women": "womens-fashion",
-    "ladies": "womens-fashion",
-    
-    // Home
-    "home": "home-garden",
-    "garden": "home-garden",
-    "furniture": "furniture",
-    "kitchen": "kitchen",
-    "cookware": "kitchen",
-    "bedding": "bedding",
-    "decor": "decor",
-    "decoration": "decor",
-    
-    // Health & Beauty
-    "beauty": "beauty",
-    "cosmetic": "beauty",
-    "makeup": "beauty",
-    "skincare": "skincare",
-    "skin care": "skincare",
-    "health": "health",
-    "fitness": "fitness",
-    "exercise": "fitness",
-    
-    // Other
-    "toy": "toys",
-    "kids": "toys",
-    "baby": "baby",
-    "infant": "baby",
-    "sport": "sports",
-    "athletic": "sports",
-    "pet": "pets",
-    "dog": "pets",
-    "cat": "pets",
-    "automotive": "automotive",
-    "car": "automotive",
+    "phone": "phone", "mobile": "phone", "smartphone": "phone", "cell phone": "phone",
+    "computer": "computer", "laptop": "computer", "tablet": "computer", "pc": "computer",
+    "audio": "audio", "headphone": "audio", "earphone": "audio", "speaker": "audio",
+    "camera": "camera", "photography": "camera",
+    "gaming": "gaming", "game": "gaming", "console": "gaming",
+    "shoes": "shoes", "footwear": "shoes", "sneaker": "shoes", "boot": "shoes",
+    "bag": "bags", "backpack": "bags", "handbag": "bags", "luggage": "bags",
+    "watch": "watches", "timepiece": "watches",
+    "jewelry": "jewelry", "necklace": "jewelry", "bracelet": "jewelry", "ring": "jewelry",
+    "accessory": "accessories", "accessories": "accessories",
+    "men": "mens-fashion", "women": "womens-fashion", "ladies": "womens-fashion",
+    "home": "home-garden", "garden": "home-garden",
+    "furniture": "furniture", "kitchen": "kitchen", "cookware": "kitchen",
+    "bedding": "bedding", "decor": "decor", "decoration": "decor",
+    "beauty": "beauty", "cosmetic": "beauty", "makeup": "beauty",
+    "skincare": "skincare", "skin care": "skincare",
+    "health": "health", "fitness": "fitness", "exercise": "fitness",
+    "toy": "toys", "kids": "toys", "baby": "baby", "infant": "baby",
+    "sport": "sports", "athletic": "sports",
+    "pet": "pets", "dog": "pets", "cat": "pets",
+    "automotive": "automotive", "car": "automotive",
   }
   
-  // Check for exact matches first
   for (const [key, value] of Object.entries(categoryMap)) {
-    if (cat.includes(key)) {
-      return value
-    }
+    if (cat.includes(key)) return value
   }
   
-  // If no match, use the first part of CJ category
   const firstPart = cjCategory.split('>')[0].trim().toLowerCase()
   return firstPart.replace(/[^a-z0-9]+/g, '-').substring(0, 30) || "general"
 }
@@ -182,7 +147,6 @@ async function cjFetch(url: string, retries = 3): Promise<any> {
 
       const data = await res.json()
 
-      // Rate limit - retry after delay
       if (data.code === 1600200) {
         console.log("⚠️ Rate limited, waiting 2s...")
         await sleep(2000)
@@ -277,10 +241,16 @@ function extractVariants(detail: any) {
     return { variants: null, totalStock: randomStock(), skipped: false }
   }
 
+  // FIRST: Check if ALL variants are SKU-like
+  if (allVariantsAreSKUs(raw)) {
+    console.log(`⚠️ All variants are SKU-like - skipping product`)
+    return { variants: null, totalStock: 0, skipped: true }
+  }
+
   const variants: any[] = []
   const optionNames: Set<string> = new Set()
   let totalStock = 0
-  let hasSkuLikeVariants = false
+  let skippedCount = 0
 
   for (const v of raw) {
     const sellPrice = parsePrice(v.variantSellPrice || v.sellPrice)
@@ -298,7 +268,7 @@ function extractVariants(detail: any) {
     if (v.variantKey) {
       v.variantKey.split(";").forEach((part: string) => {
         const [name, value] = part.split("-").map((s: string) => s.trim())
-        if (name && value) {
+        if (name && value && !isSkuLikeVariant(value)) {
           options[name] = value
           optionNames.add(name)
         }
@@ -307,43 +277,36 @@ function extractVariants(detail: any) {
     
     // Fallback to variantName
     if (Object.keys(options).length === 0 && v.variantName) {
+      // Skip if variantName is SKU-like
+      if (isSkuLikeVariant(v.variantName)) {
+        skippedCount++
+        continue
+      }
+
       const parts = v.variantName.split("-").map((s: string) => s.trim())
-      if (parts.length === 2) {
+      if (parts.length === 2 && !isSkuLikeVariant(parts[0]) && !isSkuLikeVariant(parts[1])) {
         options["Color"] = parts[0]
         options["Size"] = parts[1]
         optionNames.add("Color")
         optionNames.add("Size")
-      } else if (parts.length === 1 && parts[0]) {
-        // Check if this looks like an SKU
-        if (isSkuLikeVariant(parts[0])) {
-          hasSkuLikeVariants = true
-          continue // Skip this variant
-        }
+      } else if (parts.length === 1 && parts[0] && !isSkuLikeVariant(parts[0])) {
         options["Option"] = parts[0]
         optionNames.add("Option")
+      } else {
+        skippedCount++
+        continue
       }
     }
 
-    // Check if variant name itself is SKU-like (even with options)
-    const variantName = v.variantName || Object.values(options).join("-")
-    if (isSkuLikeVariant(variantName)) {
-      hasSkuLikeVariants = true
-      continue // Skip this variant
-    }
-
-    // Check if options are valid (not just generic labels)
-    if (!hasValidVariantOptions(options) && Object.keys(options).length > 0) {
-      // If options exist but aren't meaningful, check values
-      const allValuesSkuLike = Object.values(options).every(val => isSkuLikeVariant(val))
-      if (allValuesSkuLike) {
-        hasSkuLikeVariants = true
-        continue // Skip this variant
-      }
+    // Validate options
+    if (!hasValidVariantOptions(options)) {
+      skippedCount++
+      continue
     }
 
     const label = Object.keys(options).length > 0
       ? Object.entries(options).map(([k, v]) => `${k}: ${v}`).join(", ")
-      : v.variantSku || `Variant ${variants.length + 1}`
+      : `Variant ${variants.length + 1}`
 
     variants.push({
       id: v.vid,
@@ -357,9 +320,9 @@ function extractVariants(detail: any) {
     })
   }
 
-  // If ALL variants look like SKUs, skip the entire product
-  if (hasSkuLikeVariants && variants.length === 0) {
-    console.log(`⚠️ Skipping product - all variants are SKU-like`)
+  // If we skipped all variants, reject the product
+  if (variants.length === 0 && skippedCount > 0) {
+    console.log(`⚠️ All ${skippedCount} variants were SKU-like - skipping product`)
     return { variants: null, totalStock: 0, skipped: true }
   }
 
@@ -392,18 +355,16 @@ async function saveProduct(product: any, keyword?: string) {
   const costPrice = sellPrice * 0.7
   let price = applyMarkup(costPrice)
 
-  // Random discount
   const discount = randomDiscount()
   const compareAtPrice = +(price / (1 - discount / 100)).toFixed(2)
 
   const images = extractImages(product, detail)
   if (images.length === 0) return null
 
-  // Auto category from CJ
   const cjCategory = detail.categoryName || product.threeCategoryName || ""
   const category = mapCJCategory(cjCategory)
 
-  // Extract variants (with SKU filtering)
+  // Extract variants with SKU filtering
   const { variants, totalStock, skipped } = extractVariants(detail)
 
   // Skip products with only SKU-like variants
@@ -418,8 +379,7 @@ async function saveProduct(product: any, keyword?: string) {
     if (lowestPrice > 0) price = lowestPrice
   }
 
-  // Tags - include source
-  const tags = ["tealmart", "verified", "cj-source"]
+  const tags = ["tealmart", "verified"]
   if (category !== "general") tags.push(category)
   if (keyword) tags.push(keyword.toLowerCase())
 
@@ -501,7 +461,6 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Log ingestion
     await prisma.ingestionLog.create({
       data: {
         source: keyword ? `cj-${keyword}` : "cj-general",
