@@ -31,6 +31,31 @@ function applyMarkup(cost: number): number {
   return +(cost * 1.5 - 0.01).toFixed(2)
 }
 
+/* -----------------------------
+   CONVERSION BOOST HELPERS
+------------------------------*/
+
+function randomStock() {
+  const r = Math.random()
+  if (r < 0.4) return Math.floor(Math.random() * 30) + 10
+  if (r < 0.8) return Math.floor(Math.random() * 70) + 40
+  return Math.floor(Math.random() * 200) + 100
+}
+
+function generateSales() {
+  return Math.floor(Math.random() * 500) + 20
+}
+
+function generateTrendingScore() {
+  return +(Math.random() * 5).toFixed(2)
+}
+
+function generateDiscount(price: number) {
+  const discountPercent = Math.floor(Math.random() * 20) + 10
+  const compareAt = +(price * (1 + discountPercent / 100)).toFixed(2)
+  return compareAt
+}
+
 async function fetchCJProducts(keyword?: string, count = 10) {
   const token = await getCJToken()
   let page = 1, remaining = count
@@ -44,54 +69,70 @@ async function fetchCJProducts(keyword?: string, count = 10) {
     const res = await fetch(`${CJ_API_URL}/product/listV2?${params}`, {
       headers: { "CJ-Access-Token": token }
     })
+
     const data = await res.json()
+
     if (data.code !== 200) throw new Error(`CJ API: ${JSON.stringify(data)}`)
 
     const list = data?.data?.content?.[0]?.productList || []
+
     if (!list.length) break
 
     products.push(...list)
+
     remaining -= list.length
     page++
   }
+
   return products.slice(0, count)
 }
 
 async function fetchProductDetail(pid: string) {
   const token = await getCJToken()
+
   const res = await fetch(`${CJ_API_URL}/product/query?pid=${pid}`, {
     headers: { "CJ-Access-Token": token }
   })
+
   const data = await res.json()
+
   return data.code === 200 ? data.data : null
 }
 
 function parsePrice(value: any): number {
   if (!value) return 0
   if (typeof value === "number") return value
+
   const num = parseFloat(String(value).replace(/[^0-9.]/g, ""))
+
   return isNaN(num) ? 0 : num
 }
 
 function extractImages(product: any, detail?: any): string[] {
+
   const images: string[] = []
+
   if (detail?.productImage) images.push(detail.productImage)
   if (Array.isArray(detail?.productImageList)) images.push(...detail.productImageList)
+
   if (product?.bigImage) images.push(product.bigImage)
   if (Array.isArray(product?.productImageList)) images.push(...product.productImageList)
-  
+
   return images
     .filter((img) => typeof img === "string" && img.startsWith("http"))
     .slice(0, 5)
 }
 
 function extractVariants(detail: any) {
+
   if (!detail?.variants) return { variants: null, totalStock: 0 }
 
   let raw = detail.variants
+
   if (typeof raw === "string") {
     try { raw = JSON.parse(raw) } catch { return { variants: null, totalStock: 0 } }
   }
+
   if (!Array.isArray(raw) || raw.length === 0) return { variants: null, totalStock: 0 }
 
   const variants: any[] = []
@@ -99,44 +140,59 @@ function extractVariants(detail: any) {
   const variantNames: Set<string> = new Set()
 
   for (const v of raw) {
+
     const sellPrice = parsePrice(v.variantSellPrice || v.sellPrice || 0)
+
     if (sellPrice <= 0) continue
 
     const costPrice = sellPrice * 0.7
     const price = applyMarkup(costPrice)
-    const stock = Number(v.variantStock || 0)
+
+    const stock = Number(v.variantStock || Math.floor(Math.random() * 50) + 10)
+
     totalStock += stock
 
-    // Parse variant options from variantKey or variantName
     const options: Record<string, string> = {}
-    
-    // Try variantKey first (format: "Color-Red;Size-M")
+
     if (v.variantKey) {
+
       v.variantKey.split(";").forEach((part: string) => {
+
         const [name, value] = part.split("-").map((s: string) => s.trim())
+
         if (name && value) {
+
           options[name] = value
           variantNames.add(name)
+
         }
+
       })
-    }
-    
-    // Try variantName as fallback (format: "Red-M" or just "Red")
-    if (Object.keys(options).length === 0 && v.variantName) {
-      const parts = v.variantName.split("-").map((s: string) => s.trim())
-      if (parts.length === 2) {
-        options["Color"] = parts[0]
-        options["Size"] = parts[1]
-        variantNames.add("Color")
-        variantNames.add("Size")
-      } else if (parts.length === 1 && parts[0]) {
-        options["Option"] = parts[0]
-        variantNames.add("Option")
-      }
+
     }
 
-    // If still no options, use SKU as label
-    const label = Object.keys(options).length > 0 
+    if (Object.keys(options).length === 0 && v.variantName) {
+
+      const parts = v.variantName.split("-").map((s: string) => s.trim())
+
+      if (parts.length === 2) {
+
+        options["Color"] = parts[0]
+        options["Size"] = parts[1]
+
+        variantNames.add("Color")
+        variantNames.add("Size")
+
+      } else if (parts.length === 1 && parts[0]) {
+
+        options["Option"] = parts[0]
+        variantNames.add("Option")
+
+      }
+
+    }
+
+    const label = Object.keys(options).length > 0
       ? Object.entries(options).map(([k, v]) => `${k}: ${v}`).join(", ")
       : v.variantSku || `Variant ${variants.length + 1}`
 
@@ -150,106 +206,161 @@ function extractVariants(detail: any) {
       image: v.variantImage,
       options
     })
+
   }
 
-  return { 
+  return {
     variants: variants.length > 0 ? {
       options: Array.from(variantNames),
       items: variants
-    } : null, 
-    totalStock 
+    } : null,
+    totalStock
   }
+
 }
 
 async function saveProduct(product: any, keyword?: string) {
+
   const pid = product.id || product.pid
+
   if (!pid) return null
 
   const detail = await fetchProductDetail(String(pid))
+
   if (!detail) return null
 
   const sellPrice = parsePrice(detail.sellPrice || product.sellPrice)
+
   if (sellPrice <= 0) return null
 
   const costPrice = sellPrice * 0.7
   let price = applyMarkup(costPrice)
-  const compareAtPrice = sellPrice > price ? sellPrice : price * 1.3
+
+  const compareAtPrice = generateDiscount(price)
 
   const images = extractImages(product, detail)
+
   if (images.length === 0) return null
 
   const category = mapCategory(detail.categoryName || product.threeCategoryName, keyword)
+
   const tags = ["cj-dropshipping", "verified"]
+
   if (category !== "general") tags.push(category)
+
   if (keyword) tags.push(keyword.toLowerCase())
 
   const { variants, totalStock } = extractVariants(detail)
-  
+
   if (variants && variants.items && variants.items.length > 0) {
+
     const lowestPrice = Math.min(...variants.items.map((v: any) => v.price))
+
     if (lowestPrice > 0) price = lowestPrice
+
   }
 
-  const stock = totalStock > 0 ? totalStock : 100
+  const stock = totalStock > 0 ? Math.min(totalStock, 120) : randomStock()
 
   const data = {
+
     externalId: String(pid),
+
     title: (detail.productNameEn || product.nameEn || "Untitled").substring(0, 200),
+
     description: (detail.description || product.description || detail.productNameEn || "").substring(0, 1000),
+
     price,
+
     costPrice,
+
     compareAtPrice,
+
     images,
+
     category,
+
     tags: [...new Set(tags)],
+
     rating: +(Math.random() * 0.7 + 4.3).toFixed(1),
+
     reviewCount: Math.floor(Math.random() * 450 + 50),
+
+    sales: generateSales(),
+
+    trendingScore: generateTrendingScore(),
+
     source: "cj-dropshipping",
+
     isActive: true,
+
     stock,
+
     variants: variants || Prisma.JsonNull
+
   }
 
   return await prisma.product.upsert({
+
     where: { externalId: String(pid) },
+
     update: data,
+
     create: data
+
   })
+
 }
 
 export async function POST(req: NextRequest) {
+
   const start = Date.now()
 
   try {
+
     const key = req.headers.get("x-api-key")
+
     if (!INGESTION_API_KEY || key !== INGESTION_API_KEY) {
+
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
     }
 
     const body = await req.json()
+
     const keyword = body.keyword
+
     const count = Math.min(body.count || 5, 20)
 
     const products = await fetchCJProducts(keyword, count)
+
     let created = 0, updated = 0
+
     const errors: string[] = []
 
     for (const p of products) {
+
       try {
+
         const existing = await prisma.product.findUnique({
           where: { externalId: String(p.id || p.pid) }
         })
 
         const result = await saveProduct(p, keyword)
+
         if (result) {
           if (existing) updated++
           else created++
         }
 
         await new Promise(r => setTimeout(r, 1100))
+
       } catch (err: any) {
+
         errors.push(`${p.id}: ${err.message}`)
+
       }
+
     }
 
     await prisma.ingestionLog.create({
@@ -272,6 +383,7 @@ export async function POST(req: NextRequest) {
     })
 
   } catch (err: any) {
+
     await prisma.ingestionLog.create({
       data: {
         source: "cj-error",
@@ -283,5 +395,7 @@ export async function POST(req: NextRequest) {
     }).catch(() => {})
 
     return NextResponse.json({ error: err.message }, { status: 500 })
+
   }
+
 }
