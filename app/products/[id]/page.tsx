@@ -88,7 +88,7 @@ function getColorHex(colorName: string): string | null {
   return COLOR_MAP[normalized] || null
 }
 
-ex'port default function ProductDetailPage({ params }: { params: { id: string } }) {
+export default function ProductDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter()
   const { addItem } = useCart()
 
