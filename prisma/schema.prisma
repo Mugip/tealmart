@@ -9,6 +9,10 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
+// ============================================
+// USER MANAGEMENT
+// ============================================
+
 model User {
   id        String   @id @default(cuid())
   email     String   @unique
@@ -18,7 +22,13 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   orders    Order[]
+
+  @@index([email])
 }
+
+// ============================================
+// PRODUCT CATALOG
+// ============================================
 
 model Product {
   id             String      @id @default(cuid())
@@ -47,7 +57,13 @@ model Product {
   @@index([category])
   @@index([isActive, isFeatured])
   @@index([createdAt])
+  @@index([externalId])
+  @@index([source])
 }
+
+// ============================================
+// ORDER MANAGEMENT
+// ============================================
 
 model Order {
   id              String      @id @default(cuid())
@@ -76,6 +92,8 @@ model Order {
   @@index([orderNumber])
   @@index([email])
   @@index([status])
+  @@index([createdAt])
+  @@index([userId])
 }
 
 model OrderItem {
@@ -91,6 +109,10 @@ model OrderItem {
   @@index([productId])
 }
 
+// ============================================
+// PRICING & RULES
+// ============================================
+
 model PricingRule {
   id        String   @id @default(cuid())
   category  String   @unique
@@ -99,7 +121,14 @@ model PricingRule {
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([category])
+  @@index([isActive])
 }
+
+// ============================================
+// INGESTION & LOGGING
+// ============================================
 
 model IngestionLog {
   id              String   @id @default(cuid())
@@ -111,7 +140,13 @@ model IngestionLog {
   createdAt       DateTime @default(now())
 
   @@index([createdAt])
+  @@index([source])
+  @@index([status])
 }
+
+// ============================================
+// CJ DROPSHIPPING TOKEN CACHE
+// ============================================
 
 model CJTokenCache {
   key       String   @id
@@ -121,6 +156,10 @@ model CJTokenCache {
 
   @@index([expiresAt])
 }
+
+// ============================================
+// ENUMS
+// ============================================
 
 enum OrderStatus {
   PENDING
