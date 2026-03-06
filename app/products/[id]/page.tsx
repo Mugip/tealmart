@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from 'react'
 import Image from 'next/image'
-import { Star, ShoppingCart, Truck, Shield, ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Star, ShoppingCart, Truck, Shield, ArrowLeft } from 'lucide-react'
 import { useCart } from '@/lib/contexts/CartContext'
 import { useRouter } from 'next/navigation'
 
@@ -38,6 +38,36 @@ interface Product {
   variants?: VariantData
 }
 
+// Color mapping for common color names
+const COLOR_MAP: Record<string, string> = {
+  'red': '#EF4444',
+  'blue': '#3B82F6',
+  'green': '#10B981',
+  'yellow': '#F59E0B',
+  'orange': '#F97316',
+  'purple': '#A855F7',
+  'pink': '#EC4899',
+  'black': '#000000',
+  'white': '#FFFFFF',
+  'gray': '#6B7280',
+  'grey': '#6B7280',
+  'brown': '#92400E',
+  'navy': '#1E3A8A',
+  'gold': '#D97706',
+  'silver': '#9CA3AF',
+  'beige': '#D4B896',
+  'maroon': '#7C2D12',
+  'teal': '#14B8A6',
+  'cyan': '#06B6D4',
+  'lime': '#84CC16',
+  'indigo': '#6366F1',
+}
+
+function getColorHex(colorName: string): string | null {
+  const normalized = colorName.toLowerCase().trim()
+  return COLOR_MAP[normalized] || null
+}
+
 export default function ProductDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter()
   const { addItem } = useCart()
@@ -45,7 +75,6 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
   const [product, setProduct] = useState<Product | null>(null)
   const [selectedImage, setSelectedImage] = useState(0)
   const [selectedVariant, setSelectedVariant] = useState<Variant | null>(null)
-  const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [quantity, setQuantity] = useState(1)
 
@@ -57,7 +86,6 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
         // Auto-select first variant if available
         if (data.variants?.items?.[0]) {
           setSelectedVariant(data.variants.items[0])
-          setSelectedOptions(data.variants.items[0].options)
         }
         setLoading(false)
       })
@@ -66,44 +94,6 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
         setLoading(false)
       })
   }, [params.id])
-
-  // Find variant based on selected options
-  const findMatchingVariant = (options: Record<string, string>) => {
-    if (!product?.variants?.items) return null
-    
-    return product.variants.items.find(variant => {
-      return Object.keys(options).every(key => variant.options[key] === options[key])
-    })
-  }
-
-  // Handle option selection
-  const handleOptionSelect = (optionName: string, value: string) => {
-    const newOptions = { ...selectedOptions, [optionName]: value }
-    setSelectedOptions(newOptions)
-    
-    const matchingVariant = findMatchingVariant(newOptions)
-    if (matchingVariant) {
-      setSelectedVariant(matchingVariant)
-      // Update image if variant has one
-      if (matchingVariant.image && product) {
-        const imgIndex = product.images.indexOf(matchingVariant.image)
-        if (imgIndex >= 0) setSelectedImage(imgIndex)
-      }
-    }
-  }
-
-  // Get unique values for each option
-  const getOptionValues = (optionName: string): string[] => {
-    if (!product?.variants?.items) return []
-    
-    const values = new Set<string>()
-    product.variants.items.forEach(variant => {
-      if (variant.options[optionName]) {
-        values.add(variant.options[optionName])
-      }
-    })
-    return Array.from(values)
-  }
 
   if (loading) {
     return (
@@ -290,12 +280,15 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                         const isSelected = selectedVariant?.id === variant.id
                         const hasStock = variant.stock > 0
                         
+                        // Detect color from variant options
+                        const colorValue = variant.options['Color'] || variant.options['color']
+                        const colorHex = colorValue ? getColorHex(colorValue) : null
+                        
                         return (
                           <button
                             key={variant.id}
                             onClick={() => {
                               setSelectedVariant(variant)
-                              setSelectedOptions(variant.options)
                               if (variant.image && product.images.includes(variant.image)) {
                                 setSelectedImage(product.images.indexOf(variant.image))
                               }
@@ -309,6 +302,20 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                                 : 'border-gray-200 bg-gray-50 opacity-50 cursor-not-allowed'
                             }`}
                           >
+                            {/* Color Indicator */}
+                            {colorHex && (
+                              <div className="flex justify-center mb-2">
+                                <div 
+                                  className="w-8 h-8 rounded-full border-2 border-gray-300"
+                                  style={{ 
+                                    backgroundColor: colorHex,
+                                    boxShadow: colorHex === '#FFFFFF' ? 'inset 0 0 0 1px #e5e7eb' : 'none'
+                                  }}
+                                />
+                              </div>
+                            )}
+                            
+                            {/* Variant Image */}
                             {variant.image && (
                               <div className="relative w-full aspect-square mb-2 rounded-lg overflow-hidden">
                                 <Image
@@ -319,6 +326,8 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                                 />
                               </div>
                             )}
+                            
+                            {/* Variant Info */}
                             <div className="text-xs font-semibold text-gray-900 truncate mb-1">
                               {Object.values(variant.options).join(' / ') || variant.name}
                             </div>
@@ -383,16 +392,17 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
               onClick={() => {
                 if (!isInStock) return
                 
-                // Add the specific variant to cart
-                addItem({
-                  id: selectedVariant ? `${product.id}-${selectedVariant.id}` : product.id,
-                  title: selectedVariant 
-                    ? `${product.title} (${selectedVariant.name})` 
-                    : product.title,
-                  price: activePrice,
-                  image: activeImage,
-                  quantity: quantity,
-                })
+                // Add items one by one (quantity times)
+                for (let i = 0; i < quantity; i++) {
+                  addItem({
+                    id: selectedVariant ? `${product.id}-${selectedVariant.id}` : product.id,
+                    title: selectedVariant 
+                      ? `${product.title} (${selectedVariant.name})` 
+                      : product.title,
+                    price: activePrice,
+                    image: activeImage,
+                  })
+                }
               }}
               disabled={!isInStock}
               className={`w-full py-4 rounded-xl text-lg font-bold flex items-center justify-center gap-3 transition-all shadow-lg ${
