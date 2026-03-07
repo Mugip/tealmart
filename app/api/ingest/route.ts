@@ -58,6 +58,19 @@ function allVariantsAreSkus(variants: any[]): boolean {
   return skuCount / variants.length >= 0.8
 }
 
+/**
+ * Check if description mentions sizes/variants
+ */
+function descriptionMentionsSizes(description: string): boolean {
+  const desc = description.toLowerCase()
+  const sizeKeywords = [
+    'size chart', 'choose size', 'asian size', 'european size',
+    'choose the larger size', 'please check the size',
+    's/m/l', 'xs/s/m/l/xl'
+  ]
+  return sizeKeywords.some(kw => desc.includes(kw))
+}
+
 // ============================================
 // IMPROVED CATEGORY MAPPING
 // ============================================
@@ -71,7 +84,7 @@ function mapCJCategory(cjCategory: string, productTitle?: string, description?: 
   const combined = `${cat} ${title} ${desc}`
   
   // PRIORITY 1: Women's Fashion (check FIRST before men's)
-  const womenKeywords = ['women', 'ladies', 'girl', 'female', 'dress', 'skirt', 'bra', 'heels', 'handbag', 'purse']
+  const womenKeywords = ['women', 'ladies', 'lady', 'girl', 'female', 'dress', 'skirt', 'bra', 'heels', 'handbag', 'purse']
   if (womenKeywords.some(kw => combined.includes(kw))) {
     return "womens-fashion"
   }
@@ -92,7 +105,7 @@ function mapCJCategory(cjCategory: string, productTitle?: string, description?: 
     "shoes": ["shoes", "footwear", "sneaker", "boot", "sandal", "slipper"],
     "bags": ["bag", "backpack", "luggage", "suitcase"],
     "watches": ["watch", "timepiece", "smartwatch"],
-    "jewelry": ["jewelry", "necklace", "bracelet", "ring", "earring"],
+    "jewelry": ["jewelry", "jewellery", "necklace", "bracelet", "ring", "earring"],
     "accessories": ["accessory", "accessories", "belt", "scarf", "hat", "cap"],
     "home-garden": ["home", "garden", "outdoor", "patio"],
     "furniture": ["furniture", "chair", "table", "sofa", "couch", "desk"],
@@ -212,19 +225,6 @@ function extractImages(product: any, detail?: any): string[] {
     .slice(0, 5)
 }
 
-/**
- * Check if description mentions sizes/variants
- */
-function descriptionMentionsSizes(description: string): boolean {
-  const desc = description.toLowerCase()
-  const sizeKeywords = [
-    'size chart', 'choose size', 'asian size', 'european size',
-    'xs', 'small', 'medium', 'large', 'xl', 'xxl',
-    's/m/l', 'please check the size'
-  ]
-  return sizeKeywords.some(kw => desc.includes(kw))
-}
-
 function extractVariants(detail: any) {
   if (!detail?.variants) {
     return { variants: null, totalStock: randomStock(), skipped: false }
@@ -319,7 +319,6 @@ function extractVariants(detail: any) {
     return { variants: null, totalStock: 0, skipped: true }
   }
 
-  // Hide generic labels like "Option 1", "Option 2"
   if (hasGenericLabels && variants.every(v => v.name.startsWith("Option "))) {
     console.log(`⚠️ Variants have generic labels - hiding variant selector`)
     return { variants: null, totalStock, skipped: false }
@@ -366,19 +365,19 @@ async function saveProduct(product: any, existingProducts: Set<string>, keyword?
   const productDescription = detail.description || product.description || ""
   const cjCategory = detail.categoryName || product.threeCategoryName || ""
   
-  // Use improved category mapping
   const category = mapCJCategory(cjCategory, productTitle, productDescription)
 
   const { variants, totalStock, skipped } = extractVariants(detail)
 
   if (skipped) {
-    console.log(`❌ Skipped product ${pid}`)
+    console.log(`❌ Skipped product ${pid} - SKU variants`)
     return { result: null, wasExisting: false }
   }
 
-  // Check if description mentions sizes but no variants exist
+  // SKIP if no variants but description mentions sizes
   if (!variants && descriptionMentionsSizes(productDescription)) {
-    console.log(`⚠️ Product ${pid} mentions sizes in description but has no variants - adding note`)
+    console.log(`❌ Skipped product ${pid} - Sizes in description but no variants`)
+    return { result: null, wasExisting: false }
   }
 
   if (variants?.items?.length) {
@@ -390,16 +389,10 @@ async function saveProduct(product: any, existingProducts: Set<string>, keyword?
   if (category !== "general") tags.push(category)
   if (keyword) tags.push(keyword.toLowerCase())
 
-  // Add size note if applicable
-  let finalDescription = productDescription
-  if (!variants && descriptionMentionsSizes(productDescription)) {
-    finalDescription = `⚠️ Multiple sizes available - Please contact us to specify your size when ordering.\n\n${productDescription}`
-  }
-
   const data = {
     externalId: String(pid),
     title: productTitle.substring(0, 200),
-    description: finalDescription.substring(0, 5000),
+    description: productDescription.substring(0, 5000),
     price,
     costPrice,
     compareAtPrice,
@@ -463,6 +456,7 @@ export async function POST(req: NextRequest) {
       console.log(`🔄 Batch ${b + 1}/${batches}: fetching ${count} products`)
 
       const products = await fetchCJProducts(keyword, count)
+      console.log(`📥 Fetched ${products.length} products from CJ API`)
 
       for (const p of products) {
         try {
@@ -481,9 +475,11 @@ export async function POST(req: NextRequest) {
           await sleep(1100)
         } catch (err: any) {
           errors.push(`${p.id}: ${err.message}`)
-          console.error(`Error processing ${p.id}:`, err)
+          console.error(`❌ Error processing ${p.id}:`, err)
         }
       }
+
+      console.log(`✅ Batch ${b + 1} complete: ${created} created, ${updated} updated, ${skipped} skipped so far`)
     }
 
     await prisma.ingestionLog.create({
@@ -496,7 +492,7 @@ export async function POST(req: NextRequest) {
       },
     })
 
-    console.log(`✅ Completed: ${created} created, ${updated} updated, ${skipped} skipped, ${errors.length} errors`)
+    console.log(`✅ FINAL: ${created} created, ${updated} updated, ${skipped} skipped, ${errors.length} errors`)
 
     return NextResponse.json({
       success: true,
