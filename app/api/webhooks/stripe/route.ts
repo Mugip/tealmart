@@ -36,6 +36,7 @@ async function forwardOrderToCJ(order: any) {
         state: order.shippingState,
         zip: order.shippingZip,
         country: order.shippingCountry,
+        phone: shippingAddress.phone || "",
         email: order.email,
       },
     }
