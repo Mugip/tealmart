@@ -3,7 +3,6 @@ import { NextRequest, NextResponse } from "next/server"
 import { PrismaClient, Prisma } from "@prisma/client"
 import { getCJToken } from "@/lib/cjToken"
 
-// Use singleton pattern for Prisma Client
 const globalForPrisma = global as unknown as { prisma: PrismaClient }
 
 const prisma = globalForPrisma.prisma || new PrismaClient({
@@ -136,7 +135,7 @@ function mapCJCategory(cjCategory: string, productTitle?: string, description?: 
 }
 
 // ============================================
-// CJ API FUNCTIONS
+// CJ API FUNCTIONS - FIXED PAGINATION
 // ============================================
 
 async function cjFetch(url: string, retries = 3): Promise<any> {
@@ -169,31 +168,55 @@ async function cjFetch(url: string, retries = 3): Promise<any> {
 }
 
 async function fetchCJProducts(keyword?: string, count = 10) {
-  let page = 1
-  let remaining = count
   const products: any[] = []
+  const seenIds = new Set<string>()
+  let page = 1
+  const maxPages = Math.ceil(count / MAX_BATCH) + 2 // Add buffer for duplicates
 
-  while (remaining > 0 && page <= 10) {
-    const size = Math.min(remaining, MAX_BATCH)
+  while (products.length < count && page <= maxPages) {
     const params = new URLSearchParams({
-      page: String(page),
-      pageSize: String(size),
+      pageNum: String(page), // Changed from 'page' to 'pageNum'
+      pageSize: String(MAX_BATCH),
     })
 
     if (keyword) params.append("keyWord", keyword)
 
-    const data = await cjFetch(`${CJ_API_URL}/product/listV2?${params}`)
-    const list = data?.data?.content?.[0]?.productList || []
+    console.log(`🔍 Fetching page ${page} with params: ${params.toString()}`)
 
-    if (!list.length) break
+    const data = await cjFetch(`${CJ_API_URL}/product/list?${params}`) // Changed endpoint
+    const list = data?.data?.list || data?.data?.content?.[0]?.productList || []
 
-    products.push(...list)
-    remaining -= list.length
+    if (!list.length) {
+      console.log(`⚠️ No products returned for page ${page}`)
+      break
+    }
+
+    console.log(`📥 Received ${list.length} products from page ${page}`)
+
+    // Filter out duplicates
+    let newProductsCount = 0
+    for (const product of list) {
+      const pid = String(product.id || product.pid)
+      if (!seenIds.has(pid)) {
+        seenIds.add(pid)
+        products.push(product)
+        newProductsCount++
+      }
+    }
+
+    console.log(`✨ ${newProductsCount} new unique products from page ${page}`)
+
+    // If we got zero new products, CJ API might be broken - try different approach
+    if (newProductsCount === 0) {
+      console.log(`⚠️ No new products on page ${page}, stopping pagination`)
+      break
+    }
+
     page++
-
     await sleep(1100)
   }
 
+  console.log(`🎯 Total unique products collected: ${products.length}`)
   return products.slice(0, count)
 }
 
@@ -335,7 +358,7 @@ function extractVariants(detail: any) {
 }
 
 // ============================================
-// PRODUCT SAVE - WITH IMMEDIATE DB FLUSH
+// PRODUCT SAVE
 // ============================================
 
 async function saveProduct(product: any, existingProducts: Set<string>, keyword?: string) {
@@ -368,12 +391,10 @@ async function saveProduct(product: any, existingProducts: Set<string>, keyword?
   const { variants, totalStock, skipped } = extractVariants(detail)
 
   if (skipped) {
-    console.log(`❌ Skipped product ${pid} - SKU variants`)
     return { result: null, wasExisting: false }
   }
 
   if (!variants && descriptionMentionsSizes(productDescription)) {
-    console.log(`❌ Skipped product ${pid} - Sizes in description but no variants`)
     return { result: null, wasExisting: false }
   }
 
@@ -404,31 +425,13 @@ async function saveProduct(product: any, existingProducts: Set<string>, keyword?
     variants: variants || Prisma.JsonNull,
   }
 
-  try {
-    // Force immediate write to DB
-    const result = await prisma.product.upsert({
-      where: { externalId: String(pid) },
-      update: data,
-      create: data,
-    })
+  const result = await prisma.product.upsert({
+    where: { externalId: String(pid) },
+    update: data,
+    create: data,
+  })
 
-    // Verify it was actually saved
-    const verified = await prisma.product.findUnique({
-      where: { externalId: String(pid) },
-      select: { id: true }
-    })
-
-    if (!verified) {
-      console.error(`⚠️ Product ${pid} save verification FAILED`)
-      return { result: null, wasExisting: false }
-    }
-
-    console.log(`✅ Product ${pid} saved and verified`)
-    return { result, wasExisting }
-  } catch (err: any) {
-    console.error(`❌ Failed to save product ${pid}:`, err.message)
-    throw err
-  }
+  return { result, wasExisting }
 }
 
 // ============================================
@@ -458,51 +461,38 @@ export async function POST(req: NextRequest) {
         .map(p => p.externalId)
         .filter((id): id is string => id !== null)
     )
-    console.log(`📊 Found ${existingIds.size} existing products in database`)
 
-    const batches = Math.ceil(requested / MAX_BATCH)
+    // Fetch ALL products at once with proper pagination
+    const products = await fetchCJProducts(keyword, requested)
+    console.log(`📥 Fetched ${products.length} unique products total`)
+
     let created = 0
     let updated = 0
     let skipped = 0
     const errors: string[] = []
 
-    for (let b = 0; b < batches; b++) {
-      const count = Math.min(MAX_BATCH, requested - b * MAX_BATCH)
-      console.log(`🔄 Batch ${b + 1}/${batches}: fetching ${count} products`)
+    for (const p of products) {
+      try {
+        const { result, wasExisting } = await saveProduct(p, existingIds, keyword)
 
-      const products = await fetchCJProducts(keyword, count)
-      console.log(`📥 Fetched ${products.length} products from CJ API`)
-
-      for (const p of products) {
-        try {
-          const { result, wasExisting } = await saveProduct(p, existingIds, keyword)
-
-          if (result) {
-            if (wasExisting) {
-              updated++
-            } else {
-              created++
-            }
+        if (result) {
+          if (wasExisting) {
+            updated++
           } else {
-            skipped++
+            created++
           }
-
-          await sleep(1100)
-        } catch (err: any) {
-          errors.push(`${p.id}: ${err.message}`)
-          console.error(`❌ Error processing ${p.id}:`, err)
+        } else {
+          skipped++
         }
-      }
 
-      // Verify batch save
-      const actualCount = await prisma.product.count()
-      console.log(`📊 Database now has ${actualCount} total products`)
-      console.log(`✅ Batch ${b + 1} complete: ${created} created, ${updated} updated, ${skipped} skipped`)
+        await sleep(1100)
+      } catch (err: any) {
+        errors.push(`${p.id}: ${err.message}`)
+        console.error(`❌ Error processing ${p.id}:`, err)
+      }
     }
 
-    // Final verification
     const finalCount = await prisma.product.count()
-    console.log(`🎯 FINAL DATABASE COUNT: ${finalCount} products`)
 
     await prisma.ingestionLog.create({
       data: {
@@ -514,7 +504,7 @@ export async function POST(req: NextRequest) {
       },
     })
 
-    console.log(`✅ FINAL: ${created} created, ${updated} updated, ${skipped} skipped, ${errors.length} errors`)
+    console.log(`✅ FINAL: ${created} created, ${updated} updated, ${skipped} skipped`)
 
     return NextResponse.json({
       success: true,
@@ -541,7 +531,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ error: err.message }, { status: 500 })
   } finally {
-    // Disconnect Prisma to free connections
     await prisma.$disconnect()
   }
 }
