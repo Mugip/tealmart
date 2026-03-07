@@ -1,0 +1,57 @@
+name: Daily Product Ingestion
+
+on:
+  schedule:
+    - cron: "30 15 * * *"   # runs once per day (02:00 UTC)
+  workflow_dispatch:      # allows manual run from GitHub
+
+jobs:
+  ingest-products:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Run product ingestion for all keywords
+        run: |
+          API="https://tealmart.vercel.app/api/ingest"
+          KEY="Craigbes123"
+
+          keywords=(
+            phone mobile smartphone "cell phone"
+            computer laptop tablet pc
+            audio headphone earphone speaker
+            camera photography
+            gaming game console
+            shoes footwear sneaker boot
+            bag backpack luggage
+            watch timepiece smartwatch
+            jewelry necklace bracelet ring
+            accessory accessories belt scarf hat
+            home garden outdoor
+            furniture chair table sofa
+            kitchen cookware
+            bedding sheet pillow
+            decor decoration
+            beauty cosmetic makeup
+            skincare "skin care"
+            health vitamin
+            fitness exercise workout
+            toy kids children
+            baby infant
+            sport athletic
+            pet dog cat
+            automotive car
+          )
+
+          for keyword in "${keywords[@]}"
+          do
+            echo "Ingesting keyword: $keyword"
+
+            curl -X POST $API \
+              -H "Content-Type: application/json" \
+              -H "x-api-key: $KEY" \
+              -d "{\"count\":100,\"keyword\":\"$keyword\"}"
+
+            echo ""
+            echo "Waiting to avoid CJ API rate limit..."
+            sleep 3
+          done
