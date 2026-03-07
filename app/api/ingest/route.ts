@@ -59,35 +59,64 @@ function allVariantsAreSkus(variants: any[]): boolean {
 }
 
 // ============================================
-// CATEGORY MAPPING
+// IMPROVED CATEGORY MAPPING
 // ============================================
 
-function mapCJCategory(cjCategory: string): string {
+function mapCJCategory(cjCategory: string, productTitle?: string, description?: string): string {
   if (!cjCategory) return "general"
   
   const cat = cjCategory.toLowerCase()
+  const title = (productTitle || "").toLowerCase()
+  const desc = (description || "").toLowerCase()
+  const combined = `${cat} ${title} ${desc}`
   
-  const categoryMap: Record<string, string> = {
-    "phone": "phone", "mobile": "phone", "smartphone": "phone",
-    "computer": "computer", "laptop": "computer", "tablet": "computer",
-    "audio": "audio", "headphone": "audio", "speaker": "audio",
-    "camera": "camera", "gaming": "gaming",
-    "shoes": "shoes", "footwear": "shoes",
-    "bag": "bags", "backpack": "bags",
-    "watch": "watches", "jewelry": "jewelry",
-    "accessory": "accessories", "men": "mens-fashion",
-    "women": "womens-fashion", "home": "home-garden",
-    "furniture": "furniture", "kitchen": "kitchen",
-    "beauty": "beauty", "skincare": "skincare",
-    "health": "health", "fitness": "fitness",
-    "toy": "toys", "baby": "baby", "sport": "sports",
-    "pet": "pets", "automotive": "automotive",
+  // PRIORITY 1: Women's Fashion (check FIRST before men's)
+  const womenKeywords = ['women', 'ladies', 'girl', 'female', 'dress', 'skirt', 'bra', 'heels', 'handbag', 'purse']
+  if (womenKeywords.some(kw => combined.includes(kw))) {
+    return "womens-fashion"
   }
   
-  for (const [key, value] of Object.entries(categoryMap)) {
-    if (cat.includes(key)) return value
+  // PRIORITY 2: Men's Fashion (after women's check)
+  const menKeywords = ['men', 'male', 'gentleman', 'beard']
+  if (menKeywords.some(kw => combined.includes(kw))) {
+    return "mens-fashion"
   }
   
+  // PRIORITY 3: Specific Categories
+  const categoryMap: Record<string, string[]> = {
+    "phone": ["phone", "mobile", "smartphone", "cell phone", "iphone", "samsung galaxy"],
+    "computer": ["computer", "laptop", "tablet", "pc", "macbook", "chromebook"],
+    "audio": ["audio", "headphone", "earphone", "speaker", "airpods", "earbuds"],
+    "camera": ["camera", "photography", "gopro", "canon", "nikon"],
+    "gaming": ["gaming", "game", "console", "playstation", "xbox", "nintendo"],
+    "shoes": ["shoes", "footwear", "sneaker", "boot", "sandal", "slipper"],
+    "bags": ["bag", "backpack", "luggage", "suitcase"],
+    "watches": ["watch", "timepiece", "smartwatch"],
+    "jewelry": ["jewelry", "necklace", "bracelet", "ring", "earring"],
+    "accessories": ["accessory", "accessories", "belt", "scarf", "hat", "cap"],
+    "home-garden": ["home", "garden", "outdoor", "patio"],
+    "furniture": ["furniture", "chair", "table", "sofa", "couch", "desk"],
+    "kitchen": ["kitchen", "cookware", "utensil", "appliance"],
+    "bedding": ["bedding", "sheet", "pillow", "blanket", "comforter"],
+    "decor": ["decor", "decoration", "wall art", "vase", "candle"],
+    "beauty": ["beauty", "cosmetic", "makeup", "lipstick", "foundation"],
+    "skincare": ["skincare", "skin care", "moisturizer", "serum", "cleanser"],
+    "health": ["health", "vitamin", "supplement", "wellness"],
+    "fitness": ["fitness", "exercise", "workout", "gym", "yoga"],
+    "toys": ["toy", "kids", "children", "play"],
+    "baby": ["baby", "infant", "newborn", "toddler"],
+    "sports": ["sport", "athletic", "running", "tennis", "basketball"],
+    "pets": ["pet", "dog", "cat", "animal"],
+    "automotive": ["automotive", "car", "vehicle", "motorcycle"],
+  }
+  
+  for (const [category, keywords] of Object.entries(categoryMap)) {
+    if (keywords.some(kw => combined.includes(kw))) {
+      return category
+    }
+  }
+  
+  // PRIORITY 4: Fallback to first part of CJ category
   const firstPart = cjCategory.split('>')[0].trim().toLowerCase()
   return firstPart.replace(/[^a-z0-9]+/g, '-').substring(0, 30) || "general"
 }
@@ -181,6 +210,19 @@ function extractImages(product: any, detail?: any): string[] {
   return images
     .filter((img) => typeof img === "string" && img.startsWith("http"))
     .slice(0, 5)
+}
+
+/**
+ * Check if description mentions sizes/variants
+ */
+function descriptionMentionsSizes(description: string): boolean {
+  const desc = description.toLowerCase()
+  const sizeKeywords = [
+    'size chart', 'choose size', 'asian size', 'european size',
+    'xs', 'small', 'medium', 'large', 'xl', 'xxl',
+    's/m/l', 'please check the size'
+  ]
+  return sizeKeywords.some(kw => desc.includes(kw))
 }
 
 function extractVariants(detail: any) {
@@ -277,6 +319,7 @@ function extractVariants(detail: any) {
     return { variants: null, totalStock: 0, skipped: true }
   }
 
+  // Hide generic labels like "Option 1", "Option 2"
   if (hasGenericLabels && variants.every(v => v.name.startsWith("Option "))) {
     console.log(`⚠️ Variants have generic labels - hiding variant selector`)
     return { variants: null, totalStock, skipped: false }
@@ -319,14 +362,23 @@ async function saveProduct(product: any, existingProducts: Set<string>, keyword?
   const images = extractImages(product, detail)
   if (images.length === 0) return { result: null, wasExisting: false }
 
+  const productTitle = detail.productNameEn || product.nameEn || ""
+  const productDescription = detail.description || product.description || ""
   const cjCategory = detail.categoryName || product.threeCategoryName || ""
-  const category = mapCJCategory(cjCategory)
+  
+  // Use improved category mapping
+  const category = mapCJCategory(cjCategory, productTitle, productDescription)
 
   const { variants, totalStock, skipped } = extractVariants(detail)
 
   if (skipped) {
     console.log(`❌ Skipped product ${pid}`)
     return { result: null, wasExisting: false }
+  }
+
+  // Check if description mentions sizes but no variants exist
+  if (!variants && descriptionMentionsSizes(productDescription)) {
+    console.log(`⚠️ Product ${pid} mentions sizes in description but has no variants - adding note`)
   }
 
   if (variants?.items?.length) {
@@ -338,10 +390,16 @@ async function saveProduct(product: any, existingProducts: Set<string>, keyword?
   if (category !== "general") tags.push(category)
   if (keyword) tags.push(keyword.toLowerCase())
 
+  // Add size note if applicable
+  let finalDescription = productDescription
+  if (!variants && descriptionMentionsSizes(productDescription)) {
+    finalDescription = `⚠️ Multiple sizes available - Please contact us to specify your size when ordering.\n\n${productDescription}`
+  }
+
   const data = {
     externalId: String(pid),
-    title: (detail.productNameEn || product.nameEn || "Untitled").substring(0, 200),
-    description: (detail.description || product.description || detail.productNameEn || "").substring(0, 1000),
+    title: productTitle.substring(0, 200),
+    description: finalDescription.substring(0, 5000),
     price,
     costPrice,
     compareAtPrice,
@@ -384,7 +442,6 @@ export async function POST(req: NextRequest) {
 
     console.log(`📦 Starting ingestion: ${requested} products, keyword: ${keyword || "all"}`)
 
-    // Get existing products and filter out nulls
     const existingProducts = await prisma.product.findMany({
       select: { externalId: true }
     })
