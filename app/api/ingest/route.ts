@@ -33,39 +33,26 @@ function applyMarkup(cost: number): number {
 }
 
 // ============================================
-// VALIDATION FUNCTIONS (More Permissive)
+// VALIDATION FUNCTIONS
 // ============================================
 
-/**
- * Only reject OBVIOUS SKU patterns
- * Be permissive - only filter clear SKU codes
- */
 function isObviousSkuCode(str: string): boolean {
   if (!str || str.length < 10) return false
   
   const normalized = str.trim().toUpperCase()
   
-  // Only reject very specific CJ SKU patterns
-  // Pattern: CJYD196698201AZ (CJ + 2 letters + 8-15 digits + 1-3 letters)
-  if (/^CJ[A-Z]{2}\d{9,15}[A-Z]{1,3}$/.test(normalized)) {
-    return true
-  }
+  // CJ SKU pattern: CJYD196698201AZ
+  if (/^CJ[A-Z]{2}\d{9,15}[A-Z]{1,3}$/.test(normalized)) return true
   
-  // Pattern: 4+ letters, 9+ consecutive digits, 2+ letters (very SKU-like)
-  if (/^[A-Z]{4,}\d{9,}[A-Z]{2,}$/.test(normalized)) {
-    return true
-  }
+  // Generic SKU: 4+ letters, 9+ digits, 2+ letters
+  if (/^[A-Z]{4,}\d{9,}[A-Z]{2,}$/.test(normalized)) return true
   
   return false
 }
 
-/**
- * Check if ALL variants are obvious SKU codes
- */
 function allVariantsAreSkus(variants: any[]): boolean {
   if (variants.length === 0) return false
   
-  // Need at least 80% to be SKUs to reject entire product
   const skuCount = variants.filter(v => {
     const name = v.variantName || ""
     return isObviousSkuCode(name)
@@ -226,6 +213,7 @@ function extractVariants(detail: any) {
   const variants: any[] = []
   const optionNames: Set<string> = new Set()
   let totalStock = 0
+  let hasGenericLabels = false
 
   for (const v of raw) {
     const sellPrice = parsePrice(v.variantSellPrice || v.sellPrice)
@@ -239,6 +227,7 @@ function extractVariants(detail: any) {
 
     // Parse variant options
     const options: Record<string, string> = {}
+    let variantLabel = ""
     
     if (v.variantKey) {
       v.variantKey.split(";").forEach((part: string) => {
@@ -252,9 +241,8 @@ function extractVariants(detail: any) {
     
     // Fallback to variantName
     if (Object.keys(options).length === 0 && v.variantName) {
-      // Only skip if it's an OBVIOUS SKU code
       if (isObviousSkuCode(v.variantName)) {
-        continue // Skip this specific variant
+        continue // Skip SKU variants
       }
 
       const parts = v.variantName.split("-").map((s: string) => s.trim())
@@ -264,22 +252,26 @@ function extractVariants(detail: any) {
         optionNames.add("Color")
         optionNames.add("Size")
       } else if (parts.length === 1 && parts[0]) {
-        options["Option"] = parts[0]
-        optionNames.add("Option")
+        options["Style"] = parts[0]
+        optionNames.add("Style")
       }
     }
 
-    // Create label - use variant name or build from options
-    const label = Object.keys(options).length > 0
-      ? Object.entries(options).map(([k, v]) => `${k}: ${v}`).join(", ")
-      : (v.variantName && !isObviousSkuCode(v.variantName))
-      ? v.variantName
-      : `Variant ${variants.length + 1}`
+    // Build label
+    if (Object.keys(options).length > 0) {
+      variantLabel = Object.entries(options).map(([k, v]) => `${k}: ${v}`).join(", ")
+    } else if (v.variantName && !isObviousSkuCode(v.variantName)) {
+      variantLabel = v.variantName
+    } else {
+      // Generic fallback - we'll handle this later
+      variantLabel = `Option ${variants.length + 1}`
+      hasGenericLabels = true
+    }
 
     variants.push({
       id: v.vid,
       sku: v.variantSku || v.vid,
-      name: label,
+      name: variantLabel,
       price,
       costPrice,
       stock,
@@ -288,11 +280,15 @@ function extractVariants(detail: any) {
     })
   }
 
-  // Accept product even if some variants were filtered
-  // Only reject if we have NO valid variants
   if (variants.length === 0) {
     console.log(`⚠️ No valid variants after filtering - skipping`)
     return { variants: null, totalStock: 0, skipped: true }
+  }
+
+  // If all variants have generic labels like "Option 1", "Option 2", don't show variants
+  if (hasGenericLabels && variants.every(v => v.name.startsWith("Option "))) {
+    console.log(`⚠️ Variants have generic labels - hiding variant selector`)
+    return { variants: null, totalStock, skipped: false }
   }
 
   if (totalStock <= 0) totalStock = randomStock()
@@ -311,15 +307,18 @@ function extractVariants(detail: any) {
 // PRODUCT SAVE
 // ============================================
 
-async function saveProduct(product: any, keyword?: string) {
+async function saveProduct(product: any, keyword?: string, existingProducts: Set<string>) {
   const pid = product.id || product.pid
-  if (!pid) return null
+  if (!pid) return { result: null, wasExisting: false }
+
+  // Check if product already exists in DB
+  const wasExisting = existingProducts.has(String(pid))
 
   const detail = await fetchProductDetail(String(pid))
-  if (!detail) return null
+  if (!detail) return { result: null, wasExisting: false }
 
   const sellPrice = parsePrice(detail.sellPrice || product.sellPrice)
-  if (sellPrice <= 0) return null
+  if (sellPrice <= 0) return { result: null, wasExisting: false }
 
   const costPrice = sellPrice * 0.7
   let price = applyMarkup(costPrice)
@@ -328,7 +327,7 @@ async function saveProduct(product: any, keyword?: string) {
   const compareAtPrice = +(price / (1 - discount / 100)).toFixed(2)
 
   const images = extractImages(product, detail)
-  if (images.length === 0) return null
+  if (images.length === 0) return { result: null, wasExisting: false }
 
   const cjCategory = detail.categoryName || product.threeCategoryName || ""
   const category = mapCJCategory(cjCategory)
@@ -337,7 +336,7 @@ async function saveProduct(product: any, keyword?: string) {
 
   if (skipped) {
     console.log(`❌ Skipped product ${pid}`)
-    return null
+    return { result: null, wasExisting: false }
   }
 
   if (variants?.items?.length) {
@@ -367,11 +366,13 @@ async function saveProduct(product: any, keyword?: string) {
     variants: variants || Prisma.JsonNull,
   }
 
-  return await prisma.product.upsert({
+  const result = await prisma.product.upsert({
     where: { externalId: String(pid) },
     update: data,
     create: data,
   })
+
+  return { result, wasExisting }
 }
 
 // ============================================
@@ -393,6 +394,13 @@ export async function POST(req: NextRequest) {
 
     console.log(`📦 Starting ingestion: ${requested} products, keyword: ${keyword || "all"}`)
 
+    // Get all existing product externalIds BEFORE ingestion
+    const existingProducts = await prisma.product.findMany({
+      select: { externalId: true }
+    })
+    const existingIds = new Set(existingProducts.map(p => p.externalId))
+    console.log(`📊 Found ${existingIds.size} existing products in database`)
+
     const batches = Math.ceil(requested / MAX_BATCH)
     let created = 0
     let updated = 0
@@ -407,15 +415,14 @@ export async function POST(req: NextRequest) {
 
       for (const p of products) {
         try {
-          const existing = await prisma.product.findUnique({
-            where: { externalId: String(p.id || p.pid) },
-          })
-
-          const result = await saveProduct(p, keyword)
+          const { result, wasExisting } = await saveProduct(p, keyword, existingIds)
 
           if (result) {
-            if (existing) updated++
-            else created++
+            if (wasExisting) {
+              updated++
+            } else {
+              created++
+            }
           } else {
             skipped++
           }
@@ -423,6 +430,7 @@ export async function POST(req: NextRequest) {
           await sleep(1100)
         } catch (err: any) {
           errors.push(`${p.id}: ${err.message}`)
+          console.error(`Error processing ${p.id}:`, err)
         }
       }
     }
@@ -437,7 +445,7 @@ export async function POST(req: NextRequest) {
       },
     })
 
-    console.log(`✅ Completed: ${created} created, ${updated} updated, ${skipped} skipped`)
+    console.log(`✅ Completed: ${created} created, ${updated} updated, ${skipped} skipped, ${errors.length} errors`)
 
     return NextResponse.json({
       success: true,
