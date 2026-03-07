@@ -102,7 +102,6 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
       .then(res => res.json())
       .then(data => {
         setProduct(data)
-        // Auto-select first variant if available
         if (data.variants?.items?.[0]) {
           setSelectedVariant(data.variants.items[0])
         }
@@ -128,7 +127,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
   if (!product) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center max-w-md">
+        <div className="text-center max-w-md px-4">
           <div className="bg-white rounded-2xl shadow-lg p-8">
             <div className="text-6xl mb-4">😔</div>
             <h1 className="text-2xl font-bold text-gray-900 mb-2">Product Not Found</h1>
@@ -155,7 +154,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
   const isInStock = activeStock > 0
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 overflow-x-hidden">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         
         {/* Back Button */}
@@ -167,7 +166,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
           <span className="font-medium">Back</span>
         </button>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
           
           {/* Image Gallery */}
           <div className="space-y-4">
@@ -230,11 +229,11 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
           </div>
 
           {/* Product Info */}
-          <div className="space-y-6">
+          <div className="space-y-6 min-w-0">
             
             {/* Title */}
-            <div>
-              <h1 className="text-4xl font-bold text-gray-900 mb-2">{product.title}</h1>
+            <div className="break-words">
+              <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-2 break-words">{product.title}</h1>
               <p className="text-sm text-gray-500 uppercase tracking-wide font-medium">
                 {product.category}
               </p>
@@ -242,7 +241,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
 
             {/* Rating */}
             {product.rating && (
-              <div className="flex items-center gap-4">
+              <div className="flex flex-wrap items-center gap-4">
                 <div className="flex items-center gap-1">
                   {[...Array(5)].map((_, i) => (
                     <Star
@@ -268,12 +267,12 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
 
             {/* Price */}
             <div className="bg-gradient-to-br from-tiffany-50 to-tiffany-100 rounded-2xl p-6 border border-tiffany-200">
-              <div className="flex items-baseline gap-3">
-                <span className="text-5xl font-bold text-gray-900">
+              <div className="flex flex-wrap items-baseline gap-3">
+                <span className="text-4xl sm:text-5xl font-bold text-gray-900">
                   ${activePrice.toFixed(2)}
                 </span>
                 {product.compareAtPrice && product.compareAtPrice > activePrice && (
-                  <span className="text-2xl text-gray-500 line-through">
+                  <span className="text-xl sm:text-2xl text-gray-500 line-through">
                     ${product.compareAtPrice.toFixed(2)}
                   </span>
                 )}
@@ -287,19 +286,18 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
 
             {/* Horizontal Scrollable Variants */}
             {product.variants?.items && product.variants.items.length > 0 && (
-              <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-200">
-                <h3 className="font-bold text-gray-900 text-lg mb-4">
+              <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-gray-200">
+                <h3 className="font-bold text-gray-900 text-base sm:text-lg mb-4 break-words">
                   Select Variant {selectedVariant && `(${selectedVariant.name})`}
                 </h3>
                 
-                <div className="relative">
+                <div className="relative -mx-2 px-2">
                   <div className="overflow-x-auto pb-2 scrollbar-hide">
                     <div className="flex gap-3" style={{ minWidth: 'min-content' }}>
                       {product.variants.items.map((variant) => {
                         const isSelected = selectedVariant?.id === variant.id
                         const hasStock = variant.stock > 0
                         
-                        // Detect color from variant options
                         const colorValue = variant.options['Color'] || variant.options['color']
                         const colorHex = colorValue ? getColorHex(colorValue) : null
                         
@@ -313,7 +311,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                               }
                             }}
                             disabled={!hasStock}
-                            className={`flex-shrink-0 w-32 p-3 rounded-xl border-2 transition-all ${
+                            className={`flex-shrink-0 w-28 sm:w-32 p-3 rounded-xl border-2 transition-all ${
                               isSelected
                                 ? 'border-tiffany-500 bg-tiffany-50 shadow-md'
                                 : hasStock
@@ -321,7 +319,6 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                                 : 'border-gray-200 bg-gray-50 opacity-50 cursor-not-allowed'
                             }`}
                           >
-                            {/* Color Indicator */}
                             {colorHex && (
                               <div className="flex justify-center mb-2">
                                 <div 
@@ -334,7 +331,6 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                               </div>
                             )}
                             
-                            {/* Variant Image */}
                             {variant.image && (
                               <div className="relative w-full aspect-square mb-2 rounded-lg overflow-hidden">
                                 <Image
@@ -346,8 +342,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                               </div>
                             )}
                             
-                            {/* Variant Info */}
-                            <div className="text-xs font-semibold text-gray-900 truncate mb-1">
+                            <div className="text-xs font-semibold text-gray-900 truncate mb-1" title={Object.values(variant.options).join(' / ') || variant.name}>
                               {Object.values(variant.options).join(' / ') || variant.name}
                             </div>
                             <div className="text-sm font-bold text-tiffany-600">
@@ -380,7 +375,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
 
             {/* Quantity Selector */}
             {isInStock && (
-              <div className="flex items-center gap-4">
+              <div className="flex flex-wrap items-center gap-4">
                 <label className="font-semibold text-gray-900">Quantity:</label>
                 <div className="flex items-center border-2 border-gray-300 rounded-lg overflow-hidden">
                   <button
@@ -405,7 +400,6 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
               onClick={() => {
                 if (!isInStock) return
                 
-                // Add items one by one (quantity times)
                 for (let i = 0; i < quantity; i++) {
                   addItem({
                     id: selectedVariant ? `${product.id}-${selectedVariant.id}` : product.id,
@@ -418,7 +412,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                 }
               }}
               disabled={!isInStock}
-              className={`w-full py-4 rounded-xl text-lg font-bold flex items-center justify-center gap-3 transition-all shadow-lg ${
+              className={`w-full py-4 rounded-xl text-base sm:text-lg font-bold flex items-center justify-center gap-3 transition-all shadow-lg ${
                 isInStock
                   ? 'bg-gradient-to-r from-tiffany-500 to-tiffany-600 hover:from-tiffany-600 hover:to-tiffany-700 text-white hover:shadow-xl hover:scale-[1.02]'
                   : 'bg-gray-300 text-gray-500 cursor-not-allowed'
@@ -432,7 +426,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-6 border-t border-gray-200">
               <div className="flex items-start gap-3 bg-white p-4 rounded-xl shadow-sm border border-gray-200">
                 <Truck className="text-tiffany-600 flex-shrink-0 mt-1" size={24} />
-                <div>
+                <div className="min-w-0">
                   <h3 className="font-bold text-gray-900">Free Shipping</h3>
                   <p className="text-sm text-gray-600">On orders over $50</p>
                 </div>
@@ -440,18 +434,18 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
 
               <div className="flex items-start gap-3 bg-white p-4 rounded-xl shadow-sm border border-gray-200">
                 <Shield className="text-tiffany-600 flex-shrink-0 mt-1" size={24} />
-                <div>
+                <div className="min-w-0">
                   <h3 className="font-bold text-gray-900">Secure Payment</h3>
                   <p className="text-sm text-gray-600">100% secure checkout</p>
                 </div>
               </div>
             </div>
 
-            {/* Description */}
-            <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-200">
-              <h3 className="font-bold text-gray-900 text-lg mb-4">Product Details</h3>
+            {/* Description - FIXED WRAPPING */}
+            <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-gray-200 overflow-hidden">
+              <h3 className="font-bold text-gray-900 text-base sm:text-lg mb-4">Product Details</h3>
               <div
-                className="prose prose-sm max-w-none text-gray-700"
+                className="prose prose-sm max-w-none text-gray-700 break-words overflow-wrap-anywhere"
                 dangerouslySetInnerHTML={{ __html: product.description }}
               />
             </div>
@@ -462,7 +456,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                 {product.tags.filter(tag => !tag.includes('cj')).map(tag => (
                   <span
                     key={tag}
-                    className="px-3 py-1 bg-gray-100 text-gray-700 text-sm rounded-full font-medium"
+                    className="px-3 py-1 bg-gray-100 text-gray-700 text-sm rounded-full font-medium break-all"
                   >
                     #{tag}
                   </span>
@@ -480,6 +474,33 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
         .scrollbar-hide {
           -ms-overflow-style: none;
           scrollbar-width: none;
+        }
+        
+        /* Force text wrapping in descriptions */
+        .prose {
+          word-wrap: break-word;
+          overflow-wrap: break-word;
+          word-break: break-word;
+        }
+        
+        .prose * {
+          max-width: 100%;
+          overflow-wrap: break-word;
+        }
+        
+        .prose pre {
+          white-space: pre-wrap;
+          word-break: break-all;
+        }
+        
+        .prose table {
+          display: block;
+          overflow-x: auto;
+        }
+        
+        /* Prevent horizontal overflow */
+        .overflow-wrap-anywhere {
+          overflow-wrap: anywhere;
         }
       `}</style>
     </div>
