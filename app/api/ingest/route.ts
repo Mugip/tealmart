@@ -304,10 +304,10 @@ function extractVariants(detail: any) {
 }
 
 // ============================================
-// PRODUCT SAVE
+// PRODUCT SAVE - FIXED PARAMETER ORDER
 // ============================================
 
-async function saveProduct(product: any, keyword?: string, existingProducts: Set<string>) {
+async function saveProduct(product: any, existingProducts: Set<string>, keyword?: string) {
   const pid = product.id || product.pid
   if (!pid) return { result: null, wasExisting: false }
 
@@ -415,7 +415,7 @@ export async function POST(req: NextRequest) {
 
       for (const p of products) {
         try {
-          const { result, wasExisting } = await saveProduct(p, keyword, existingIds)
+          const { result, wasExisting } = await saveProduct(p, existingIds, keyword)
 
           if (result) {
             if (wasExisting) {
