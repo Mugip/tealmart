@@ -5,7 +5,7 @@ import Stripe from "stripe"
 
 const prisma = new PrismaClient()
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2024-12-18.acacia",
+  apiVersion: "2026-02-25.clover", // Fixed version
 })
 
 export async function POST(req: NextRequest) {
@@ -127,20 +127,32 @@ export async function POST(req: NextRequest) {
       },
     })
 
+    // Generate unique order number
+    const orderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`
+
     // Create order in database (pending payment)
     const order = await prisma.order.create({
       data: {
-        stripeSessionId: session.id,
-        customerEmail: email,
-        shippingAddress,
-        status: "pending",
+        orderNumber,
+        email,
+        shippingName: shippingAddress.name || "Customer",
+        shippingAddress: shippingAddress.address1 || shippingAddress.line1 || "",
+        shippingCity: shippingAddress.city || "",
+        shippingState: shippingAddress.state || "",
+        shippingZip: shippingAddress.zip || shippingAddress.postalCode || "",
+        shippingCountry: shippingAddress.country || "US",
+        paymentMethod: "stripe",
+        paymentId: session.id,
+        status: "PENDING",
+        subtotal,
+        tax,
+        shipping,
         total,
         items: {
           create: validatedItems.map(item => ({
             productId: item.productId,
             quantity: item.quantity,
             price: item.price,
-            variantId: item.variantId,
           })),
         },
       },
@@ -153,12 +165,13 @@ export async function POST(req: NextRequest) {
       },
     })
 
-    console.log(`✅ Order created: ${order.id}`)
+    console.log(`✅ Order created: ${order.orderNumber}`)
 
     return NextResponse.json({
       sessionId: session.id,
       url: session.url,
       orderId: order.id,
+      orderNumber: order.orderNumber,
     })
   } catch (error: any) {
     console.error("Checkout error:", error)
