@@ -1,5 +1,3 @@
-The issue is that the frontend checkout form isn't sending the data in the format the API expects. Let me fix both the frontend form and the API:
-1. Fixed Checkout Page (Frontend)
 // app/checkout/page.tsx
 'use client'
 
