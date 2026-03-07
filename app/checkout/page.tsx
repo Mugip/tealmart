@@ -1,7 +1,8 @@
 // app/checkout/page.tsx
 'use client'
 
-e‎xport const dynamic = 'force-dynamic'
+export const dynamic = 'force-dynamic'
+
 import { useState } from 'react'
 import { useCart } from '@/lib/contexts/CartContext'
 import { useRouter } from 'next/navigation'
