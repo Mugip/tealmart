@@ -2,7 +2,7 @@ name: Daily Product Ingestion
 
 on:
   schedule:
-    - cron: "30 15 * * *"   # runs once per day (02:00 UTC)
+    - cron: "40 15 * * *"   # runs once per day (02:00 UTC)
   workflow_dispatch:      # allows manual run from GitHub
 
 jobs:
