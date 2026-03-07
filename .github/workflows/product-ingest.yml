@@ -49,7 +49,7 @@ jobs:
             curl -X POST $API \
               -H "Content-Type: application/json" \
               -H "x-api-key: $KEY" \
-              -d "{\"count\":100,\"keyword\":\"$keyword\"}"
+              -d "{\"count\":200,\"keyword\":\"$keyword\"}"
 
             echo ""
             echo "Waiting to avoid CJ API rate limit..."
