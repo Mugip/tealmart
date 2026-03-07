@@ -3,7 +3,15 @@ import { NextRequest, NextResponse } from "next/server"
 import { PrismaClient, Prisma } from "@prisma/client"
 import { getCJToken } from "@/lib/cjToken"
 
-const prisma = new PrismaClient()
+// Use singleton pattern for Prisma Client
+const globalForPrisma = global as unknown as { prisma: PrismaClient }
+
+const prisma = globalForPrisma.prisma || new PrismaClient({
+  log: ['error', 'warn'],
+})
+
+if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma
+
 const CJ_API_URL = "https://developers.cjdropshipping.com/api2.0/v1"
 const INGESTION_API_KEY = process.env.INGESTION_API_KEY!
 const MAX_BATCH = 20
@@ -58,9 +66,6 @@ function allVariantsAreSkus(variants: any[]): boolean {
   return skuCount / variants.length >= 0.8
 }
 
-/**
- * Check if description mentions sizes/variants
- */
 function descriptionMentionsSizes(description: string): boolean {
   const desc = description.toLowerCase()
   const sizeKeywords = [
@@ -83,19 +88,16 @@ function mapCJCategory(cjCategory: string, productTitle?: string, description?: 
   const desc = (description || "").toLowerCase()
   const combined = `${cat} ${title} ${desc}`
   
-  // PRIORITY 1: Women's Fashion (check FIRST before men's)
   const womenKeywords = ['women', 'ladies', 'lady', 'girl', 'female', 'dress', 'skirt', 'bra', 'heels', 'handbag', 'purse']
   if (womenKeywords.some(kw => combined.includes(kw))) {
     return "womens-fashion"
   }
   
-  // PRIORITY 2: Men's Fashion (after women's check)
   const menKeywords = ['men', 'male', 'gentleman', 'beard']
   if (menKeywords.some(kw => combined.includes(kw))) {
     return "mens-fashion"
   }
   
-  // PRIORITY 3: Specific Categories
   const categoryMap: Record<string, string[]> = {
     "phone": ["phone", "mobile", "smartphone", "cell phone", "iphone", "samsung galaxy"],
     "computer": ["computer", "laptop", "tablet", "pc", "macbook", "chromebook"],
@@ -129,7 +131,6 @@ function mapCJCategory(cjCategory: string, productTitle?: string, description?: 
     }
   }
   
-  // PRIORITY 4: Fallback to first part of CJ category
   const firstPart = cjCategory.split('>')[0].trim().toLowerCase()
   return firstPart.replace(/[^a-z0-9]+/g, '-').substring(0, 30) || "general"
 }
@@ -244,7 +245,6 @@ function extractVariants(detail: any) {
   }
 
   if (allVariantsAreSkus(raw)) {
-    console.log(`⚠️ Product has 80%+ SKU-like variants - skipping`)
     return { variants: null, totalStock: 0, skipped: true }
   }
 
@@ -315,12 +315,10 @@ function extractVariants(detail: any) {
   }
 
   if (variants.length === 0) {
-    console.log(`⚠️ No valid variants after filtering - skipping`)
     return { variants: null, totalStock: 0, skipped: true }
   }
 
   if (hasGenericLabels && variants.every(v => v.name.startsWith("Option "))) {
-    console.log(`⚠️ Variants have generic labels - hiding variant selector`)
     return { variants: null, totalStock, skipped: false }
   }
 
@@ -337,7 +335,7 @@ function extractVariants(detail: any) {
 }
 
 // ============================================
-// PRODUCT SAVE
+// PRODUCT SAVE - WITH IMMEDIATE DB FLUSH
 // ============================================
 
 async function saveProduct(product: any, existingProducts: Set<string>, keyword?: string) {
@@ -374,7 +372,6 @@ async function saveProduct(product: any, existingProducts: Set<string>, keyword?
     return { result: null, wasExisting: false }
   }
 
-  // SKIP if no variants but description mentions sizes
   if (!variants && descriptionMentionsSizes(productDescription)) {
     console.log(`❌ Skipped product ${pid} - Sizes in description but no variants`)
     return { result: null, wasExisting: false }
@@ -407,13 +404,31 @@ async function saveProduct(product: any, existingProducts: Set<string>, keyword?
     variants: variants || Prisma.JsonNull,
   }
 
-  const result = await prisma.product.upsert({
-    where: { externalId: String(pid) },
-    update: data,
-    create: data,
-  })
+  try {
+    // Force immediate write to DB
+    const result = await prisma.product.upsert({
+      where: { externalId: String(pid) },
+      update: data,
+      create: data,
+    })
 
-  return { result, wasExisting }
+    // Verify it was actually saved
+    const verified = await prisma.product.findUnique({
+      where: { externalId: String(pid) },
+      select: { id: true }
+    })
+
+    if (!verified) {
+      console.error(`⚠️ Product ${pid} save verification FAILED`)
+      return { result: null, wasExisting: false }
+    }
+
+    console.log(`✅ Product ${pid} saved and verified`)
+    return { result, wasExisting }
+  } catch (err: any) {
+    console.error(`❌ Failed to save product ${pid}:`, err.message)
+    throw err
+  }
 }
 
 // ============================================
@@ -479,8 +494,15 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      console.log(`✅ Batch ${b + 1} complete: ${created} created, ${updated} updated, ${skipped} skipped so far`)
+      // Verify batch save
+      const actualCount = await prisma.product.count()
+      console.log(`📊 Database now has ${actualCount} total products`)
+      console.log(`✅ Batch ${b + 1} complete: ${created} created, ${updated} updated, ${skipped} skipped`)
     }
+
+    // Final verification
+    const finalCount = await prisma.product.count()
+    console.log(`🎯 FINAL DATABASE COUNT: ${finalCount} products`)
 
     await prisma.ingestionLog.create({
       data: {
@@ -500,6 +522,7 @@ export async function POST(req: NextRequest) {
       updated,
       skipped,
       totalFetched: created + updated,
+      databaseCount: finalCount,
       errors,
       time: `${Date.now() - start}ms`,
     })
@@ -517,5 +540,8 @@ export async function POST(req: NextRequest) {
     }).catch(() => {})
 
     return NextResponse.json({ error: err.message }, { status: 500 })
+  } finally {
+    // Disconnect Prisma to free connections
+    await prisma.$disconnect()
   }
 }
