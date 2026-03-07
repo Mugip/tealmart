@@ -6,7 +6,7 @@ import { getCJToken } from "@/lib/cjToken"
 
 const prisma = new PrismaClient()
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2024-12-18.acacia",
+  apiVersion: "2026-02-25.clover", // Fixed version
 })
 
 const CJ_API_URL = "https://developers.cjdropshipping.com/api2.0/v1"
@@ -20,32 +20,28 @@ async function forwardOrderToCJ(order: any) {
     const products = order.items.map((item: any) => ({
       productId: item.product.externalId, // CJ product ID
       quantity: item.quantity,
-      variantId: item.variantId || "",
+      variantId: "", // Add variant support if needed
     }))
 
-    const shippingAddress = typeof order.shippingAddress === 'string' 
-      ? JSON.parse(order.shippingAddress) 
-      : order.shippingAddress
-
     const payload = {
-      orderNumber: order.id,
+      orderNumber: order.orderNumber,
       shippingMethod: "standard",
       products,
       shippingAddress: {
-        firstName: shippingAddress.firstName || shippingAddress.name?.split(' ')[0] || "Customer",
-        lastName: shippingAddress.lastName || shippingAddress.name?.split(' ').slice(1).join(' ') || "",
-        address1: shippingAddress.address1 || shippingAddress.line1 || "",
-        address2: shippingAddress.address2 || shippingAddress.line2 || "",
-        city: shippingAddress.city || "",
-        state: shippingAddress.state || shippingAddress.region || "",
-        zip: shippingAddress.zip || shippingAddress.postalCode || "",
-        country: shippingAddress.country || "US",
-        phone: shippingAddress.phone || "",
-        email: order.customerEmail,
+        firstName: order.shippingName.split(' ')[0] || "Customer",
+        lastName: order.shippingName.split(' ').slice(1).join(' ') || "",
+        address1: order.shippingAddress,
+        address2: "",
+        city: order.shippingCity,
+        state: order.shippingState,
+        zip: order.shippingZip,
+        country: order.shippingCountry,
+        phone: "",
+        email: order.email,
       },
     }
 
-    console.log(`📤 Forwarding order ${order.id} to CJ:`, payload)
+    console.log(`📤 Forwarding order ${order.orderNumber} to CJ:`, payload)
 
     const response = await fetch(`${CJ_API_URL}/shopping/order/createOrderV2`, {
       method: "POST",
@@ -61,13 +57,10 @@ async function forwardOrderToCJ(order: any) {
     if (data.code === 200) {
       console.log(`✅ CJ Order created: ${data.data?.orderNumber}`)
       
-      // Update order with CJ order number
       await prisma.order.update({
         where: { id: order.id },
         data: {
-          cjOrderNumber: data.data?.orderNumber,
-          cjOrderId: data.data?.orderId,
-          status: "processing",
+          status: "PROCESSING",
         },
       })
 
@@ -75,12 +68,10 @@ async function forwardOrderToCJ(order: any) {
     } else {
       console.error(`❌ CJ API error:`, data)
       
-      // Update order with error
       await prisma.order.update({
         where: { id: order.id },
         data: {
-          status: "failed",
-          notes: `CJ API Error: ${data.message || data.code}`,
+          status: "CANCELLED",
         },
       })
 
@@ -92,8 +83,7 @@ async function forwardOrderToCJ(order: any) {
     await prisma.order.update({
       where: { id: order.id },
       data: {
-        status: "failed",
-        notes: `Forwarding error: ${error.message}`,
+        status: "CANCELLED",
       },
     })
 
@@ -128,8 +118,8 @@ export async function POST(req: NextRequest) {
       console.log(`✅ Payment successful: ${session.id}`)
 
       // Find the order
-      const order = await prisma.order.findUnique({
-        where: { stripeSessionId: session.id },
+      const order = await prisma.order.findFirst({
+        where: { paymentId: session.id },
         include: {
           items: {
             include: {
@@ -144,19 +134,22 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Order not found" }, { status: 404 })
       }
 
-      // Update order status to paid
+      // Update order status to processing
       await prisma.order.update({
         where: { id: order.id },
-        data: { status: "paid" },
+        data: { 
+          status: "PROCESSING",
+          paidAt: new Date(),
+        },
       })
 
       // Forward order to CJ Dropshipping
       const result = await forwardOrderToCJ(order)
 
       if (result.success) {
-        console.log(`✅ Order ${order.id} forwarded to CJ: ${result.cjOrderNumber}`)
+        console.log(`✅ Order ${order.orderNumber} forwarded to CJ: ${result.cjOrderNumber}`)
       } else {
-        console.error(`❌ Failed to forward order ${order.id} to CJ: ${result.error}`)
+        console.error(`❌ Failed to forward order ${order.orderNumber} to CJ: ${result.error}`)
       }
     }
 
