@@ -76,7 +76,7 @@ function descriptionMentionsSizes(description: string): boolean {
 }
 
 // ============================================
-// IMPROVED CATEGORY MAPPING
+// CATEGORY MAPPING
 // ============================================
 
 function mapCJCategory(cjCategory: string, productTitle?: string, description?: string): string {
@@ -98,30 +98,30 @@ function mapCJCategory(cjCategory: string, productTitle?: string, description?: 
   }
   
   const categoryMap: Record<string, string[]> = {
-    "phone": ["phone", "mobile", "smartphone", "cell phone", "iphone", "samsung galaxy"],
-    "computer": ["computer", "laptop", "tablet", "pc", "macbook", "chromebook"],
-    "audio": ["audio", "headphone", "earphone", "speaker", "airpods", "earbuds"],
-    "camera": ["camera", "photography", "gopro", "canon", "nikon"],
-    "gaming": ["gaming", "game", "console", "playstation", "xbox", "nintendo"],
-    "shoes": ["shoes", "footwear", "sneaker", "boot", "sandal", "slipper"],
-    "bags": ["bag", "backpack", "luggage", "suitcase"],
+    "phone": ["phone", "mobile", "smartphone", "cell phone"],
+    "computer": ["computer", "laptop", "tablet", "pc"],
+    "audio": ["audio", "headphone", "earphone", "speaker"],
+    "camera": ["camera", "photography"],
+    "gaming": ["gaming", "game", "console"],
+    "shoes": ["shoes", "footwear", "sneaker", "boot"],
+    "bags": ["bag", "backpack", "luggage"],
     "watches": ["watch", "timepiece", "smartwatch"],
-    "jewelry": ["jewelry", "jewellery", "necklace", "bracelet", "ring", "earring"],
-    "accessories": ["accessory", "accessories", "belt", "scarf", "hat", "cap"],
-    "home-garden": ["home", "garden", "outdoor", "patio"],
-    "furniture": ["furniture", "chair", "table", "sofa", "couch", "desk"],
-    "kitchen": ["kitchen", "cookware", "utensil", "appliance"],
-    "bedding": ["bedding", "sheet", "pillow", "blanket", "comforter"],
-    "decor": ["decor", "decoration", "wall art", "vase", "candle"],
-    "beauty": ["beauty", "cosmetic", "makeup", "lipstick", "foundation"],
-    "skincare": ["skincare", "skin care", "moisturizer", "serum", "cleanser"],
-    "health": ["health", "vitamin", "supplement", "wellness"],
-    "fitness": ["fitness", "exercise", "workout", "gym", "yoga"],
-    "toys": ["toy", "kids", "children", "play"],
-    "baby": ["baby", "infant", "newborn", "toddler"],
-    "sports": ["sport", "athletic", "running", "tennis", "basketball"],
-    "pets": ["pet", "dog", "cat", "animal"],
-    "automotive": ["automotive", "car", "vehicle", "motorcycle"],
+    "jewelry": ["jewelry", "necklace", "bracelet", "ring"],
+    "accessories": ["accessory", "accessories", "belt", "scarf", "hat"],
+    "home-garden": ["home", "garden", "outdoor"],
+    "furniture": ["furniture", "chair", "table", "sofa"],
+    "kitchen": ["kitchen", "cookware"],
+    "bedding": ["bedding", "sheet", "pillow"],
+    "decor": ["decor", "decoration"],
+    "beauty": ["beauty", "cosmetic", "makeup"],
+    "skincare": ["skincare", "skin care"],
+    "health": ["health", "vitamin"],
+    "fitness": ["fitness", "exercise", "workout"],
+    "toys": ["toy", "kids", "children"],
+    "baby": ["baby", "infant"],
+    "sports": ["sport", "athletic"],
+    "pets": ["pet", "dog", "cat"],
+    "automotive": ["automotive", "car"],
   }
   
   for (const [category, keywords] of Object.entries(categoryMap)) {
@@ -135,7 +135,7 @@ function mapCJCategory(cjCategory: string, productTitle?: string, description?: 
 }
 
 // ============================================
-// CJ API FUNCTIONS - FIXED PAGINATION
+// CJ API - ACCEPTS DUPLICATES, FILTERS LATER
 // ============================================
 
 async function cjFetch(url: string, retries = 3): Promise<any> {
@@ -150,7 +150,6 @@ async function cjFetch(url: string, retries = 3): Promise<any> {
       const data = await res.json()
 
       if (data.code === 1600200) {
-        console.log("⚠️ Rate limited, waiting 2s...")
         await sleep(2000)
         continue
       }
@@ -167,57 +166,49 @@ async function cjFetch(url: string, retries = 3): Promise<any> {
   }
 }
 
+// Just fetch pages - don't worry about duplicates yet
 async function fetchCJProducts(keyword?: string, count = 10) {
-  const products: any[] = []
-  const seenIds = new Set<string>()
-  let page = 1
-  const maxPages = Math.ceil(count / MAX_BATCH) + 2 // Add buffer for duplicates
-
-  while (products.length < count && page <= maxPages) {
+  const allProducts: any[] = []
+  const targetPages = Math.ceil(count / MAX_BATCH) * 3 // Fetch 3x pages to account for duplicates
+  
+  for (let page = 1; page <= targetPages && page <= 15; page++) {
     const params = new URLSearchParams({
-      pageNum: String(page), // Changed from 'page' to 'pageNum'
+      page: String(page),
       pageSize: String(MAX_BATCH),
     })
 
     if (keyword) params.append("keyWord", keyword)
 
-    console.log(`🔍 Fetching page ${page} with params: ${params.toString()}`)
+    console.log(`🔍 Fetching CJ page ${page}`)
 
-    const data = await cjFetch(`${CJ_API_URL}/product/list?${params}`) // Changed endpoint
-    const list = data?.data?.list || data?.data?.content?.[0]?.productList || []
+    const data = await cjFetch(`${CJ_API_URL}/product/listV2?${params}`)
+    const list = data?.data?.content?.[0]?.productList || []
 
     if (!list.length) {
-      console.log(`⚠️ No products returned for page ${page}`)
+      console.log(`⚠️ No products on page ${page}, stopping`)
       break
     }
 
-    console.log(`📥 Received ${list.length} products from page ${page}`)
+    console.log(`📥 Got ${list.length} products from page ${page}`)
+    allProducts.push(...list)
 
-    // Filter out duplicates
-    let newProductsCount = 0
-    for (const product of list) {
-      const pid = String(product.id || product.pid)
-      if (!seenIds.has(pid)) {
-        seenIds.add(pid)
-        products.push(product)
-        newProductsCount++
-      }
-    }
-
-    console.log(`✨ ${newProductsCount} new unique products from page ${page}`)
-
-    // If we got zero new products, CJ API might be broken - try different approach
-    if (newProductsCount === 0) {
-      console.log(`⚠️ No new products on page ${page}, stopping pagination`)
-      break
-    }
-
-    page++
     await sleep(1100)
   }
 
-  console.log(`🎯 Total unique products collected: ${products.length}`)
-  return products.slice(0, count)
+  // NOW deduplicate
+  const seen = new Set<string>()
+  const unique: any[] = []
+  
+  for (const p of allProducts) {
+    const pid = String(p.id || p.pid)
+    if (!seen.has(pid)) {
+      seen.add(pid)
+      unique.push(p)
+    }
+  }
+
+  console.log(`✨ Deduped: ${allProducts.length} total → ${unique.length} unique`)
+  return unique.slice(0, count)
 }
 
 async function fetchProductDetail(pid: string) {
@@ -300,9 +291,7 @@ function extractVariants(detail: any) {
     }
     
     if (Object.keys(options).length === 0 && v.variantName) {
-      if (isObviousSkuCode(v.variantName)) {
-        continue
-      }
+      if (isObviousSkuCode(v.variantName)) continue
 
       const parts = v.variantName.split("-").map((s: string) => s.trim())
       if (parts.length === 2) {
@@ -390,13 +379,8 @@ async function saveProduct(product: any, existingProducts: Set<string>, keyword?
 
   const { variants, totalStock, skipped } = extractVariants(detail)
 
-  if (skipped) {
-    return { result: null, wasExisting: false }
-  }
-
-  if (!variants && descriptionMentionsSizes(productDescription)) {
-    return { result: null, wasExisting: false }
-  }
+  if (skipped) return { result: null, wasExisting: false }
+  if (!variants && descriptionMentionsSizes(productDescription)) return { result: null, wasExisting: false }
 
   if (variants?.items?.length) {
     const lowestPrice = Math.min(...variants.items.map((v: any) => v.price))
@@ -451,7 +435,7 @@ export async function POST(req: NextRequest) {
     const keyword = body.keyword
     const requested = body.count || 10
 
-    console.log(`📦 Starting ingestion: ${requested} products, keyword: ${keyword || "all"}`)
+    console.log(`📦 Ingesting ${requested} products, keyword: ${keyword || "all"}`)
 
     const existingProducts = await prisma.product.findMany({
       select: { externalId: true }
@@ -462,9 +446,9 @@ export async function POST(req: NextRequest) {
         .filter((id): id is string => id !== null)
     )
 
-    // Fetch ALL products at once with proper pagination
+    // Fetch all unique products upfront
     const products = await fetchCJProducts(keyword, requested)
-    console.log(`📥 Fetched ${products.length} unique products total`)
+    console.log(`🎯 Processing ${products.length} unique products`)
 
     let created = 0
     let updated = 0
@@ -476,11 +460,8 @@ export async function POST(req: NextRequest) {
         const { result, wasExisting } = await saveProduct(p, existingIds, keyword)
 
         if (result) {
-          if (wasExisting) {
-            updated++
-          } else {
-            created++
-          }
+          if (wasExisting) updated++
+          else created++
         } else {
           skipped++
         }
@@ -488,7 +469,6 @@ export async function POST(req: NextRequest) {
         await sleep(1100)
       } catch (err: any) {
         errors.push(`${p.id}: ${err.message}`)
-        console.error(`❌ Error processing ${p.id}:`, err)
       }
     }
 
@@ -504,7 +484,7 @@ export async function POST(req: NextRequest) {
       },
     })
 
-    console.log(`✅ FINAL: ${created} created, ${updated} updated, ${skipped} skipped`)
+    console.log(`✅ Done: ${created} created, ${updated} updated, ${skipped} skipped`)
 
     return NextResponse.json({
       success: true,
@@ -517,7 +497,7 @@ export async function POST(req: NextRequest) {
       time: `${Date.now() - start}ms`,
     })
   } catch (err: any) {
-    console.error("❌ Ingestion error:", err)
+    console.error("❌ Error:", err)
 
     await prisma.ingestionLog.create({
       data: {
