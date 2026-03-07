@@ -41,10 +41,7 @@ function isObviousSkuCode(str: string): boolean {
   
   const normalized = str.trim().toUpperCase()
   
-  // CJ SKU pattern: CJYD196698201AZ
   if (/^CJ[A-Z]{2}\d{9,15}[A-Z]{1,3}$/.test(normalized)) return true
-  
-  // Generic SKU: 4+ letters, 9+ digits, 2+ letters
   if (/^[A-Z]{4,}\d{9,}[A-Z]{2,}$/.test(normalized)) return true
   
   return false
@@ -204,7 +201,6 @@ function extractVariants(detail: any) {
     return { variants: null, totalStock: randomStock(), skipped: false }
   }
 
-  // Check if product should be skipped (80%+ obvious SKUs)
   if (allVariantsAreSkus(raw)) {
     console.log(`⚠️ Product has 80%+ SKU-like variants - skipping`)
     return { variants: null, totalStock: 0, skipped: true }
@@ -225,7 +221,6 @@ function extractVariants(detail: any) {
     
     totalStock += stock
 
-    // Parse variant options
     const options: Record<string, string> = {}
     let variantLabel = ""
     
@@ -239,10 +234,9 @@ function extractVariants(detail: any) {
       })
     }
     
-    // Fallback to variantName
     if (Object.keys(options).length === 0 && v.variantName) {
       if (isObviousSkuCode(v.variantName)) {
-        continue // Skip SKU variants
+        continue
       }
 
       const parts = v.variantName.split("-").map((s: string) => s.trim())
@@ -257,13 +251,11 @@ function extractVariants(detail: any) {
       }
     }
 
-    // Build label
     if (Object.keys(options).length > 0) {
       variantLabel = Object.entries(options).map(([k, v]) => `${k}: ${v}`).join(", ")
     } else if (v.variantName && !isObviousSkuCode(v.variantName)) {
       variantLabel = v.variantName
     } else {
-      // Generic fallback - we'll handle this later
       variantLabel = `Option ${variants.length + 1}`
       hasGenericLabels = true
     }
@@ -285,7 +277,6 @@ function extractVariants(detail: any) {
     return { variants: null, totalStock: 0, skipped: true }
   }
 
-  // If all variants have generic labels like "Option 1", "Option 2", don't show variants
   if (hasGenericLabels && variants.every(v => v.name.startsWith("Option "))) {
     console.log(`⚠️ Variants have generic labels - hiding variant selector`)
     return { variants: null, totalStock, skipped: false }
@@ -304,14 +295,13 @@ function extractVariants(detail: any) {
 }
 
 // ============================================
-// PRODUCT SAVE - FIXED PARAMETER ORDER
+// PRODUCT SAVE
 // ============================================
 
 async function saveProduct(product: any, existingProducts: Set<string>, keyword?: string) {
   const pid = product.id || product.pid
   if (!pid) return { result: null, wasExisting: false }
 
-  // Check if product already exists in DB
   const wasExisting = existingProducts.has(String(pid))
 
   const detail = await fetchProductDetail(String(pid))
@@ -394,11 +384,15 @@ export async function POST(req: NextRequest) {
 
     console.log(`📦 Starting ingestion: ${requested} products, keyword: ${keyword || "all"}`)
 
-    // Get all existing product externalIds BEFORE ingestion
+    // Get existing products and filter out nulls
     const existingProducts = await prisma.product.findMany({
       select: { externalId: true }
     })
-    const existingIds = new Set(existingProducts.map(p => p.externalId))
+    const existingIds = new Set(
+      existingProducts
+        .map(p => p.externalId)
+        .filter((id): id is string => id !== null)
+    )
     console.log(`📊 Found ${existingIds.size} existing products in database`)
 
     const batches = Math.ceil(requested / MAX_BATCH)
