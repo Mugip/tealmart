@@ -6,44 +6,43 @@ import { getCJToken } from "@/lib/cjToken"
 
 const prisma = new PrismaClient()
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2026-02-25.clover", // Fixed version
+  apiVersion: "2026-02-25.clover",
 })
 
 const CJ_API_URL = "https://developers.cjdropshipping.com/api2.0/v1"
 
-// Forward order to CJ Dropshipping
 async function forwardOrderToCJ(order: any) {
   try {
     const token = await getCJToken()
 
-    // Build CJ order payload
-    const products = order.items.map((item: any) => ({
-      productId: item.product.externalId, // CJ product ID
-      quantity: item.quantity,
-      variantId: "", // Add variant support if needed
-    }))
+    // Build products array with correct format
+    const products = order.items.map((item: any) => {
+      const product: any = {
+        vid: item.product.externalId, // CJ uses 'vid' not 'productId'
+        quantity: String(item.quantity), // Must be string
+      }
+      
+      return product
+    })
 
+    // Build correct CJ payload format
     const payload = {
       orderNumber: order.orderNumber,
-      shippingMethod: "standard",
-      products,
-      shippingAddress: {
-        firstName: order.shippingName.split(' ')[0] || "Customer",
-        lastName: order.shippingName.split(' ').slice(1).join(' ') || "",
-        address1: order.shippingAddress,
-        address2: "",
-        city: order.shippingCity,
-        state: order.shippingState,
-        zip: order.shippingZip,
-        country: order.shippingCountry,
-        phone: order.phone || "",
-        email: order.email,
-      },
+      shippingZip: order.shippingZip,
+      shippingCountryCode: order.shippingCountry === "United States" ? "US" : order.shippingCountry,
+      shippingCountry: order.shippingCountry,
+      shippingCity: order.shippingCity,
+      shippingState: order.shippingState,
+      shippingAddress: order.shippingAddress,
+      shippingCustomerName: order.shippingName,
+      shippingPhone: "1234567890", // Phone wasn't stored, use placeholder
+      remark: `TealMart Order ${order.orderNumber}`,
+      products: products,
     }
 
-    console.log(`📤 Forwarding order ${order.orderNumber} to CJ:`, payload)
+    console.log(`📤 Forwarding order to CJ:`, JSON.stringify(payload, null, 2))
 
-    const response = await fetch(`${CJ_API_URL}/shopping/order/createOrderV2`, {
+    const response = await fetch(`${CJ_API_URL}/shopping/order/createOrder`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -54,37 +53,31 @@ async function forwardOrderToCJ(order: any) {
 
     const data = await response.json()
 
-    if (data.code === 200) {
-      console.log(`✅ CJ Order created: ${data.data?.orderNumber}`)
+    if (data.code === 200 || data.result === true) {
+      console.log(`✅ CJ Order created successfully`)
       
       await prisma.order.update({
         where: { id: order.id },
-        data: {
-          status: "PROCESSING",
-        },
+        data: { status: "PROCESSING" },
       })
 
-      return { success: true, cjOrderNumber: data.data?.orderNumber }
+      return { success: true, cjOrderNumber: data.data?.orderNum }
     } else {
       console.error(`❌ CJ API error:`, data)
       
       await prisma.order.update({
         where: { id: order.id },
-        data: {
-          status: "CANCELLED",
-        },
+        data: { status: "PENDING" }, // Keep as PENDING, not CANCELLED
       })
 
       return { success: false, error: data.message }
     }
   } catch (error: any) {
-    console.error(`❌ Error forwarding order to CJ:`, error)
+    console.error(`❌ Error forwarding to CJ:`, error)
     
     await prisma.order.update({
       where: { id: order.id },
-      data: {
-        status: "CANCELLED",
-      },
+      data: { status: "PENDING" },
     })
 
     return { success: false, error: error.message }
@@ -101,7 +94,6 @@ export async function POST(req: NextRequest) {
     }
 
     const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!
-
     let event: Stripe.Event
 
     try {
@@ -111,13 +103,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: err.message }, { status: 400 })
     }
 
-    // Handle the event
     if (event.type === "checkout.session.completed") {
       const session = event.data.object as Stripe.Checkout.Session
 
       console.log(`✅ Payment successful: ${session.id}`)
 
-      // Find the order
       const order = await prisma.order.findFirst({
         where: { paymentId: session.id },
         include: {
@@ -134,7 +124,6 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Order not found" }, { status: 404 })
       }
 
-      // Update order status to processing
       await prisma.order.update({
         where: { id: order.id },
         data: { 
@@ -143,13 +132,13 @@ export async function POST(req: NextRequest) {
         },
       })
 
-      // Forward order to CJ Dropshipping
+      // Forward to CJ
       const result = await forwardOrderToCJ(order)
 
       if (result.success) {
-        console.log(`✅ Order ${order.orderNumber} forwarded to CJ: ${result.cjOrderNumber}`)
+        console.log(`✅ Order ${order.orderNumber} forwarded to CJ`)
       } else {
-        console.error(`❌ Failed to forward order ${order.orderNumber} to CJ: ${result.error}`)
+        console.error(`❌ Failed to forward order to CJ: ${result.error}`)
       }
     }
 
