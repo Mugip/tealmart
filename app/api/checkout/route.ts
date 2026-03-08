@@ -15,51 +15,32 @@ export async function POST(req: NextRequest) {
 
     console.log('📦 Checkout request:', { items: items?.length, email, hasAddress: !!shippingAddress })
 
-    // Validate required fields
     if (!email || typeof email !== 'string' || !email.includes('@')) {
-      return NextResponse.json(
-        { error: "Valid email is required" },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: "Valid email is required" }, { status: 400 })
     }
 
     if (!shippingAddress || typeof shippingAddress !== 'object') {
-      return NextResponse.json(
-        { error: "Shipping address is required" },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: "Shipping address is required" }, { status: 400 })
     }
 
-    // Validate shipping address fields
     const requiredFields = ['name', 'address1', 'city', 'state', 'zip', 'phone']
     for (const field of requiredFields) {
       if (!shippingAddress[field]) {
-        return NextResponse.json(
-          { error: `${field} is required in shipping address` },
-          { status: 400 }
-        )
+        return NextResponse.json({ error: `${field} is required in shipping address` }, { status: 400 })
       }
     }
 
     if (!items || !Array.isArray(items) || items.length === 0) {
-      return NextResponse.json(
-        { error: "Cart is empty" },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: "Cart is empty" }, { status: 400 })
     }
 
-    // Validate and fetch all products
     const productIds = items.map(item => item.id.split('-')[0])
-
     const products = await prisma.product.findMany({
       where: { id: { in: productIds } }
     })
 
     if (products.length === 0) {
-      return NextResponse.json(
-        { error: "No valid products found" },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: "No valid products found" }, { status: 400 })
     }
 
     const productMap = new Map(products.map(p => [p.id, p]))
@@ -69,7 +50,6 @@ export async function POST(req: NextRequest) {
     for (const item of items) {
       const baseProductId = item.id.split('-')[0]
       const product = productMap.get(baseProductId)
-
       if (!product) continue
 
       const price = item.price || product.price
@@ -86,17 +66,13 @@ export async function POST(req: NextRequest) {
     }
 
     if (validatedItems.length === 0) {
-      return NextResponse.json(
-        { error: "No valid products in cart" },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: "No valid products in cart" }, { status: 400 })
     }
 
     const shipping = subtotal >= 50 ? 0 : 9.99
     const tax = subtotal * 0.1
     const total = subtotal + shipping + tax
 
-    // Create Stripe session
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
       line_items: validatedItems.map(item => ({
@@ -111,16 +87,10 @@ export async function POST(req: NextRequest) {
       success_url: `${process.env.NEXT_PUBLIC_APP_URL}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/checkout/cancel`,
       customer_email: email,
-      metadata: {
-        email,
-        shippingAddress: JSON.stringify(shippingAddress),
-        items: JSON.stringify(validatedItems),
-      },
     })
 
     const orderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`
 
-    // Create order
     const order = await prisma.order.create({
       data: {
         orderNumber,
@@ -158,10 +128,7 @@ export async function POST(req: NextRequest) {
     })
   } catch (error: any) {
     console.error("Checkout error:", error)
-    return NextResponse.json(
-      { error: error.message || "Checkout failed" },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: error.message || "Checkout failed" }, { status: 500 })
   } finally {
     await prisma.$disconnect()
   }
