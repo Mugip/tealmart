@@ -60,18 +60,20 @@ async function forwardOrderToCJ(order: any) {
 
     const countryCode = getCountryCode(order.shippingCountry)
 
-    // CJ API expects these exact field names - NO shippingCountryCode
+    // Exact format from CJ documentation
     const payload = {
       orderNumber: order.orderNumber,
-      countryCode: countryCode, // This is the correct field name
       shippingZip: order.shippingZip,
       shippingCountry: order.shippingCountry,
+      shippingCountryCode: countryCode, // Must use shippingCountryCode
+      shippingProvince: order.shippingState, // CJ uses "shippingProvince" not "shippingState"
       shippingCity: order.shippingCity,
-      shippingState: order.shippingState,
-      shippingAddress: order.shippingAddress,
-      shippingCustomerName: order.shippingName,
       shippingPhone: order.shippingPhone || "0000000000",
+      shippingCustomerName: order.shippingName,
+      shippingAddress: order.shippingAddress,
       remark: `TealMart Order ${order.orderNumber}`,
+      logisticName: "YunExpress", // Required field - using a common carrier
+      fromCountryCode: "CN", // Required field - shipping from China
       products: products,
     }
 
@@ -101,7 +103,6 @@ async function forwardOrderToCJ(order: any) {
     } else {
       console.error(`❌ CJ API error:`, data)
       
-      // Keep as PENDING so you can retry manually
       await prisma.order.update({
         where: { id: order.id },
         data: { status: "PENDING" },
