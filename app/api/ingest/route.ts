@@ -15,6 +15,10 @@ const CJ_API_URL = "https://developers.cjdropshipping.com/api2.0/v1"
 const INGESTION_API_KEY = process.env.INGESTION_API_KEY!
 const MAX_BATCH = 20
 
+// In-memory cache for product details (persists during Lambda warm)
+const productDetailCache = new Map<string, { data: any; timestamp: number }>()
+const CACHE_TTL = 24 * 60 * 60 * 1000 // 24 hours
+
 // ============================================
 // UTILITY FUNCTIONS
 // ============================================
@@ -135,7 +139,7 @@ function mapCJCategory(cjCategory: string, productTitle?: string, description?: 
 }
 
 // ============================================
-// CJ API - ACCEPTS DUPLICATES, FILTERS LATER
+// CJ API WITH CACHING
 // ============================================
 
 async function cjFetch(url: string, retries = 3): Promise<any> {
@@ -166,10 +170,9 @@ async function cjFetch(url: string, retries = 3): Promise<any> {
   }
 }
 
-// Just fetch pages - don't worry about duplicates yet
 async function fetchCJProducts(keyword?: string, count = 10) {
   const allProducts: any[] = []
-  const targetPages = Math.ceil(count / MAX_BATCH) * 3 // Fetch 3x pages to account for duplicates
+  const targetPages = Math.ceil(count / MAX_BATCH) * 3
   
   for (let page = 1; page <= targetPages && page <= 15; page++) {
     const params = new URLSearchParams({
@@ -195,7 +198,6 @@ async function fetchCJProducts(keyword?: string, count = 10) {
     await sleep(1100)
   }
 
-  // NOW deduplicate
   const seen = new Set<string>()
   const unique: any[] = []
   
@@ -211,8 +213,25 @@ async function fetchCJProducts(keyword?: string, count = 10) {
   return unique.slice(0, count)
 }
 
+// CACHED product detail fetch
 async function fetchProductDetail(pid: string) {
+  const now = Date.now()
+  const cached = productDetailCache.get(pid)
+  
+  // Return cached if valid
+  if (cached && (now - cached.timestamp) < CACHE_TTL) {
+    console.log(`💾 Cache hit for product ${pid}`)
+    return cached.data
+  }
+
+  // DON'T use database cache - always fetch fresh from CJ API
+  // This ensures we get valid, current VIDs
+  console.log(`🌐 Fetching fresh data from CJ API for product ${pid}`)
   const data = await cjFetch(`${CJ_API_URL}/product/query?pid=${pid}`)
+  
+  // Cache the result
+  productDetailCache.set(pid, { data: data.data, timestamp: now })
+  
   return data.data
 }
 
@@ -240,8 +259,9 @@ function extractImages(product: any, detail?: any): string[] {
     .slice(0, 5)
 }
 
-function extractVariants(detail: any) {
+function extractVariants(detail: any, productPid: string) {
   if (!detail?.variants) {
+    console.log(`ℹ️ Product ${productPid} has no variants`)
     return { variants: null, totalStock: randomStock(), skipped: false }
   }
 
@@ -255,10 +275,14 @@ function extractVariants(detail: any) {
   }
 
   if (!Array.isArray(raw) || raw.length === 0) {
+    console.log(`ℹ️ Product ${productPid} variants is not an array or empty`)
     return { variants: null, totalStock: randomStock(), skipped: false }
   }
 
+  console.log(`📦 Product ${productPid} has ${raw.length} variants`)
+
   if (allVariantsAreSkus(raw)) {
+    console.log(`⚠️ Product ${productPid} has SKU-only variants, skipping`)
     return { variants: null, totalStock: 0, skipped: true }
   }
 
@@ -314,9 +338,20 @@ function extractVariants(detail: any) {
       hasGenericLabels = true
     }
 
+    // CRITICAL FIX: Store the actual CJ variant ID
+    // Try multiple possible field names for variant ID
+    const variantId = v.vid || v.variantId || v.id || v.vId
+    
+    if (!variantId) {
+      console.warn(`⚠️ Variant has no ID in product ${productPid}, raw variant:`, JSON.stringify(v))
+      continue
+    }
+
+    console.log(`✅ Storing variant ${variantId} for product ${productPid}`)
+
     variants.push({
-      id: v.vid,
-      sku: v.variantSku || v.vid,
+      id: String(variantId), // Store CJ's actual variant ID as string
+      sku: v.variantSku || String(variantId),
       name: variantLabel,
       price,
       costPrice,
@@ -327,14 +362,18 @@ function extractVariants(detail: any) {
   }
 
   if (variants.length === 0) {
+    console.log(`⚠️ Product ${productPid} ended up with 0 valid variants`)
     return { variants: null, totalStock: 0, skipped: true }
   }
 
   if (hasGenericLabels && variants.every(v => v.name.startsWith("Option "))) {
+    console.log(`ℹ️ Product ${productPid} has only generic labels, hiding variants`)
     return { variants: null, totalStock, skipped: false }
   }
 
   if (totalStock <= 0) totalStock = randomStock()
+
+  console.log(`✅ Product ${productPid} successfully extracted ${variants.length} variants`)
 
   return {
     variants: variants.length > 0 ? {
@@ -377,7 +416,7 @@ async function saveProduct(product: any, existingProducts: Set<string>, keyword?
   
   const category = mapCJCategory(cjCategory, productTitle, productDescription)
 
-  const { variants, totalStock, skipped } = extractVariants(detail)
+  const { variants, totalStock, skipped } = extractVariants(detail, String(pid))
 
   if (skipped) return { result: null, wasExisting: false }
   if (!variants && descriptionMentionsSizes(productDescription)) return { result: null, wasExisting: false }
@@ -436,6 +475,7 @@ export async function POST(req: NextRequest) {
     const requested = body.count || 10
 
     console.log(`📦 Ingesting ${requested} products, keyword: ${keyword || "all"}`)
+    console.log(`💾 Cache size: ${productDetailCache.size} products`)
 
     const existingProducts = await prisma.product.findMany({
       select: { externalId: true }
@@ -446,18 +486,25 @@ export async function POST(req: NextRequest) {
         .filter((id): id is string => id !== null)
     )
 
-    // Fetch all unique products upfront
     const products = await fetchCJProducts(keyword, requested)
     console.log(`🎯 Processing ${products.length} unique products`)
 
     let created = 0
     let updated = 0
     let skipped = 0
+    let apiCalls = 0
+    let cacheHits = 0
     const errors: string[] = []
 
     for (const p of products) {
       try {
+        const pid = String(p.id || p.pid)
+        const hadCache = productDetailCache.has(pid)
+        
         const { result, wasExisting } = await saveProduct(p, existingIds, keyword)
+
+        if (hadCache) cacheHits++
+        else apiCalls++
 
         if (result) {
           if (wasExisting) updated++
@@ -485,6 +532,7 @@ export async function POST(req: NextRequest) {
     })
 
     console.log(`✅ Done: ${created} created, ${updated} updated, ${skipped} skipped`)
+    console.log(`📊 API calls: ${apiCalls}, Cache hits: ${cacheHits}`)
 
     return NextResponse.json({
       success: true,
@@ -493,6 +541,8 @@ export async function POST(req: NextRequest) {
       skipped,
       totalFetched: created + updated,
       databaseCount: finalCount,
+      apiCallsUsed: apiCalls,
+      cacheHits,
       errors,
       time: `${Date.now() - start}ms`,
     })
@@ -514,3 +564,12 @@ export async function POST(req: NextRequest) {
     await prisma.$disconnect()
   }
 }
+Now re-ingest:
+curl -X POST https://tealmart.vercel.app/api/ingest \
+  -H "Content-Type: application/json" \
+  -H "x-api-key: Craigbes123" \
+  -d '{"count": 30, "keyword": "women dress"}'
+Check the Vercel logs - you should see messages like:
+✅ Storing variant XXXXX for product YYYYY
+✅ Product YYYYY successfully extracted N variants
+Then try ordering one of the newly ingested products! 🚀
