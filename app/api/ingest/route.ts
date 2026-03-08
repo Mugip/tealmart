@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { PrismaClient, Prisma } from "@prisma/client"
 import { getCJToken } from "@/lib/cjToken"
+import { classifyProduct } from "@/lib/productClassifier"
 
 const globalForPrisma = global as unknown as { prisma: PrismaClient }
 
@@ -83,174 +84,11 @@ function descriptionMentionsSizes(description: string): boolean {
 // CATEGORY MAPPING
 // ============================================
 
-
-function mapCJCategory(cjCategory: string, productTitle?: string, description?: string): string {
-
-  const title = (productTitle || "").toLowerCase()
-  const desc = (description || "").toLowerCase()
-  const cj = (cjCategory || "").toLowerCase()
-
-  const categories: Record<string, string[]> = {
-
-    gaming: [
-      "gaming","gamepad","controller","rgb keyboard","gaming mouse",
-      "playstation","ps5","ps4","xbox","nintendo"
-    ],
-
-    phone: [
-      "phone","iphone","android","phone case","screen protector",
-      "phone holder","mobile charger"
-    ],
-
-    computer: [
-      "laptop","computer","pc","keyboard","mouse","monitor","usb","ssd"
-    ],
-
-    audio: [
-      "earbuds","earphones","headphones","speaker","microphone","bluetooth headset"
-    ],
-
-    camera: [
-      "camera","dslr","tripod","photography","gopro"
-    ],
-
-    sports: [
-      "sports","football","basketball","soccer","tennis","golf",
-      "training","athletic","sports equipment"
-    ],
-
-    fitness: [
-      "gym","fitness","workout","yoga","resistance band","dumbbell","exercise"
-    ],
-
-    "mens-fashion": [
-      "mens shirt","men shirt","mens hoodie","men jacket",
-      "mens shorts","mens jeans","mens coat","mens clothing"
-    ],
-
-    "womens-fashion": [
-      "women dress","ladies dress","skirt","lingerie","bra","heels","women blouse"
-    ],
-
-    shoes: [
-      "shoes","sneaker","boots","footwear","running shoes"
-    ],
-
-    bags: [
-      "backpack","handbag","purse","wallet","luggage","crossbody bag"
-    ],
-
-    jewelry: [
-      "necklace","bracelet","ring","earring","jewelry"
-    ],
-
-    watches: [
-      "watch","smartwatch","digital watch"
-    ],
-
-    beauty: [
-      "makeup","cosmetic","lipstick","beauty brush","foundation"
-    ],
-
-    skincare: [
-      "skincare","face cream","serum","moisturizer","cleanser"
-    ],
-
-    kitchen: [
-      "kitchen","cookware","knife","pan","cutting board","utensil"
-    ],
-
-    furniture: [
-      "chair","table","sofa","desk","cabinet","furniture"
-    ],
-
-    decor: [
-      "lamp","led lamp","decoration","vase","wall decor"
-    ],
-
-    bedding: [
-      "bed","pillow","blanket","bedsheet","duvet"
-    ],
-
-    "home-garden": [
-      "garden","plant","watering","patio","outdoor tools"
-    ],
-
-    pets: [
-      "dog","cat","pet toy","pet feeder","pet bed","pet bowl"
-    ],
-
-    automotive: [
-      "car charger","car mount","dashboard","vehicle accessory"
-    ],
-
-    toys: [
-      "toy","lego","doll","kids toy","rc car"
-    ],
-
-    baby: [
-      "baby","infant","stroller","baby bottle"
-    ]
-  }
-
-  let bestCategory = "general"
-  let bestScore = 0
-
-  for (const [category, keywords] of Object.entries(categories)) {
-
-    let score = 0
-
-    for (const word of keywords) {
-
-      if (title.includes(word)) score += 5
-      else if (desc.includes(word)) score += 3
-      else if (cj.includes(word)) score += 4
-
-    }
-
-    if (cj.includes(category.replace("-", " "))) {
-      score += 6
-    }
-
-    if (score > bestScore) {
-      bestScore = score
-      bestCategory = category
-    }
-  }
-
-  // ===============================
-  // FINAL AI OVERRIDE RULES
-  // ===============================
-
-  const overrideRules: Record<string,string> = {
-
-    "gaming chair":"gaming",
-    "gaming desk":"gaming",
-    "gaming keyboard":"gaming",
-    "gaming mouse":"gaming",
-
-    "basketball":"sports",
-    "football":"sports",
-    "tennis":"sports",
-
-    "men shirt":"mens-fashion",
-    "men jacket":"mens-fashion",
-    "mens hoodie":"mens-fashion",
-
-    "women dress":"womens-fashion",
-    "ladies dress":"womens-fashion"
-  }
-
-  const combined = `${title} ${desc}`
-
-  for (const [keyword, cat] of Object.entries(overrideRules)) {
-    if (combined.includes(keyword)) {
-      return cat
-    }
-  }
-
-  return bestScore > 0 ? bestCategory : "general"
-    }
+const category = classifyProduct(
+  product.productName,
+  product.description,
+  product.categoryName
+)
 
 // ============================================
 // CJ API WITH CACHING
