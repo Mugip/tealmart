@@ -60,11 +60,11 @@ async function forwardOrderToCJ(order: any) {
 
     const countryCode = getCountryCode(order.shippingCountry)
 
-    // CJ API v2 format - correct field names
+    // CJ API expects these exact field names - NO shippingCountryCode
     const payload = {
       orderNumber: order.orderNumber,
+      countryCode: countryCode, // This is the correct field name
       shippingZip: order.shippingZip,
-      shippingCountryCode: countryCode, // Changed from countryCode to shippingCountryCode
       shippingCountry: order.shippingCountry,
       shippingCity: order.shippingCity,
       shippingState: order.shippingState,
@@ -90,7 +90,7 @@ async function forwardOrderToCJ(order: any) {
     console.log(`📥 CJ Response:`, JSON.stringify(data, null, 2))
 
     if (data.code === 200 || data.result === true) {
-      console.log(`✅ CJ Order created`)
+      console.log(`✅ CJ Order created successfully`)
       
       await prisma.order.update({
         where: { id: order.id },
@@ -101,6 +101,7 @@ async function forwardOrderToCJ(order: any) {
     } else {
       console.error(`❌ CJ API error:`, data)
       
+      // Keep as PENDING so you can retry manually
       await prisma.order.update({
         where: { id: order.id },
         data: { status: "PENDING" },
@@ -171,7 +172,7 @@ export async function POST(req: NextRequest) {
       const result = await forwardOrderToCJ(order)
 
       if (result.success) {
-        console.log(`✅ Order ${order.orderNumber} forwarded to CJ`)
+        console.log(`✅ Order ${order.orderNumber} forwarded to CJ: ${result.cjOrderNumber}`)
       } else {
         console.error(`❌ Failed to forward: ${result.error}`)
       }
