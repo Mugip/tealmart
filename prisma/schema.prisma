@@ -81,6 +81,7 @@ model Order {
   shippingState   String
   shippingZip     String
   shippingCountry String
+  shippingPhone   String?
   paymentMethod   String
   paymentId       String?
   paidAt          DateTime?
