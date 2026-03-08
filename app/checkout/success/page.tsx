@@ -2,6 +2,8 @@
 import { Suspense } from 'react'
 import SuccessPageClient from './SuccessPageClient'
 
+export const dynamic = 'force-dynamic'
+
 export default function CheckoutSuccessPage() {
   return (
     <Suspense fallback={
