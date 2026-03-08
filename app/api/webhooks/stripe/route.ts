@@ -53,10 +53,20 @@ async function forwardOrderToCJ(order: any) {
   try {
     const token = await getCJToken()
 
-    const products = order.items.map((item: any) => ({
-      vid: item.product.externalId,
-      quantity: String(item.quantity),
-    }))
+    // Build products array - quantity must be integer, not string
+    const products = order.items.map((item: any) => {
+      const vid = item.product.externalId
+      
+      // Validate VID exists
+      if (!vid) {
+        throw new Error(`Product ${item.product.id} has no externalId (CJ VID)`)
+      }
+      
+      return {
+        vid: vid, // Keep as string or number depending on what CJ returns
+        quantity: parseInt(item.quantity), // Convert to integer
+      }
+    })
 
     const countryCode = getCountryCode(order.shippingCountry)
 
@@ -65,15 +75,15 @@ async function forwardOrderToCJ(order: any) {
       orderNumber: order.orderNumber,
       shippingZip: order.shippingZip,
       shippingCountry: order.shippingCountry,
-      shippingCountryCode: countryCode, // Must use shippingCountryCode
-      shippingProvince: order.shippingState, // CJ uses "shippingProvince" not "shippingState"
+      shippingCountryCode: countryCode,
+      shippingProvince: order.shippingState,
       shippingCity: order.shippingCity,
       shippingPhone: order.shippingPhone || "0000000000",
       shippingCustomerName: order.shippingName,
       shippingAddress: order.shippingAddress,
       remark: `TealMart Order ${order.orderNumber}`,
-      logisticName: "YunExpress", // Required field - using a common carrier
-      fromCountryCode: "CN", // Required field - shipping from China
+      logisticName: "YunExpress",
+      fromCountryCode: "CN",
       products: products,
     }
 
@@ -102,6 +112,13 @@ async function forwardOrderToCJ(order: any) {
       return { success: true, cjOrderNumber: data.data?.orderNum }
     } else {
       console.error(`❌ CJ API error:`, data)
+      
+      // Log detailed product info for debugging
+      console.error(`Product VIDs in order:`, order.items.map((i: any) => ({
+        productId: i.product.id,
+        externalId: i.product.externalId,
+        title: i.product.title,
+      })))
       
       await prisma.order.update({
         where: { id: order.id },
