@@ -1,15 +1,13 @@
 // app/checkout/page.tsx
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useCart } from '@/lib/contexts/CartContext'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
-import { Truck, CreditCard, AlertCircle } from 'lucide-react'
-import countries from 'i18n-iso-countries'
-
-// Register English locale
-countries.registerLocale(require('i18n-iso-countries/langs/en.json'))
+import { Truck, CreditCard, AlertCircle, MapPin } from 'lucide-react'
+import { Country, State, City } from 'country-state-city'
+import type { ICountry, IState } from 'country-state-city'
 
 export default function CheckoutPage() {
   const { items, total } = useCart()
@@ -25,23 +23,63 @@ export default function CheckoutPage() {
     city: '',
     state: '',
     zip: '',
-    country: 'United States',
+    country: 'US', // Store country code instead of name
     phone: '',
   })
 
+  const [selectedCountry, setSelectedCountry] = useState<ICountry | null>(null)
+  const [states, setStates] = useState<IState[]>([])
+
   // Get all countries sorted alphabetically
-  const countryList = useMemo(() => {
-    const allCountries = countries.getNames('en', { select: 'official' })
-    return Object.entries(allCountries)
-      .map(([code, name]) => ({ code, name }))
-      .sort((a, b) => a.name.localeCompare(b.name))
+  const countries = useMemo(() => {
+    return Country.getAllCountries().sort((a, b) => 
+      a.name.localeCompare(b.name)
+    )
+  }, [])
+
+  // Update states when country changes
+  useEffect(() => {
+    if (formData.country) {
+      const country = Country.getCountryByCode(formData.country)
+      setSelectedCountry(country || null)
+      
+      if (country) {
+        const countryStates = State.getStatesOfCountry(country.isoCode)
+        setStates(countryStates)
+        
+        // Reset state if it doesn't exist in new country
+        if (formData.state && !countryStates.find(s => s.isoCode === formData.state)) {
+          setFormData(prev => ({ ...prev, state: '' }))
+        }
+      }
+    }
+  }, [formData.country])
+
+  // Set default country on mount
+  useEffect(() => {
+    const defaultCountry = Country.getCountryByCode('US')
+    if (defaultCountry) {
+      setSelectedCountry(defaultCountry)
+      setStates(State.getStatesOfCountry('US'))
+    }
   }, [])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    })
+    const { name, value } = e.target
+    
+    setFormData(prev => ({
+      ...prev,
+      [name]: value,
+    }))
+  }
+
+  const handleCountryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const countryCode = e.target.value
+    setFormData(prev => ({
+      ...prev,
+      country: countryCode,
+      state: '', // Reset state when country changes
+    }))
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -51,8 +89,15 @@ export default function CheckoutPage() {
 
     // Validation
     if (!formData.email || !formData.name || !formData.address || !formData.city || 
-        !formData.state || !formData.zip || !formData.phone || !formData.country) {
+        !formData.zip || !formData.phone || !formData.country) {
       setError('Please fill in all required fields')
+      setLoading(false)
+      return
+    }
+
+    // Validate state for countries that have states
+    if (states.length > 0 && !formData.state) {
+      setError('Please select a state/province')
       setLoading(false)
       return
     }
@@ -64,6 +109,10 @@ export default function CheckoutPage() {
     }
 
     try {
+      // Get country and state names
+      const country = Country.getCountryByCode(formData.country)
+      const state = formData.state ? State.getStateByCodeAndCountry(formData.state, formData.country) : null
+
       const response = await fetch('/api/checkout', {
         method: 'POST',
         headers: {
@@ -81,10 +130,11 @@ export default function CheckoutPage() {
             name: formData.name,
             address1: formData.address,
             city: formData.city,
-            state: formData.state,
+            state: state?.name || formData.state || '', // Use state name if available
             zip: formData.zip,
             postalCode: formData.zip,
-            country: formData.country,
+            country: country?.name || formData.country, // Use country name
+            countryCode: formData.country, // Also send code
             phone: formData.phone,
           },
         }),
@@ -107,6 +157,24 @@ export default function CheckoutPage() {
       setLoading(false)
     }
   }
+
+  // Get field labels based on country
+  const getFieldLabels = () => {
+    const countryCode = formData.country
+    
+    return {
+      state: countryCode === 'US' ? 'State' : 
+             countryCode === 'CA' ? 'Province' : 
+             countryCode === 'GB' ? 'County' : 
+             'State / Province / Region',
+      zip: countryCode === 'US' ? 'ZIP Code' :
+           countryCode === 'GB' ? 'Postcode' :
+           countryCode === 'CA' ? 'Postal Code' :
+           'ZIP / Postal Code',
+    }
+  }
+
+  const labels = getFieldLabels()
 
   if (items.length === 0) {
     return (
@@ -154,134 +222,181 @@ export default function CheckoutPage() {
                 </h2>
               </div>
 
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Email <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="email"
-                  name="email"
-                  value={formData.email}
-                  onChange={handleChange}
-                  required
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-tiffany-500 focus:border-tiffany-500"
-                  placeholder="you@example.com"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Full Name <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  name="name"
-                  value={formData.name}
-                  onChange={handleChange}
-                  required
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-tiffany-500 focus:border-tiffany-500"
-                  placeholder="John Doe"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Phone Number <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="tel"
-                  name="phone"
-                  value={formData.phone}
-                  onChange={handleChange}
-                  required
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-tiffany-500 focus:border-tiffany-500"
-                  placeholder="+1 (555) 123-4567"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Address <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  name="address"
-                  value={formData.address}
-                  onChange={handleChange}
-                  required
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-tiffany-500 focus:border-tiffany-500"
-                  placeholder="123 Main St"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
+              {/* Contact Information */}
+              <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    City <span className="text-red-500">*</span>
+                    Email <span className="text-red-500">*</span>
                   </label>
                   <input
-                    type="text"
-                    name="city"
-                    value={formData.city}
+                    type="email"
+                    name="email"
+                    value={formData.email}
                     onChange={handleChange}
                     required
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-tiffany-500 focus:border-tiffany-500"
-                    placeholder="New York"
+                    placeholder="you@example.com"
                   />
                 </div>
 
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    State / Province <span className="text-red-500">*</span>
+                    Full Name <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
-                    name="state"
-                    value={formData.state}
+                    name="name"
+                    value={formData.name}
                     onChange={handleChange}
                     required
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-tiffany-500 focus:border-tiffany-500"
-                    placeholder="NY"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    ZIP / Postal Code <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="zip"
-                    value={formData.zip}
-                    onChange={handleChange}
-                    required
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-tiffany-500 focus:border-tiffany-500"
-                    placeholder="10001"
+                    placeholder="John Doe"
                   />
                 </div>
 
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Country <span className="text-red-500">*</span>
+                    Phone Number <span className="text-red-500">*</span>
                   </label>
-                  <select
-                    name="country"
-                    value={formData.country}
+                  <input
+                    type="tel"
+                    name="phone"
+                    value={formData.phone}
                     onChange={handleChange}
                     required
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-tiffany-500 focus:border-tiffany-500"
-                  >
-                    <option value="">Select a country</option>
-                    {countryList.map(({ code, name }) => (
-                      <option key={code} value={name}>
-                        {name}
-                      </option>
-                    ))}
-                  </select>
+                    placeholder="+1 (555) 123-4567"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Include country code for international shipping
+                  </p>
                 </div>
               </div>
+
+              {/* Address Section */}
+              <div className="pt-4 border-t border-gray-200">
+                <div className="flex items-center gap-2 mb-4">
+                  <MapPin size={20} className="text-tiffany-600" />
+                  <h3 className="text-lg font-semibold text-gray-900">Delivery Address</h3>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Country <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      name="country"
+                      value={formData.country}
+                      onChange={handleCountryChange}
+                      required
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-tiffany-500 focus:border-tiffany-500"
+                    >
+                      <option value="">Select a country</option>
+                      {countries.map((country) => (
+                        <option key={country.isoCode} value={country.isoCode}>
+                          {country.flag} {country.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Street Address <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="address"
+                      value={formData.address}
+                      onChange={handleChange}
+                      required
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-tiffany-500 focus:border-tiffany-500"
+                      placeholder="123 Main Street, Apt 4B"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        City <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        name="city"
+                        value={formData.city}
+                        onChange={handleChange}
+                        required
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-tiffany-500 focus:border-tiffany-500"
+                        placeholder="New York"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        {labels.state} {states.length > 0 && <span className="text-red-500">*</span>}
+                      </label>
+                      {states.length > 0 ? (
+                        <select
+                          name="state"
+                          value={formData.state}
+                          onChange={handleChange}
+                          required={states.length > 0}
+                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-tiffany-500 focus:border-tiffany-500"
+                        >
+                          <option value="">Select {labels.state.toLowerCase()}</option>
+                          {states.map((state) => (
+                            <option key={state.isoCode} value={state.isoCode}>
+                              {state.name}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input
+                          type="text"
+                          name="state"
+                          value={formData.state}
+                          onChange={handleChange}
+                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-tiffany-500 focus:border-tiffany-500"
+                          placeholder={labels.state}
+                        />
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      {labels.zip} <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="zip"
+                      value={formData.zip}
+                      onChange={handleChange}
+                      required
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-tiffany-500 focus:border-tiffany-500"
+                      placeholder={
+                        formData.country === 'US' ? '10001' :
+                        formData.country === 'GB' ? 'SW1A 1AA' :
+                        formData.country === 'CA' ? 'K1A 0B1' :
+                        '12345'
+                      }
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Selected Address Preview */}
+              {selectedCountry && (
+                <div className="bg-tiffany-50 border border-tiffany-200 rounded-xl p-4">
+                  <p className="text-sm font-semibold text-gray-700 mb-2">📍 Shipping to:</p>
+                  <p className="text-sm text-gray-600">
+                    {selectedCountry.flag} {selectedCountry.name}
+                    {formData.state && states.find(s => s.isoCode === formData.state) && 
+                      `, ${states.find(s => s.isoCode === formData.state)?.name}`}
+                  </p>
+                </div>
+              )}
 
               <button
                 type="submit"
