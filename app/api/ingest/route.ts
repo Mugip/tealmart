@@ -84,11 +84,7 @@ function descriptionMentionsSizes(description: string): boolean {
 // CATEGORY MAPPING
 // ============================================
 
-const category = classifyProduct(
-  product.productName,
-  product.description,
-  product.categoryName
-)
+
 
 // ============================================
 // CJ API WITH CACHING
@@ -366,7 +362,7 @@ async function saveProduct(product: any, existingProducts: Set<string>, keyword?
   const productDescription = detail.description || product.description || ""
   const cjCategory = detail.categoryName || product.threeCategoryName || ""
   
-  const category = mapCJCategory(cjCategory, productTitle, productDescription)
+  const category = classifyProduct(productTitle, productDescription, cjCategory)
 
   const { variants, totalStock, skipped } = extractVariants(detail, String(pid))
 
