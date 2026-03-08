@@ -53,18 +53,42 @@ async function forwardOrderToCJ(order: any) {
   try {
     const token = await getCJToken()
 
-    // Build products array - quantity must be integer, not string
+    // Build products array - Use variant VID if available, otherwise product PID
     const products = order.items.map((item: any) => {
-      const vid = item.product.externalId
+      const product = item.product
+      let vid = product.externalId
       
-      // Validate VID exists
+      console.log(`🔍 Processing product:`, {
+        productId: product.id,
+        externalId: product.externalId,
+        title: product.title,
+        hasVariants: !!product.variants,
+      })
+      
+      // If product has variants, use the first variant's VID
+      if (product.variants && typeof product.variants === 'object') {
+        const variantsData = product.variants as any
+        
+        console.log(`📦 Variants data:`, variantsData)
+        
+        if (variantsData.items && Array.isArray(variantsData.items) && variantsData.items.length > 0) {
+          const firstVariant = variantsData.items[0]
+          vid = firstVariant.id // Use variant ID instead of product ID
+          console.log(`✅ Using variant VID ${vid} instead of product PID ${product.externalId}`)
+        } else {
+          console.log(`⚠️ Product has variants object but no items array`)
+        }
+      } else {
+        console.log(`ℹ️ Product has no variants, using product externalId as VID`)
+      }
+      
       if (!vid) {
-        throw new Error(`Product ${item.product.id} has no externalId (CJ VID)`)
+        throw new Error(`Product ${product.id} (${product.title}) has no valid VID`)
       }
       
       return {
-        vid: vid, // Keep as string or number depending on what CJ returns
-        quantity: parseInt(item.quantity), // Convert to integer
+        vid: String(vid), // Ensure it's a string
+        quantity: parseInt(item.quantity),
       }
     })
 
@@ -114,10 +138,12 @@ async function forwardOrderToCJ(order: any) {
       console.error(`❌ CJ API error:`, data)
       
       // Log detailed product info for debugging
-      console.error(`Product VIDs in order:`, order.items.map((i: any) => ({
+      console.error(`📋 Full product info:`, order.items.map((i: any) => ({
         productId: i.product.id,
         externalId: i.product.externalId,
         title: i.product.title,
+        hasVariants: !!i.product.variants,
+        variantsData: i.product.variants,
       })))
       
       await prisma.order.update({
@@ -154,7 +180,7 @@ export async function POST(req: NextRequest) {
     try {
       event = stripe.webhooks.constructEvent(body, signature, webhookSecret)
     } catch (err: any) {
-      console.error(`Webhook signature verification failed:`, err.message)
+      console.error(`❌ Webhook signature verification failed:`, err.message)
       return NextResponse.json({ error: err.message }, { status: 400 })
     }
 
@@ -175,7 +201,7 @@ export async function POST(req: NextRequest) {
       })
 
       if (!order) {
-        console.error(`Order not found for session ${session.id}`)
+        console.error(`❌ Order not found for session ${session.id}`)
         return NextResponse.json({ error: "Order not found" }, { status: 404 })
       }
 
@@ -187,18 +213,20 @@ export async function POST(req: NextRequest) {
         },
       })
 
+      console.log(`📦 Processing order ${order.orderNumber} with ${order.items.length} items`)
+
       const result = await forwardOrderToCJ(order)
 
       if (result.success) {
         console.log(`✅ Order ${order.orderNumber} forwarded to CJ: ${result.cjOrderNumber}`)
       } else {
-        console.error(`❌ Failed to forward: ${result.error}`)
+        console.error(`❌ Failed to forward order ${order.orderNumber}: ${result.error}`)
       }
     }
 
     return NextResponse.json({ received: true })
   } catch (error: any) {
-    console.error("Webhook error:", error)
+    console.error("❌ Webhook error:", error)
     return NextResponse.json({ error: error.message }, { status: 500 })
   } finally {
     await prisma.$disconnect()
