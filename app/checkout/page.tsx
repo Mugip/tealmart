@@ -1,14 +1,18 @@
 // app/checkout/page.tsx
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useCart } from '@/lib/contexts/CartContext'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { Truck, CreditCard, AlertCircle } from 'lucide-react'
+import countries from 'i18n-iso-countries'
+
+// Register English locale
+countries.registerLocale(require('i18n-iso-countries/langs/en.json'))
 
 export default function CheckoutPage() {
-  const { items, total, clearCart } = useCart()
+  const { items, total } = useCart()
   const router = useRouter()
 
   const [loading, setLoading] = useState(false)
@@ -25,6 +29,14 @@ export default function CheckoutPage() {
     phone: '',
   })
 
+  // Get all countries sorted alphabetically
+  const countryList = useMemo(() => {
+    const allCountries = countries.getNames('en', { select: 'official' })
+    return Object.entries(allCountries)
+      .map(([code, name]) => ({ code, name }))
+      .sort((a, b) => a.name.localeCompare(b.name))
+  }, [])
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData({
       ...formData,
@@ -39,7 +51,7 @@ export default function CheckoutPage() {
 
     // Validation
     if (!formData.email || !formData.name || !formData.address || !formData.city || 
-        !formData.state || !formData.zip || !formData.phone) {
+        !formData.state || !formData.zip || !formData.phone || !formData.country) {
       setError('Please fill in all required fields')
       setLoading(false)
       return
@@ -220,7 +232,7 @@ export default function CheckoutPage() {
 
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    State <span className="text-red-500">*</span>
+                    State / Province <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
@@ -237,7 +249,7 @@ export default function CheckoutPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    ZIP Code <span className="text-red-500">*</span>
+                    ZIP / Postal Code <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
@@ -261,10 +273,12 @@ export default function CheckoutPage() {
                     required
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-tiffany-500 focus:border-tiffany-500"
                   >
-                    <option value="United States">United States</option>
-                    <option value="Canada">Canada</option>
-                    <option value="United Kingdom">United Kingdom</option>
-                    <option value="Australia">Australia</option>
+                    <option value="">Select a country</option>
+                    {countryList.map(({ code, name }) => (
+                      <option key={code} value={name}>
+                        {name}
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>
