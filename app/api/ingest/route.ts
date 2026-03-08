@@ -564,12 +564,3 @@ export async function POST(req: NextRequest) {
     await prisma.$disconnect()
   }
 }
-Now re-ingest:
-curl -X POST https://tealmart.vercel.app/api/ingest \
-  -H "Content-Type: application/json" \
-  -H "x-api-key: Craigbes123" \
-  -d '{"count": 30, "keyword": "women dress"}'
-Check the Vercel logs - you should see messages like:
-✅ Storing variant XXXXX for product YYYYY
-✅ Product YYYYY successfully extracted N variants
-Then try ordering one of the newly ingested products! 🚀
