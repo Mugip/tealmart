@@ -103,7 +103,7 @@ function mapCJCategory(cjCategory: string, productTitle?: string, description?: 
     ],
 
     computer: [
-      "laptop","computer","pc","keyboard","mouse","monitor","usb hub","ssd"
+      "laptop","computer","pc","keyboard","mouse","monitor","usb","ssd"
     ],
 
     audio: [
@@ -116,19 +116,19 @@ function mapCJCategory(cjCategory: string, productTitle?: string, description?: 
 
     sports: [
       "sports","football","basketball","soccer","tennis","golf",
-      "training","running","athletic"
+      "training","athletic","sports equipment"
     ],
 
     fitness: [
       "gym","fitness","workout","yoga","resistance band","dumbbell","exercise"
     ],
 
-    mens-fashion: [
+    "mens-fashion": [
       "mens shirt","men shirt","mens hoodie","men jacket",
-      "mens shorts","mens jeans","mens coat"
+      "mens shorts","mens jeans","mens coat","mens clothing"
     ],
 
-    womens-fashion: [
+    "womens-fashion": [
       "women dress","ladies dress","skirt","lingerie","bra","heels","women blouse"
     ],
 
@@ -172,7 +172,7 @@ function mapCJCategory(cjCategory: string, productTitle?: string, description?: 
       "bed","pillow","blanket","bedsheet","duvet"
     ],
 
-    home-garden: [
+    "home-garden": [
       "garden","plant","watering","patio","outdoor tools"
     ],
 
@@ -202,15 +202,14 @@ function mapCJCategory(cjCategory: string, productTitle?: string, description?: 
 
     for (const word of keywords) {
 
-      if (title.includes(word)) score += 4
-      else if (desc.includes(word)) score += 2
-      else if (cj.includes(word)) score += 3
+      if (title.includes(word)) score += 5
+      else if (desc.includes(word)) score += 3
+      else if (cj.includes(word)) score += 4
 
     }
 
-    // Boost if CJ category name matches
     if (cj.includes(category.replace("-", " "))) {
-      score += 5
+      score += 6
     }
 
     if (score > bestScore) {
@@ -219,18 +218,39 @@ function mapCJCategory(cjCategory: string, productTitle?: string, description?: 
     }
   }
 
-  // Prevent electronics becoming fashion
-  const protectedCategories = [
-    "gaming","phone","computer","audio","camera","sports","fitness"
-  ]
+  // ===============================
+  // FINAL AI OVERRIDE RULES
+  // ===============================
 
-  if (protectedCategories.includes(bestCategory)) {
-    return bestCategory
+  const overrideRules: Record<string,string> = {
+
+    "gaming chair":"gaming",
+    "gaming desk":"gaming",
+    "gaming keyboard":"gaming",
+    "gaming mouse":"gaming",
+
+    "basketball":"sports",
+    "football":"sports",
+    "tennis":"sports",
+
+    "men shirt":"mens-fashion",
+    "men jacket":"mens-fashion",
+    "mens hoodie":"mens-fashion",
+
+    "women dress":"womens-fashion",
+    "ladies dress":"womens-fashion"
+  }
+
+  const combined = `${title} ${desc}`
+
+  for (const [keyword, cat] of Object.entries(overrideRules)) {
+    if (combined.includes(keyword)) {
+      return cat
+    }
   }
 
   return bestScore > 0 ? bestCategory : "general"
-}
-
+    }
 
 // ============================================
 // CJ API WITH CACHING
