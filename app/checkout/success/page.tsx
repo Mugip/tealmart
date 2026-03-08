@@ -1,12 +1,12 @@
 // app/checkout/success/page.tsx
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { CheckCircle, Package, Truck, Mail } from 'lucide-react'
 import { useCart } from '@/lib/contexts/CartContext'
 
-export default function CheckoutSuccessPage() {
+function SuccessContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { clearCart } = useCart()
@@ -128,5 +128,17 @@ export default function CheckoutSuccessPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function CheckoutSuccessPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-tiffany-50 to-white flex items-center justify-center">
+        <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-tiffany-600"></div>
+      </div>
+    }>
+      <SuccessContent />
+    </Suspense>
   )
 }
