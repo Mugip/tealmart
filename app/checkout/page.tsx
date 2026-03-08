@@ -62,7 +62,7 @@ export default function CheckoutPage() {
             id: item.id,
             title: item.title,
             price: item.price,
-            quantity: 1, // Cart context doesn't track quantity, so default to 1
+            quantity: 1,
           })),
           email: formData.email,
           shippingAddress: {
@@ -84,7 +84,6 @@ export default function CheckoutPage() {
         throw new Error(data.error || 'Checkout failed')
       }
 
-      // Redirect to Stripe checkout
       if (data.url) {
         window.location.href = data.url
       } else {
