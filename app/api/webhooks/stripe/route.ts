@@ -5,7 +5,6 @@ import Stripe from "stripe"
 import { getCJToken } from "@/lib/cjToken"
 import countries from "i18n-iso-countries"
 
-// Register English locale
 countries.registerLocale(require("i18n-iso-countries/langs/en.json"))
 
 const prisma = new PrismaClient()
@@ -16,12 +15,10 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 const CJ_API_URL = "https://developers.cjdropshipping.com/api2.0/v1"
 
 function getCountryCode(countryName: string): string {
-  // Already a 2-letter code
   if (countryName.length === 2) {
     return countryName.toUpperCase()
   }
   
-  // Try to get code from country name
   const code = countries.getAlpha2Code(countryName, "en")
   
   if (code) {
@@ -29,7 +26,6 @@ function getCountryCode(countryName: string): string {
     return code
   }
   
-  // Try common variations
   const variations: Record<string, string> = {
     "USA": "US",
     "United States of America": "US",
@@ -64,10 +60,11 @@ async function forwardOrderToCJ(order: any) {
 
     const countryCode = getCountryCode(order.shippingCountry)
 
+    // CJ API v2 format - correct field names
     const payload = {
       orderNumber: order.orderNumber,
       shippingZip: order.shippingZip,
-      countryCode: countryCode,
+      shippingCountryCode: countryCode, // Changed from countryCode to shippingCountryCode
       shippingCountry: order.shippingCountry,
       shippingCity: order.shippingCity,
       shippingState: order.shippingState,
@@ -80,7 +77,7 @@ async function forwardOrderToCJ(order: any) {
 
     console.log(`📤 Forwarding to CJ:`, JSON.stringify(payload, null, 2))
 
-    const response = await fetch(`${CJ_API_URL}/shopping/order/createOrder`, {
+    const response = await fetch(`${CJ_API_URL}/shopping/order/createOrderV2`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
