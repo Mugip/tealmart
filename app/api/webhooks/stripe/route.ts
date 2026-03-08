@@ -1,4 +1,4 @@
-// app/api/webhooks/stripe/route.ts
+// app/api/webhooks/stripe/route.ts - FINAL FIX
 import { NextRequest, NextResponse } from "next/server"
 import { PrismaClient } from "@prisma/client"
 import Stripe from "stripe"
@@ -53,10 +53,11 @@ async function forwardOrderToCJ(order: any) {
   try {
     const token = await getCJToken()
 
-    // Build products array - Use variant VID if available, otherwise product PID
+    // Build products array - Use SKU if available, otherwise VID
     const products = order.items.map((item: any) => {
       const product = item.product
-      let vid = product.externalId
+      let identifier = product.externalId
+      let identifierType = "product PID"
       
       console.log(`🔍 Processing product:`, {
         productId: product.id,
@@ -65,7 +66,7 @@ async function forwardOrderToCJ(order: any) {
         hasVariants: !!product.variants,
       })
       
-      // If product has variants, use the first variant's VID
+      // If product has variants, use the first variant's SKU
       if (product.variants && typeof product.variants === 'object') {
         const variantsData = product.variants as any
         
@@ -73,28 +74,29 @@ async function forwardOrderToCJ(order: any) {
         
         if (variantsData.items && Array.isArray(variantsData.items) && variantsData.items.length > 0) {
           const firstVariant = variantsData.items[0]
-          vid = firstVariant.id // Use variant ID instead of product ID
-          console.log(`✅ Using variant VID ${vid} instead of product PID ${product.externalId}`)
+          // Try SKU first, then VID
+          identifier = firstVariant.sku || firstVariant.id
+          identifierType = firstVariant.sku ? "variant SKU" : "variant VID"
+          console.log(`✅ Using ${identifierType}: ${identifier} instead of product PID ${product.externalId}`)
         } else {
           console.log(`⚠️ Product has variants object but no items array`)
         }
       } else {
-        console.log(`ℹ️ Product has no variants, using product externalId as VID`)
+        console.log(`ℹ️ Product has no variants, using product externalId as identifier`)
       }
       
-      if (!vid) {
-        throw new Error(`Product ${product.id} (${product.title}) has no valid VID`)
+      if (!identifier) {
+        throw new Error(`Product ${product.id} (${product.title}) has no valid identifier`)
       }
       
       return {
-        vid: String(vid), // Ensure it's a string
+        vid: String(identifier), // CJ expects this field even when using SKU
         quantity: parseInt(item.quantity),
       }
     })
 
     const countryCode = getCountryCode(order.shippingCountry)
 
-    // Exact format from CJ documentation
     const payload = {
       orderNumber: order.orderNumber,
       shippingZip: order.shippingZip,
@@ -136,8 +138,6 @@ async function forwardOrderToCJ(order: any) {
       return { success: true, cjOrderNumber: data.data?.orderNum }
     } else {
       console.error(`❌ CJ API error:`, data)
-      
-      // Log detailed product info for debugging
       console.error(`📋 Full product info:`, order.items.map((i: any) => ({
         productId: i.product.id,
         externalId: i.product.externalId,
