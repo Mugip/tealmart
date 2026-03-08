@@ -84,59 +84,172 @@ function descriptionMentionsSizes(description: string): boolean {
 // ============================================
 
 function mapCJCategory(cjCategory: string, productTitle?: string, description?: string): string {
-  if (!cjCategory) return "general"
-  
-  const cat = cjCategory.toLowerCase()
+
   const title = (productTitle || "").toLowerCase()
   const desc = (description || "").toLowerCase()
-  const combined = `${cat} ${title} ${desc}`
-  
-  const womenKeywords = ['women', 'ladies', 'lady', 'girl', 'female', 'dress', 'skirt', 'bra', 'heels', 'handbag', 'purse']
-  if (womenKeywords.some(kw => combined.includes(kw))) {
-    return "womens-fashion"
+  const cat = (cjCategory || "").toLowerCase()
+
+  const text = `${title} ${desc} ${cat}`
+
+  const match = (keywords: string[]) =>
+    keywords.some(k => text.includes(k))
+
+  // ============================================
+  // HIGH PRIORITY – ELECTRONICS
+  // ============================================
+
+  if (match([
+    "gaming","rgb","gamepad","controller","xbox","playstation","ps5","ps4","nintendo"
+  ])) return "gaming"
+
+  if (match([
+    "iphone","android","smartphone","mobile phone","phone case","phone cover",
+    "screen protector","phone holder","magnetic charger"
+  ])) return "phone"
+
+  if (match([
+    "laptop","keyboard","mouse","monitor","pc","computer","usb hub","ssd","hard drive"
+  ])) return "computer"
+
+  if (match([
+    "earbuds","earphones","headphones","bluetooth headset","speaker","microphone","soundbar"
+  ])) return "audio"
+
+  if (match([
+    "camera","dslr","tripod","photography","gopro","camera lens"
+  ])) return "camera"
+
+  // ============================================
+  // HOME / LIFESTYLE
+  // ============================================
+
+  if (match([
+    "kitchen","cookware","knife","cutting board","pan","food storage","utensil"
+  ])) return "kitchen"
+
+  if (match([
+    "sofa","table","chair","desk","cabinet","furniture"
+  ])) return "furniture"
+
+  if (match([
+    "lamp","led lamp","wall decor","decoration","vase","home decoration"
+  ])) return "decor"
+
+  if (match([
+    "bed","pillow","bedsheet","blanket","duvet"
+  ])) return "bedding"
+
+  if (match([
+    "garden","outdoor","patio","plant pot","watering"
+  ])) return "home-garden"
+
+  // ============================================
+  // HEALTH / FITNESS
+  // ============================================
+
+  if (match([
+    "fitness","gym","workout","dumbbell","yoga","resistance band","training"
+  ])) return "fitness"
+
+  if (match([
+    "vitamin","supplement","health care","medical"
+  ])) return "health"
+
+  // ============================================
+  // BEAUTY
+  // ============================================
+
+  if (match([
+    "makeup","lipstick","cosmetic","foundation","beauty blender","makeup brush"
+  ])) return "beauty"
+
+  if (match([
+    "skincare","face cream","serum","moisturizer","anti aging","facial cleanser"
+  ])) return "skincare"
+
+  // ============================================
+  // PETS
+  // ============================================
+
+  if (match([
+    "dog","cat","pet toy","pet feeder","pet collar","pet bed","pet bowl"
+  ])) return "pets"
+
+  // ============================================
+  // AUTOMOTIVE
+  // ============================================
+
+  if (match([
+    "car charger","car mount","dashboard","automotive","vehicle","car accessory"
+  ])) return "automotive"
+
+  // ============================================
+  // ACCESSORIES
+  // ============================================
+
+  if (match([
+    "watch","smartwatch","digital watch"
+  ])) return "watches"
+
+  if (match([
+    "necklace","bracelet","ring","jewelry"
+  ])) return "jewelry"
+
+  if (match([
+    "backpack","handbag","purse","wallet","luggage","shoulder bag"
+  ])) return "bags"
+
+  if (match([
+    "belt","scarf","hat","cap","sunglasses"
+  ])) return "accessories"
+
+  if (match([
+    "shoes","sneaker","boots","footwear","running shoes"
+  ])) return "shoes"
+
+  // ============================================
+  // FASHION (LOW PRIORITY)
+  // ============================================
+
+  if (match([
+    "women dress","ladies dress","skirt","lingerie","bra","heels","women blouse"
+  ])) return "womens-fashion"
+
+  if (match([
+    "men shirt","mens shirt","men jacket","mens hoodie","men suit","tie"
+  ])) return "mens-fashion"
+
+  // ============================================
+  // TOYS / BABY
+  // ============================================
+
+  if (match([
+    "toy","lego","doll","kids toy","rc car"
+  ])) return "toys"
+
+  if (match([
+    "baby","infant","stroller","baby bottle","baby toy"
+  ])) return "baby"
+
+  // ============================================
+  // SPORTS
+  // ============================================
+
+  if (match([
+    "football","basketball","soccer","tennis","sport equipment"
+  ])) return "sports"
+
+  // ============================================
+  // FALLBACK
+  // ============================================
+
+  if (cat) {
+    const first = cat.split(">")[0].trim()
+    return first.replace(/[^a-z0-9]+/g, "-").substring(0, 30)
   }
-  
-  const menKeywords = ['men', 'male', 'gentleman', 'beard']
-  if (menKeywords.some(kw => combined.includes(kw))) {
-    return "mens-fashion"
-  }
-  
-  const categoryMap: Record<string, string[]> = {
-    "phone": ["phone", "mobile", "smartphone", "cell phone"],
-    "computer": ["computer", "laptop", "tablet", "pc"],
-    "audio": ["audio", "headphone", "earphone", "speaker"],
-    "camera": ["camera", "photography"],
-    "gaming": ["gaming", "game", "console"],
-    "shoes": ["shoes", "footwear", "sneaker", "boot"],
-    "bags": ["bag", "backpack", "luggage"],
-    "watches": ["watch", "timepiece", "smartwatch"],
-    "jewelry": ["jewelry", "necklace", "bracelet", "ring"],
-    "accessories": ["accessory", "accessories", "belt", "scarf", "hat"],
-    "home-garden": ["home", "garden", "outdoor"],
-    "furniture": ["furniture", "chair", "table", "sofa"],
-    "kitchen": ["kitchen", "cookware"],
-    "bedding": ["bedding", "sheet", "pillow"],
-    "decor": ["decor", "decoration"],
-    "beauty": ["beauty", "cosmetic", "makeup"],
-    "skincare": ["skincare", "skin care"],
-    "health": ["health", "vitamin"],
-    "fitness": ["fitness", "exercise", "workout"],
-    "toys": ["toy", "kids", "children"],
-    "baby": ["baby", "infant"],
-    "sports": ["sport", "athletic"],
-    "pets": ["pet", "dog", "cat"],
-    "automotive": ["automotive", "car"],
-  }
-  
-  for (const [category, keywords] of Object.entries(categoryMap)) {
-    if (keywords.some(kw => combined.includes(kw))) {
-      return category
+
+  return "general"
     }
-  }
-  
-  const firstPart = cjCategory.split('>')[0].trim().toLowerCase()
-  return firstPart.replace(/[^a-z0-9]+/g, '-').substring(0, 30) || "general"
-}
 
 // ============================================
 // CJ API WITH CACHING
