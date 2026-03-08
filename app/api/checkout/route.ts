@@ -101,6 +101,7 @@ export async function POST(req: NextRequest) {
         shippingState: shippingAddress.state,
         shippingZip: shippingAddress.zip,
         shippingCountry: shippingAddress.country || "US",
+        shippingPhone: shippingAddress.phone,
         paymentMethod: "stripe",
         paymentId: session.id,
         status: "PENDING",
