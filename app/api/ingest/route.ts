@@ -16,7 +16,7 @@ const CJ_API_URL = "https://developers.cjdropshipping.com/api2.0/v1"
 const INGESTION_API_KEY = process.env.INGESTION_API_KEY!
 const MAX_BATCH = 20
 
-// In-memory cache for product details (persists during Lambda warm)
+// In-memory cache for product details
 const productDetailCache = new Map<string, { data: any; timestamp: number }>()
 const CACHE_TTL = 24 * 60 * 60 * 1000 // 24 hours
 
@@ -42,6 +42,12 @@ function applyMarkup(cost: number): number {
   if (cost < 15) return +(cost * 2.2 - 0.01).toFixed(2)
   if (cost < 50) return +(cost * 1.8 - 0.01).toFixed(2)
   return +(cost * 1.5 - 0.01).toFixed(2)
+}
+
+// Check if ID is UUID format (orderable products)
+function isUUID(id: string): boolean {
+  const uuidRegex = /^[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}$/i
+  return uuidRegex.test(id)
 }
 
 // ============================================
@@ -81,12 +87,6 @@ function descriptionMentionsSizes(description: string): boolean {
 }
 
 // ============================================
-// CATEGORY MAPPING
-// ============================================
-
-
-
-// ============================================
 // CJ API WITH CACHING
 // ============================================
 
@@ -120,9 +120,9 @@ async function cjFetch(url: string, retries = 3): Promise<any> {
 
 async function fetchCJProducts(keyword?: string, count = 10) {
   const allProducts: any[] = []
-  const targetPages = Math.ceil(count / MAX_BATCH) * 3
+  const targetPages = Math.ceil(count / MAX_BATCH) * 5 // Fetch more pages to account for filtering
   
-  for (let page = 1; page <= targetPages && page <= 15; page++) {
+  for (let page = 1; page <= targetPages && page <= 20; page++) {
     const params = new URLSearchParams({
       page: String(page),
       pageSize: String(MAX_BATCH),
@@ -146,6 +146,7 @@ async function fetchCJProducts(keyword?: string, count = 10) {
     await sleep(1100)
   }
 
+  // Deduplicate
   const seen = new Set<string>()
   const unique: any[] = []
   
@@ -158,23 +159,62 @@ async function fetchCJProducts(keyword?: string, count = 10) {
   }
 
   console.log(`✨ Deduped: ${allProducts.length} total → ${unique.length} unique`)
-  return unique.slice(0, count)
+  
+  // FILTER: Only keep UUID products
+  const uuidProducts = unique.filter(p => {
+    const pid = String(p.id || p.pid)
+    return isUUID(pid)
+  })
+  
+  console.log(`🔑 UUID filter: ${unique.length} total → ${uuidProducts.length} UUID products (orderable)`)
+  console.log(`❌ Filtered out ${unique.length - uuidProducts.length} non-UUID products`)
+  
+  return uuidProducts.slice(0, count)
 }
 
-// CACHED product detail fetch
+// CACHED product detail fetch - Only for UUID products
 async function fetchProductDetail(pid: string) {
   const now = Date.now()
   const cached = productDetailCache.get(pid)
   
   // Return cached if valid
   if (cached && (now - cached.timestamp) < CACHE_TTL) {
-    console.log(`💾 Cache hit for product ${pid}`)
+    console.log(`💾 Memory cache hit for product ${pid}`)
     return cached.data
   }
 
-  // DON'T use database cache - always fetch fresh from CJ API
-  // This ensures we get valid, current VIDs
-  console.log(`🌐 Fetching fresh data from CJ API for product ${pid}`)
+  // Check database for existing UUID product
+  const existing = await prisma.product.findUnique({
+    where: { externalId: pid },
+    select: {
+      description: true,
+      variants: true,
+      images: true,
+      title: true,
+      category: true,
+      price: true,
+      costPrice: true,
+    }
+  })
+
+  if (existing) {
+    console.log(`🗄️ DB cache hit for product ${pid}`)
+    const dbData = {
+      productNameEn: existing.title,
+      description: existing.description,
+      variants: existing.variants,
+      productImageList: existing.images,
+      sellPrice: existing.price,
+      categoryName: existing.category,
+    }
+    
+    // Cache it in memory
+    productDetailCache.set(pid, { data: dbData, timestamp: now })
+    return dbData
+  }
+
+  // Fetch from CJ API as last resort
+  console.log(`🌐 Fetching from CJ API for UUID product ${pid}`)
   const data = await cjFetch(`${CJ_API_URL}/product/query?pid=${pid}`)
   
   // Cache the result
@@ -286,19 +326,17 @@ function extractVariants(detail: any, productPid: string) {
       hasGenericLabels = true
     }
 
-    // CRITICAL FIX: Store the actual CJ variant ID
-    // Try multiple possible field names for variant ID
     const variantId = v.vid || v.variantId || v.id || v.vId
     
     if (!variantId) {
-      console.warn(`⚠️ Variant has no ID in product ${productPid}, raw variant:`, JSON.stringify(v))
+      console.warn(`⚠️ Variant has no ID in product ${productPid}`)
       continue
     }
 
     console.log(`✅ Storing variant ${variantId} for product ${productPid}`)
 
     variants.push({
-      id: String(variantId), // Store CJ's actual variant ID as string
+      id: String(variantId),
       sku: v.variantSku || String(variantId),
       name: variantLabel,
       price,
@@ -340,6 +378,12 @@ function extractVariants(detail: any, productPid: string) {
 async function saveProduct(product: any, existingProducts: Set<string>, keyword?: string) {
   const pid = product.id || product.pid
   if (!pid) return { result: null, wasExisting: false }
+
+  // SKIP non-UUID products
+  if (!isUUID(String(pid))) {
+    console.log(`⏭️ Skipping non-UUID product: ${pid}`)
+    return { result: null, wasExisting: false }
+  }
 
   const wasExisting = existingProducts.has(String(pid))
 
@@ -422,7 +466,7 @@ export async function POST(req: NextRequest) {
     const keyword = body.keyword
     const requested = body.count || 10
 
-    console.log(`📦 Ingesting ${requested} products, keyword: ${keyword || "all"}`)
+    console.log(`📦 Ingesting ${requested} UUID products, keyword: ${keyword || "all"}`)
     console.log(`💾 Cache size: ${productDetailCache.size} products`)
 
     const existingProducts = await prisma.product.findMany({
@@ -435,7 +479,7 @@ export async function POST(req: NextRequest) {
     )
 
     const products = await fetchCJProducts(keyword, requested)
-    console.log(`🎯 Processing ${products.length} unique products`)
+    console.log(`🎯 Processing ${products.length} UUID products`)
 
     let created = 0
     let updated = 0
@@ -447,7 +491,7 @@ export async function POST(req: NextRequest) {
     for (const p of products) {
       try {
         const pid = String(p.id || p.pid)
-        const hadCache = productDetailCache.has(pid)
+        const hadCache = productDetailCache.has(pid) || existingIds.has(pid)
         
         const { result, wasExisting } = await saveProduct(p, existingIds, keyword)
 
@@ -511,4 +555,4 @@ export async function POST(req: NextRequest) {
   } finally {
     await prisma.$disconnect()
   }
-}
+    }
