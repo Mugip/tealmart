@@ -5,37 +5,16 @@ import { useRouter } from 'next/navigation'
 import { CheckCircle, Package, Truck, Mail } from 'lucide-react'
 import { useCart } from '@/lib/contexts/CartContext'
 
-export default function SuccessPageClient({
-  sessionId,
-}: {
-  sessionId: string | null
-}) {
+export default function SuccessPageClient({ sessionId }: { sessionId: string | null }) {
   const router = useRouter()
   const { clearCart } = useCart()
 
-  // Clear cart safely
-  useEffect(() => {
-    try {
-      if (clearCart) clearCart()
-      console.log(
-        '%c[Cart] Cart cleared successfully ✅',
-        'color: green; font-weight: bold;'
-      )
-    } catch (err) {
-      console.error('%c[Cart Error]', 'color: red; font-weight: bold;', err)
-    }
-  }, [clearCart])
-
-  // ErrorCatcher - logs runtime errors to server
+  // -------------------------------
+  // Runtime error catcher
+  // -------------------------------
   useEffect(() => {
     const handleError = (event: ErrorEvent) => {
-      console.error(
-        '%c[Runtime Error]',
-        'color: orange; font-weight: bold;',
-        event.message,
-        event.error?.stack
-      )
-
+      console.error('%c[Runtime Error]', 'color: orange; font-weight: bold;', event.message, event.error?.stack)
       fetch('/api/debug/client-error', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -49,12 +28,7 @@ export default function SuccessPageClient({
     }
 
     const handlePromiseError = (event: PromiseRejectionEvent) => {
-      console.error(
-        '%c[Unhandled Promise]',
-        'color: orange; font-weight: bold;',
-        event.reason
-      )
-
+      console.error('%c[Unhandled Promise]', 'color: orange; font-weight: bold;', event.reason)
       fetch('/api/debug/client-error', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -76,19 +50,32 @@ export default function SuccessPageClient({
     }
   }, [])
 
+  // -------------------------------
+  // Clear cart on load
+  // -------------------------------
+  useEffect(() => {
+    try {
+      if (clearCart) clearCart()
+    } catch (err) {
+      console.error('%c[Cart Clear Error]', 'color: red; font-weight: bold;', err)
+    }
+  }, [clearCart])
+
+  // -------------------------------
+  // UI
+  // -------------------------------
   return (
     <div className="min-h-screen bg-gradient-to-br from-tiffany-50 to-white flex items-center justify-center px-4 py-12">
       <div className="max-w-2xl w-full">
         <div className="bg-white rounded-3xl shadow-2xl p-8 md:p-12 text-center">
+
           <div className="flex justify-center mb-6">
             <div className="bg-gradient-to-br from-green-400 to-green-600 rounded-full p-6">
               <CheckCircle size={64} className="text-white" />
             </div>
           </div>
 
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">
-            Order Confirmed 🎉
-          </h1>
+          <h1 className="text-4xl font-bold text-gray-900 mb-4">Order Confirmed 🎉</h1>
           <p className="text-xl text-gray-600 mb-8">Thank you for your purchase!</p>
 
           {sessionId && (
@@ -103,9 +90,7 @@ export default function SuccessPageClient({
               <Mail className="text-tiffany-600" />
               <div>
                 <p className="font-semibold">Email Confirmation</p>
-                <p className="text-sm text-gray-600">
-                  You'll receive an email shortly.
-                </p>
+                <p className="text-sm text-gray-600">You'll receive an email shortly.</p>
               </div>
             </div>
 
@@ -133,6 +118,7 @@ export default function SuccessPageClient({
             >
               Continue Shopping
             </button>
+
             <button
               onClick={() => router.push('/')}
               className="px-6 py-3 border rounded-lg"
@@ -140,8 +126,9 @@ export default function SuccessPageClient({
               Home
             </button>
           </div>
+
         </div>
       </div>
     </div>
   )
-          }
+}
