@@ -8,8 +8,10 @@ export default function SuccessPage({
   searchParams: { session_id?: string }
 }) {
 
-  console.log("Stripe Success Page Loaded")
-  console.log("Session ID:", searchParams?.session_id)
+  const sessionId = searchParams?.session_id || null
 
-  return <SuccessPageClient />
+  console.log("Stripe Success Page Loaded")
+  console.log("Session ID:", sessionId)
+
+  return <SuccessPageClient sessionId={sessionId} />
 }
