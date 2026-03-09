@@ -26,8 +26,7 @@
     "react-dom": "^18.3.0",
     "react-hot-toast": "^2.4.1",
     "stripe": "^20.4.0",
-    "wink-nlp": "^2.1.0",
-    "wink-eng-lite-web-model": "^1.0.0",
+    "compromise": "^14.15.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {
