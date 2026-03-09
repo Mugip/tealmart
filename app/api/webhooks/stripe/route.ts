@@ -1,4 +1,4 @@
-// app/api/webhooks/stripe/route.ts - FINAL FIX
+// app/api/webhooks/stripe/route.ts - FINAL FIX using VID instead of SKU
 import { NextRequest, NextResponse } from "next/server"
 import { PrismaClient } from "@prisma/client"
 import Stripe from "stripe"
@@ -53,11 +53,11 @@ async function forwardOrderToCJ(order: any) {
   try {
     const token = await getCJToken()
 
-    // Build products array - Use SKU if available, otherwise VID
+    // Build products array - Use variant VID (the UUID), NOT the SKU
     const products = order.items.map((item: any) => {
       const product = item.product
-      let identifier = product.externalId
-      let identifierType = "product PID"
+      let vid = product.externalId // Default to product PID
+      let vidSource = "product PID"
       
       console.log(`🔍 Processing product:`, {
         productId: product.id,
@@ -66,7 +66,7 @@ async function forwardOrderToCJ(order: any) {
         hasVariants: !!product.variants,
       })
       
-      // If product has variants, use the first variant's SKU
+      // If product has variants, use the first variant's VID (the UUID id field, NOT sku)
       if (product.variants && typeof product.variants === 'object') {
         const variantsData = product.variants as any
         
@@ -74,23 +74,24 @@ async function forwardOrderToCJ(order: any) {
         
         if (variantsData.items && Array.isArray(variantsData.items) && variantsData.items.length > 0) {
           const firstVariant = variantsData.items[0]
-          // Try SKU first, then VID
-          identifier = firstVariant.sku || firstVariant.id
-          identifierType = firstVariant.sku ? "variant SKU" : "variant VID"
-          console.log(`✅ Using ${identifierType}: ${identifier} instead of product PID ${product.externalId}`)
+          // CRITICAL: Use the 'id' field (UUID), NOT the 'sku' field
+          vid = firstVariant.id // This is the VID (UUID format like 05EDFE5D-1909-4317-A888-F5AABC5267B7)
+          vidSource = "variant VID (UUID)"
+          console.log(`✅ Using variant VID (UUID): ${vid} instead of product PID ${product.externalId}`)
+          console.log(`ℹ️ Variant SKU was: ${firstVariant.sku} (NOT used for CJ API)`)
         } else {
           console.log(`⚠️ Product has variants object but no items array`)
         }
       } else {
-        console.log(`ℹ️ Product has no variants, using product externalId as identifier`)
+        console.log(`ℹ️ Product has no variants, using product externalId as VID`)
       }
       
-      if (!identifier) {
-        throw new Error(`Product ${product.id} (${product.title}) has no valid identifier`)
+      if (!vid) {
+        throw new Error(`Product ${product.id} (${product.title}) has no valid VID`)
       }
       
       return {
-        vid: String(identifier), // CJ expects this field even when using SKU
+        vid: String(vid), // Send the UUID variant ID
         quantity: parseInt(item.quantity),
       }
     })
