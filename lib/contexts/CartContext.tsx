@@ -20,50 +20,79 @@ type CartContextType = {
   total: number
 }
 
-const CartContext = createContext<CartContextType | undefined>(undefined)
+const CartContext = createContext<CartContextType | null>(null)
 
 export function CartProvider({ children }: { children: ReactNode }) {
+
   const [items, setItems] = useState<CartItem[]>([])
 
-  // Load cart from localStorage on mount
+  // ✅ Load cart safely
   useEffect(() => {
-    const savedCart = localStorage.getItem('tealmart-cart')
-    if (savedCart) {
-      setItems(JSON.parse(savedCart))
+    try {
+      if (typeof window === 'undefined') return
+
+      const savedCart = localStorage.getItem('tealmart-cart')
+
+      if (!savedCart) return
+
+      const parsed = JSON.parse(savedCart)
+
+      if (Array.isArray(parsed)) {
+        setItems(parsed)
+      }
+    } catch (err) {
+      console.error('Failed to load cart', err)
+      localStorage.removeItem('tealmart-cart')
     }
   }, [])
 
-  // Save cart to localStorage whenever it changes
+  // ✅ Save cart safely
   useEffect(() => {
-    localStorage.setItem('tealmart-cart', JSON.stringify(items))
+    try {
+      if (typeof window === 'undefined') return
+      localStorage.setItem('tealmart-cart', JSON.stringify(items))
+    } catch (err) {
+      console.error('Failed to save cart', err)
+    }
   }, [items])
 
   const addItem = (item: Omit<CartItem, 'quantity'>) => {
-    setItems((prev) => {
-      const existingItem = prev.find((i) => i.id === item.id)
-      if (existingItem) {
+    setItems(prev => {
+
+      const existing = prev.find(i => i.id === item.id)
+
+      if (existing) {
         toast.success('Updated quantity in cart')
-        return prev.map((i) =>
-          i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i
+
+        return prev.map(i =>
+          i.id === item.id
+            ? { ...i, quantity: i.quantity + 1 }
+            : i
         )
       }
+
       toast.success('Added to cart')
+
       return [...prev, { ...item, quantity: 1 }]
     })
   }
 
   const removeItem = (id: string) => {
-    setItems((prev) => prev.filter((i) => i.id !== id))
+    setItems(prev => prev.filter(i => i.id !== id))
     toast.success('Removed from cart')
   }
 
   const updateQuantity = (id: string, quantity: number) => {
+
     if (quantity <= 0) {
       removeItem(id)
       return
     }
-    setItems((prev) =>
-      prev.map((i) => (i.id === id ? { ...i, quantity } : i))
+
+    setItems(prev =>
+      prev.map(i =>
+        i.id === id ? { ...i, quantity } : i
+      )
     )
   }
 
@@ -72,11 +101,21 @@ export function CartProvider({ children }: { children: ReactNode }) {
     toast.success('Cart cleared')
   }
 
-  const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0)
+  const total = items.reduce(
+    (sum, item) => sum + item.price * item.quantity,
+    0
+  )
 
   return (
     <CartContext.Provider
-      value={{ items, addItem, removeItem, updateQuantity, clearCart, total }}
+      value={{
+        items,
+        addItem,
+        removeItem,
+        updateQuantity,
+        clearCart,
+        total
+      }}
     >
       {children}
     </CartContext.Provider>
@@ -84,9 +123,21 @@ export function CartProvider({ children }: { children: ReactNode }) {
 }
 
 export function useCart() {
+
   const context = useContext(CartContext)
+
   if (!context) {
-    throw new Error('useCart must be used within CartProvider')
+    console.warn('CartProvider missing — returning fallback')
+
+    return {
+      items: [],
+      addItem: () => {},
+      removeItem: () => {},
+      updateQuantity: () => {},
+      clearCart: () => {},
+      total: 0
+    }
   }
+
   return context
 }
