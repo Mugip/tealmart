@@ -1,40 +1,10 @@
-"use client"
-
-import { useSearchParams } from "next/navigation"
-import { useEffect } from "react"
-import { useCart } from "@/lib/contexts/CartContext"
-import { logClientError } from "@/lib/clientLogger"
+import { Suspense } from "react"
+import SuccessClient from "./SuccessClient"
 
 export default function SuccessPage() {
-  const searchParams = useSearchParams()
-  const cart = useCart()
-
-  useEffect(() => {
-    try {
-      console.log("Stripe Success Page Loaded")
-
-      const sessionId = searchParams.get("session_id")
-      console.log("Session ID:", sessionId)
-
-      if (cart?.clearCart) {
-        cart.clearCart()
-      }
-
-    } catch (error) {
-      console.error("Success page crash:", error)
-      logClientError(error, "checkout-success")
-    }
-  }, [searchParams])
-
   return (
-    <div className="max-w-2xl mx-auto py-20 text-center">
-      <h1 className="text-3xl font-bold text-green-600 mb-4">
-        Payment Successful 🎉
-      </h1>
-
-      <p className="text-gray-600">
-        Your order has been received and is being processed.
-      </p>
-    </div>
+    <Suspense fallback={<div className="p-10 text-center">Processing payment...</div>}>
+      <SuccessClient />
+    </Suspense>
   )
 }
