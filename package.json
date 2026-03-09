@@ -32,7 +32,7 @@
     "@auth/prisma-adapter": "^1.0.12",
     "resend": "^3.2.0",
     "react-email": "^2.0.0",
-    "@react-email/components": "^0.0.14",
+    "@react-email/components": "^1.0.1",
     "date-fns": "^3.3.1",
     "react-countdown": "^2.3.5",
     "zod": "^3.23.8"
