@@ -1,108 +1,33 @@
-// app/checkout/success/SuccessPageClient.tsx
+"use client"
 
-'use client'
+import { useSearchParams } from "next/navigation"
+import { useEffect } from "react"
+import { useCart } from "@/lib/contexts/CartContext"
 
-import { useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { CheckCircle, Package, Truck, Mail } from 'lucide-react'
-import { useCart } from '@/lib/contexts/CartContext'
-
-export default function SuccessPageClient({
-  sessionId,
-}: {
-  sessionId: string | null
-}) {
-  const router = useRouter()
+export default function SuccessClient() {
+  const searchParams = useSearchParams()
   const { clearCart } = useCart()
 
   useEffect(() => {
-    try {
-      if (clearCart) clearCart()
-    } catch (err) {
-      console.error("Cart clear error:", err)
+    const sessionId = searchParams.get("session_id")
+
+    console.log("Stripe Success Page Loaded")
+    console.log("Session ID:", sessionId)
+
+    if (clearCart) {
+      clearCart()
     }
-  }, [clearCart])
+  }, [searchParams, clearCart])
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-tiffany-50 to-white flex items-center justify-center px-4 py-12">
-      <div className="max-w-2xl w-full">
-        <div className="bg-white rounded-3xl shadow-2xl p-8 md:p-12 text-center">
+    <div className="max-w-2xl mx-auto py-20 text-center">
+      <h1 className="text-3xl font-bold text-green-600 mb-4">
+        Payment Successful 🎉
+      </h1>
 
-          <div className="flex justify-center mb-6">
-            <div className="bg-gradient-to-br from-green-400 to-green-600 rounded-full p-6">
-              <CheckCircle size={64} className="text-white" />
-            </div>
-          </div>
-
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">
-            Order Confirmed 🎉
-          </h1>
-
-          <p className="text-xl text-gray-600 mb-8">
-            Thank you for your purchase!
-          </p>
-
-          {sessionId && (
-            <div className="bg-tiffany-50 rounded-xl p-4 mb-6">
-              <p className="text-sm text-gray-500">Stripe Session</p>
-              <p className="text-xs font-mono break-all">{sessionId}</p>
-            </div>
-          )}
-
-          <div className="space-y-4 text-left mb-8">
-
-            <div className="flex gap-4">
-              <Mail className="text-tiffany-600" />
-              <div>
-                <p className="font-semibold">Email Confirmation</p>
-                <p className="text-sm text-gray-600">
-                  You'll receive an email shortly.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex gap-4">
-              <Package className="text-tiffany-600" />
-              <div>
-                <p className="font-semibold">Processing</p>
-                <p className="text-sm text-gray-600">
-                  Orders ship in 1–2 business days.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex gap-4">
-              <Truck className="text-tiffany-600" />
-              <div>
-                <p className="font-semibold">Shipping Updates</p>
-                <p className="text-sm text-gray-600">
-                  Tracking will be emailed to you.
-                </p>
-              </div>
-            </div>
-
-          </div>
-
-          <div className="flex gap-4 justify-center">
-
-            <button
-              onClick={() => router.push('/products')}
-              className="px-6 py-3 bg-tiffany-600 text-white rounded-lg"
-            >
-              Continue Shopping
-            </button>
-
-            <button
-              onClick={() => router.push('/')}
-              className="px-6 py-3 border rounded-lg"
-            >
-              Home
-            </button>
-
-          </div>
-
-        </div>
-      </div>
+      <p className="text-gray-600">
+        Your order has been received and is being processed.
+      </p>
     </div>
   )
-      }
+}
