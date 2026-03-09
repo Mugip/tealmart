@@ -12,29 +12,20 @@ export default function SuccessPageClient({
 }) {
   const router = useRouter()
 
-  let clearCart: (() => void) | undefined
-
-  try {
-    const cart = useCart()
-    clearCart = cart?.clearCart
-  } catch {
-    console.warn("Cart context not ready")
-  }
+  // hooks must be called normally
+  const { clearCart } = useCart()
 
   useEffect(() => {
-    if (clearCart) {
-      try {
-        clearCart()
-      } catch (err) {
-        console.error("Cart clear error:", err)
-      }
+    try {
+      clearCart()
+    } catch (err) {
+      console.error('Failed to clear cart:', err)
     }
   }, [clearCart])
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-tiffany-50 to-white flex items-center justify-center px-4 py-12">
       <div className="max-w-2xl w-full">
-
         <div className="bg-white rounded-3xl shadow-xl p-8 md:p-12 text-center">
 
           {/* Success Icon */}
@@ -44,7 +35,6 @@ export default function SuccessPageClient({
             </div>
           </div>
 
-          {/* Title */}
           <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
             Order Confirmed 🎉
           </h1>
@@ -53,7 +43,6 @@ export default function SuccessPageClient({
             Thank you for your purchase!
           </p>
 
-          {/* Session ID */}
           {sessionId && (
             <div className="bg-tiffany-50 rounded-xl p-4 mb-8">
               <p className="text-sm text-gray-500 mb-1">Stripe Session ID</p>
@@ -63,7 +52,6 @@ export default function SuccessPageClient({
             </div>
           )}
 
-          {/* Order Steps */}
           <div className="space-y-5 text-left mb-10">
 
             <div className="flex gap-4 items-start">
@@ -104,7 +92,6 @@ export default function SuccessPageClient({
 
           </div>
 
-          {/* Buttons */}
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
 
             <button
@@ -124,8 +111,7 @@ export default function SuccessPageClient({
           </div>
 
         </div>
-
       </div>
     </div>
   )
-                }
+              }
