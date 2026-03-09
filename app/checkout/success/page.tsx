@@ -1,10 +1,31 @@
-import { Suspense } from "react"
-import SuccessClient from "./SuccessPageClient"
+// /app/checkout/success/page.tsx
+"use client" // ❗ ensures Next.js treats the whole page as client-side
 
-export default function SuccessPage() {
+import { useSearchParams } from "next/navigation"
+import { useEffect } from "react"
+import { useCart } from "@/lib/contexts/CartContext"
+
+export default function CheckoutSuccess() {
+  const searchParams = useSearchParams()
+  const { clearCart } = useCart()
+
+  useEffect(() => {
+    const sessionId = searchParams.get("session_id")
+    console.log("Stripe Success Page Loaded")
+    console.log("Session ID:", sessionId)
+
+    // clear cart after payment
+    clearCart?.()
+  }, [searchParams, clearCart])
+
   return (
-    <Suspense fallback={<div className="p-10 text-center">Processing payment...</div>}>
-      <SuccessClient />
-    </Suspense>
+    <div className="max-w-2xl mx-auto py-20 text-center">
+      <h1 className="text-3xl font-bold text-green-600 mb-4">
+        Payment Successful 🎉
+      </h1>
+      <p className="text-gray-600">
+        Your order has been received and is being processed.
+      </p>
+    </div>
   )
 }
