@@ -1,17 +1,50 @@
 'use client'
 
 import { useEffect } from "react"
-import { reportClientError } from "@/lib/clientErrorLogger"
 
 export default function ErrorCatcher() {
+
   useEffect(() => {
 
+    const sendError = async (payload: {
+      error: any
+      stack?: string
+      context?: string
+    }) => {
+      try {
+        await fetch("/api/debug/client-error", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            error: typeof payload.error === "string"
+              ? payload.error
+              : payload.error?.message || "Unknown client error",
+            stack: payload.stack || payload.error?.stack || null,
+            context: payload.context || "global",
+            url: window.location.href,
+          }),
+        })
+      } catch {
+        // never break the UI if logging fails
+      }
+    }
+
     const handleError = (event: ErrorEvent) => {
-      reportClientError(event.error || event.message)
+      sendError({
+        error: event.error || event.message,
+        stack: event.error?.stack,
+        context: "window-error",
+      })
     }
 
     const handlePromiseError = (event: PromiseRejectionEvent) => {
-      reportClientError(event.reason)
+      sendError({
+        error: event.reason,
+        stack: event.reason?.stack,
+        context: "unhandled-promise-rejection",
+      })
     }
 
     window.addEventListener("error", handleError)
