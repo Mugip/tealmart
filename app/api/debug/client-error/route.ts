@@ -1,20 +1,18 @@
-import { NextRequest, NextResponse } from "next/server"
+import { NextResponse } from "next/server"
 
-export async function POST(req: NextRequest) {
+export async function POST(req: Request) {
   try {
-    const body = await req.json()
+    const data = await req.json()
 
-    console.error("🚨 CLIENT ERROR REPORT")
-    console.error("Time:", new Date().toISOString())
-    console.error("Message:", body.message)
-    console.error("Stack:", body.stack)
-    console.error("URL:", body.url)
-    console.error("UserAgent:", body.userAgent)
-    console.error("Extra:", body.extra)
+    console.error("🚨 CLIENT ERROR CAPTURED")
+    console.error("Context:", data.context)
+    console.error("Error:", data.error)
+    console.error("Stack:", data.stack)
+    console.error("URL:", data.url)
 
-    return NextResponse.json({ received: true })
-  } catch (error: any) {
-    console.error("❌ Debug logging failed:", error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ ok: true })
+  } catch (err) {
+    console.error("Debug logger failure:", err)
+    return NextResponse.json({ ok: false })
   }
 }
