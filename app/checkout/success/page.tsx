@@ -1,17 +1,40 @@
-import SuccessPageClient from "./SuccessPageClient"
+"use client"
 
-export const dynamic = "force-dynamic"
+import { useSearchParams } from "next/navigation"
+import { useEffect } from "react"
+import { useCart } from "@/lib/contexts/CartContext"
+import { logClientError } from "@/lib/clientLogger"
 
-export default function SuccessPage({
-  searchParams,
-}: {
-  searchParams: { session_id?: string }
-}) {
+export default function SuccessPage() {
+  const searchParams = useSearchParams()
+  const cart = useCart()
 
-  const sessionId = searchParams?.session_id || null
+  useEffect(() => {
+    try {
+      console.log("Stripe Success Page Loaded")
 
-  console.log("Stripe Success Page Loaded")
-  console.log("Session ID:", sessionId)
+      const sessionId = searchParams.get("session_id")
+      console.log("Session ID:", sessionId)
 
-  return <SuccessPageClient sessionId={sessionId} />
+      if (cart?.clearCart) {
+        cart.clearCart()
+      }
+
+    } catch (error) {
+      console.error("Success page crash:", error)
+      logClientError(error, "checkout-success")
+    }
+  }, [searchParams])
+
+  return (
+    <div className="max-w-2xl mx-auto py-20 text-center">
+      <h1 className="text-3xl font-bold text-green-600 mb-4">
+        Payment Successful 🎉
+      </h1>
+
+      <p className="text-gray-600">
+        Your order has been received and is being processed.
+      </p>
+    </div>
+  )
 }
