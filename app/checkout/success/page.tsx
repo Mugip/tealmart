@@ -1,5 +1,14 @@
-import SuccessPageClient from './SuccessPageClient'
+import SuccessPageClient from "./SuccessPageClient";
 
-export default function SuccessPagePage({ searchParams }: { searchParams: { session_id?: string } }) {
-  return <SuccessPageClient sessionId={searchParams.session_id || null} />
+export default function Page({
+  searchParams,
+}: {
+  searchParams: { session_id?: string };
+}) {
+  const sessionId =
+    typeof searchParams?.session_id === "string"
+      ? searchParams.session_id
+      : null;
+
+  return <SuccessPageClient sessionId={sessionId} />;
 }
