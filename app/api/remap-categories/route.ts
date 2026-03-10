@@ -137,7 +137,7 @@ export async function POST(req: NextRequest) {
         errors,
         duration: `${duration}s`,
       },
-      changes: categoryChanges.slice(0, 50), // First 50 changes for preview
+      changes: categoryChanges.slice(0, 100), // First 50 changes for preview
       changeSummary,
       categoryDistribution,
       message: dryRun
