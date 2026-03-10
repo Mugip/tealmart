@@ -205,7 +205,7 @@ export default function RemapCategoriesPage() {
                   {result.changes && result.changes.length > 0 && (
                     <div className="bg-white border border-gray-200 rounded-xl p-6">
                       <h3 className="font-semibold text-gray-900 mb-4">
-                        Sample Changes (First 50)
+                        Sample Changes (First 100)
                       </h3>
                       <div className="space-y-2 max-h-96 overflow-y-auto">
                         {result.changes.map((change: any, index: number) => (
