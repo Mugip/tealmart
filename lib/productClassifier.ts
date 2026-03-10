@@ -1,8 +1,25 @@
 // lib/productClassifier.ts
 import nlp from 'compromise'
 
+// Define types for category rules
+interface CategoryPattern {
+  match: string[]
+  with?: string[]
+  without?: string[]
+  score: number
+}
+
+interface CategoryRule {
+  required?: string[]
+  keywords?: string[]
+  phrases?: string[]
+  patterns?: CategoryPattern[]
+  exclude?: string[]
+  weight: number
+}
+
 // Define category patterns with weighted keywords
-const CATEGORY_RULES = {
+const CATEGORY_RULES: Record<string, CategoryRule> = {
   // Priority 1: Baby (check first)
   'baby': {
     required: ['baby', 'infant', 'newborn', 'toddler', 'nursery', 'maternity'],
@@ -34,12 +51,9 @@ const CATEGORY_RULES = {
   // Priority 3: Fashion categories
   'womens-fashion': {
     patterns: [
-      // Dress patterns (highest priority for womens)
       { match: ['dress'], with: ['women', 'womens', 'ladies', 'lady', 'female', 'evening', 'wedding', 'party', 'cocktail'], score: 20 },
       { match: ['dress'], without: ['men', 'mens', 'shoes', 'bedding'], score: 15 },
-      // Clothing patterns
       { match: ['clothing', 'shirt', 'blouse', 'top', 'pants', 'skirt'], with: ['women', 'womens', 'ladies'], score: 20 },
-      // Sweater patterns
       { match: ['sweater'], with: ['women', 'womens', 'ladies', 'ugly christmas'], score: 18 },
     ],
     keywords: ['gown', 'skirt', 'blouse', 'leggings', 'lace', 'sequin', 'bodycon', 'mermaid', 'fishtail', 'clutch'],
@@ -101,7 +115,6 @@ const CATEGORY_RULES = {
     weight: 7
   },
 
-  // Priority 5: Other categories
   'gaming': {
     required: ['gaming', 'game', 'console', 'playstation', 'xbox', 'nintendo', 'gamepad'],
     keywords: ['controller', 'joystick', 'rgb'],
