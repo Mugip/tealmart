@@ -1,8 +1,6 @@
 // scripts/remap-categories.ts
-// Remaps all existing products to correct categories using the updated classifier
-
 import { PrismaClient } from '@prisma/client'
-import { classifyProduct } from './lib/productClassifier'
+import { classifyProduct } from '../lib/productClassifier'  // Fixed: added ../
 
 const prisma = new PrismaClient()
 
