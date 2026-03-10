@@ -25,7 +25,7 @@ const CATEGORY_PATTERNS: Record<string, {
     primary: ['laptop', 'computer', 'pc', 'desktop', 'macbook'],
     secondary: ['keyboard', 'mouse', 'monitor'],
     phrases: ['graphics card', 'usb hub', 'usb android cable'],
-    excludeIfContains: ['baby', 'women', 'womens', 'dress']
+    excludeIfContains: ['baby', 'women dress', 'womens dress', 'ladies dress']
   },
   
   'audio': {
@@ -52,20 +52,20 @@ const CATEGORY_PATTERNS: Record<string, {
   'fitness': {
     primary: ['fitness', 'gym', 'workout', 'exercise'],
     secondary: ['dumbbell', 'kettlebell', 'resistance'],
-    phrases: ['resistance band', 'gym equipment', 'fitness tracker'],
-    excludeIfContains: ['baby', 'women', 'womens', 'dress', 'clothing', 'shirt', 'blouse']
+    phrases: ['resistance band', 'gym equipment', 'fitness tracker', 'gym wear plain shirts', 'mens fitness sports'],
+    excludeIfContains: ['baby', 'women dress', 'womens dress', 'ladies dress']
   },
   
   'mens-fashion': {
-    primary: ['mens', 'men sweater', 'men shirt'],
+    primary: ['mens dress shoes', 'mens patent', 'mens fitness'],
     secondary: ['jacket', 'jeans', 'hoodie'],
-    phrases: ['mens shirt', 'mens jacket', 'mens clothing', 'ugly christmas sweater mens'],
-    excludeIfContains: ['baby', 'womens', 'women', 'ladies', 'dress']
+    phrases: ['mens shirt', 'mens jacket', 'mens clothing', 'mens dress shoes', 'pointed toe dress shoes mens'],
+    excludeIfContains: ['baby', 'womens', 'women', 'ladies', 'dress women', 'dress ladies']
   },
   
   'womens-fashion': {
-    primary: ['womens', 'women', 'ladies', 'lady', 'female'],
-    secondary: ['skirt', 'blouse', 'gown'],
+    primary: ['womens clothing', 'ladies clothing', 'women clothing'],
+    secondary: ['skirt', 'blouse', 'gown', 'top', 'leggings', 'pants', 'trousers'],
     phrases: [
       'womens dress', 'ladies dress', 'women dress', 'dress women', 'womens clothing', 
       'sweater dress', 'vest dress', 'knit dress', 'summer dress women', 'shirt women dress',
@@ -78,10 +78,10 @@ const CATEGORY_PATTERNS: Record<string, {
       'pockets trousers womens', 'v-neck printed womens', 'colorful striped blouse',
       'women lace sling', 'lace sling lace dress', 'sleeveless bodycon', 'sleevless flowers lace',
       'bohemian floral dress', 'one-shoulder floral', 'single-breasted shirt women',
-      'sexy one shoulder women', 'printed office midi', 'ugly christmas sweater womens',
-      'vacation santa elf womens'
+      'sexy one shoulder women dress', 'printed office midi', 'ugly christmas sweater womens',
+      'vacation santa elf womens', 'gym wear plain shirts', 'fitness sports clothin'
     ],
-    excludeIfContains: ['baby', 'infant', 'mens', 'men']
+    excludeIfContains: ['baby', 'infant', 'mens', 'men', 'shoes', 'sandals', 'sneakers', 'heels', 'boots', 'flats', 'slippers']
   },
 
   'kids-fashion': {
@@ -92,24 +92,32 @@ const CATEGORY_PATTERNS: Record<string, {
   },
 
   'shoes': {
-    primary: ['shoes', 'sneakers', 'boots', 'footwear', 'sandals', 'heels'],
-    secondary: ['running', 'walking'],
-    phrases: ['running shoes', 'sports shoes', 'leisure shoes'],
-    excludeIfContains: ['baby', 'kitchen', 'women', 'womens', 'dress', 'clothing', 'sweater', 'shirt']
+    primary: ['shoes', 'sneakers', 'boots', 'footwear', 'sandals', 'heels', 'slippers'],
+    secondary: ['casual', 'running', 'walking', 'sports'],
+    phrases: [
+      'casual shoes', 'running shoes', 'sports shoes', 'leisure shoes', 'canvas shoes',
+      'women shoes', 'womens shoes', 'ladies shoes', 'women casual shoes', 'women sandal',
+      'women jelly shoes', 'women sporting shoes', 'women sports sneakers', 'flat shoes women',
+      'high heels women', 'women flats', 'sandals women', 'women mesh shoes', 'daddy shoes women',
+      'fisherman shoes women', 'high heel women shoes', 'nude shoes women', 'single shoes women',
+      'pointed stiletto women', 'loafer shoes women', 'ballet flats women', 'mens dress shoes',
+      'dress shoes mens', 'men and women shoes', 'bicycle shoes men and women', 'football shoes men and women'
+    ],
+    excludeIfContains: ['baby', 'kitchen', 'dress women', 'sweater', 'clothing', 'shirt', 'blouse']
   },
   
   'bags': {
-    primary: ['backpack', 'handbag', 'purse', 'wallet', 'luggage', 'clutch'],
-    secondary: ['shoulder', 'crossbody', 'tote'],
-    phrases: ['shoulder bag', 'travel bag', 'evening bag', 'clutch bag', 'banquet bag'],
-    excludeIfContains: ['baby', 'power bank', 'battery', 'women dress', 'printed v-neck dress']
+    primary: ['backpack', 'handbag', 'purse', 'wallet', 'luggage', 'clutch', 'evening bag'],
+    secondary: ['shoulder bag', 'crossbody', 'tote', 'banquet bag'],
+    phrases: ['shoulder bag', 'travel bag', 'laptop bag', 'evening bag', 'clutch bag', 'banquet bag', 'ladies banquet bag', 'sequin bag ladies', 'diamond-studded ladies bag'],
+    excludeIfContains: ['baby', 'power bank', 'battery', 'charger']
   },
   
   'jewelry': {
     primary: ['jewelry', 'necklace', 'bracelet', 'ring', 'earring', 'pendant'],
     secondary: ['gold', 'silver', 'diamond'],
     phrases: ['gold necklace', 'silver ring'],
-    excludeIfContains: ['baby', 'charger', 'cable', 'usb', 'android', 'women', 'womens', 'dress', 'clothing', 'lace dress', '3pcs womens']
+    excludeIfContains: ['baby', 'charger', 'cable', 'usb', 'android', 'mobile', 'phone', 'women dress', 'womens clothing']
   },
   
   'watches': {
@@ -137,7 +145,7 @@ const CATEGORY_PATTERNS: Record<string, {
     primary: ['kitchen', 'cookware', 'utensil'],
     secondary: ['pan', 'pot', 'storage box'],
     phrases: ['kitchen knife', 'kitchen cloth', 'knife and fork', 'kitchen shelf'],
-    excludeIfContains: ['baby', 'bedding', 'android', 'women', 'womens', 'dress', 'sleeveless']
+    excludeIfContains: ['baby', 'bedding', 'android', 'women', 'womens', 'dress']
   },
   
   'furniture': {
@@ -177,7 +185,7 @@ const CATEGORY_PATTERNS: Record<string, {
     primary: ['pet', 'dog', 'cat', 'puppy', 'kitten'],
     secondary: ['collar', 'leash'],
     phrases: ['pet toy', 'dog bed'],
-    excludeIfContains: ['baby', 'women', 'womens']
+    excludeIfContains: ['baby', 'women', 'womens', 'kitchen']
   },
   
   'automotive': {
@@ -247,44 +255,57 @@ export function classifyProduct(
   let bestScore = 0
   
   // Baby priority
-  const babyKeywords = ['baby', 'infant', 'newborn', 'toddler']
-  if (babyKeywords.some(k => combinedText.includes(k))) {
+  if (['baby', 'infant', 'newborn', 'toddler'].some(k => combinedText.includes(k))) {
     return 'baby'
   }
   
-  // WOMENS FASHION PRIORITY - Check first with high scoring
-  const womensIndicators = ['women', 'womens', 'ladies', 'lady', 'female']
-  const dressIndicators = ['dress', 'skirt', 'blouse', 'gown']
+  // SHOES PRIORITY - Check before womens-fashion
+  const shoeKeywords = ['shoes', 'sneakers', 'boots', 'sandals', 'heels', 'slippers', 'flats', 'stiletto', 'loafer']
+  if (shoeKeywords.some(s => combinedText.includes(s))) {
+    const shoesPatterns = CATEGORY_PATTERNS['shoes']
+    let shoesScore = 0
+    
+    for (const phrase of shoesPatterns.phrases) {
+      if (combinedText.includes(phrase)) {
+        shoesScore += 50
+        break
+      }
+    }
+    
+    for (const keyword of shoesPatterns.primary) {
+      if (combinedText.includes(keyword)) shoesScore += 30
+    }
+    
+    if (shoesScore > 0) {
+      return 'shoes'
+    }
+  }
   
-  if (womensIndicators.some(w => combinedText.includes(w)) || 
-      dressIndicators.some(d => combinedText.includes(d))) {
+  // WOMENS FASHION PRIORITY - Only for clothing/dresses
+  const womensIndicators = ['women', 'womens', 'ladies', 'lady', 'female']
+  const clothingIndicators = ['dress', 'skirt', 'blouse', 'gown', 'clothing', 'shirt', 'top', 'pants', 'trousers', 'sweater']
+  
+  if (womensIndicators.some(w => combinedText.includes(w)) && 
+      clothingIndicators.some(c => combinedText.includes(c))) {
     
     const womensPatterns = CATEGORY_PATTERNS['womens-fashion']
     let womensScore = 0
     
-    // Phrase matching (highest priority)
     for (const phrase of womensPatterns.phrases) {
       if (combinedText.includes(phrase)) {
-        womensScore += 50 // Very high score for exact phrase match
-        break // One match is enough
+        womensScore += 50
+        break
       }
     }
     
-    // Primary keyword matching
     for (const keyword of womensPatterns.primary) {
-      if (combinedText.includes(keyword)) {
-        womensScore += 30
-      }
+      if (combinedText.includes(keyword)) womensScore += 30
     }
     
-    // Secondary keyword matching
     for (const keyword of womensPatterns.secondary) {
-      if (combinedText.includes(keyword)) {
-        womensScore += 10
-      }
+      if (combinedText.includes(keyword)) womensScore += 10
     }
     
-    // If it scores anything, it's womens fashion
     if (womensScore > 0) {
       return 'womens-fashion'
     }
@@ -292,31 +313,26 @@ export function classifyProduct(
   
   // Check all other categories
   for (const [category, patterns] of Object.entries(CATEGORY_PATTERNS)) {
-    if (category === 'baby' || category === 'womens-fashion') continue
+    if (category === 'baby' || category === 'womens-fashion' || category === 'shoes') continue
     
-    // Check exclusions
     if (patterns.excludeIfContains?.some(excluded => combinedText.includes(excluded))) {
       continue
     }
     
     let score = 0
     
-    // Phrases (highest priority)
     for (const phrase of patterns.phrases) {
       if (combinedText.includes(phrase)) score += 20
     }
     
-    // Primary keywords
     for (const keyword of patterns.primary) {
       if (combinedText.includes(keyword)) score += 15
     }
     
-    // Secondary keywords
     for (const keyword of patterns.secondary) {
       if (combinedText.includes(keyword)) score += 5
     }
     
-    // CJ category boost
     if (cjCategory) {
       const normalizedCJCat = cjCategory.toLowerCase().replace(/[^a-z\s]/g, ' ')
       const categoryName = category.replace('-', ' ')
