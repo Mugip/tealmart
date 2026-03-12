@@ -1,6 +1,6 @@
 // scripts/remap-categories.ts
 import { PrismaClient } from '@prisma/client'
-import { classifyProduct } from '../lib/productClassifier'  // Fixed: added ../
+import { classifyProduct } from '../lib/productClassifier'
 
 const prisma = new PrismaClient()
 
@@ -44,11 +44,11 @@ async function remapAllCategories() {
       }
 
       try {
-        // Classify with the new classifier
-        const newCategory = classifyProduct(
+        // Classify with the new classifier (ADDED AWAIT!)
+        const newCategory = await classifyProduct(
           product.title,
           product.description,
-          product.category // Pass old category as hint
+          product.category
         )
 
         if (newCategory !== product.category) {
@@ -99,7 +99,6 @@ async function remapAllCategories() {
       console.log('\n📈 CATEGORY CHANGES:')
       console.log('-'.repeat(60))
       
-      // Sort by count (most changes first)
       const sortedChanges = Object.entries(categoryChanges).sort(
         (a, b) => b[1].count - a[1].count
       )
