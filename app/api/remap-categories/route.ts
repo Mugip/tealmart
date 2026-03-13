@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
     for (const product of products) {
       try {
         // Classify with the new classifier
-        const newCategory = await classifyProduct(
+        const newCategory = classifyProduct(
           product.title,
           product.description,
           product.category
