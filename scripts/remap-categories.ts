@@ -45,7 +45,7 @@ async function remapAllCategories() {
 
       try {
         // Classify with the new classifier (ADDED AWAIT!)
-        const newCategory = await classifyProduct(
+        const newCategory = classifyProduct(
           product.title,
           product.description,
           product.category
