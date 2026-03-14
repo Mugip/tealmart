@@ -1,40 +1,40 @@
 // lib/productClassifier.ts
+import nlp from 'compromise'
 
 /**
- * Intelligently adds spaces to a slug/camelCase/PascalCase string
- * @example "toyskidsbaby" → "toys kids baby"
- * @example "homegardenfurniture" → "home garden furniture"
- * @example "JewelryWatches" → "Jewelry Watches"
+ * Intelligently splits concatenated words using NLP
  */
-function addSpacesToSlug(text: string): string {
+function splitConcatenatedWords(text: string): string {
+  const doc = nlp(text.toLowerCase())
+  
+  // Try to identify terms/nouns
+  const terms = doc.terms().out('array')
+  
+  // If NLP found multiple terms, use them
+  if (terms.length > 1) {
+    return terms.join(' ')
+  }
+  
+  // Fallback: try to detect word boundaries using common patterns
   return text
-    // Add space before capital letters (PascalCase/camelCase)
-    .replace(/([a-z])([A-Z])/g, '$1 $2')
-    // Add space before numbers
-    .replace(/([a-zA-Z])(\d)/g, '$1 $2')
-    .replace(/(\d)([a-zA-Z])/g, '$1 $2')
-    // Common word boundaries - add spaces intelligently
-    // This handles compounds like "toyskids" → "toys kids"
-    .replace(/([a-z])(kids|baby|mens|womens|shoes|bags|office|home|garden)/gi, '$1 $2')
+    .replace(/([a-z])([A-Z])/g, '$1 $2') // camelCase
+    .replace(/([a-z])([0-9])/g, '$1 $2') // letter+number
     .toLowerCase()
-    .trim()
 }
 
 /**
  * Normalizes any category to a consistent format
- * Handles: CJ categories, old slugs, malformed slugs
  */
 function normalizeCategorySlug(input: string): string {
-  // Step 1: Replace common separators with spaces
   let normalized = input
     .toLowerCase()
     .trim()
-    .replace(/\s*&\s*/g, ' and ')       // "&" → " and "
-    .replace(/,\s*/g, ' ')              // "," → " "
-    .replace(/[/>]/g, ' ')              // "/" or ">" → " "
-    .replace(/'/g, '')                  // Remove apostrophes
+    .replace(/\s*&\s*/g, ' and ')
+    .replace(/,\s*/g, ' ')
+    .replace(/[/>]/g, ' ')
+    .replace(/'/g, '')
   
-  // Step 2: If it's already a slug (contains dashes), just clean it
+  // If already has dashes, keep structure
   if (normalized.includes('-')) {
     return normalized
       .split('-')
@@ -43,25 +43,21 @@ function normalizeCategorySlug(input: string): string {
       .join('-')
   }
   
-  // Step 3: If it's a concatenated word (no spaces or dashes), add spaces
+  // If no spaces (concatenated), use NLP to split
   if (!normalized.includes(' ')) {
-    normalized = addSpacesToSlug(normalized)
+    normalized = splitConcatenatedWords(normalized)
   }
   
-  // Step 4: Convert to final slug format
+  // Convert to slug
   return normalized
-    .replace(/[^a-z0-9\s]/g, ' ')      // Replace special chars with space
-    .replace(/\s+/g, ' ')               // Multiple spaces → single space
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
     .trim()
     .split(' ')
     .filter(Boolean)
     .join('-')
 }
 
-/**
- * Classifies a product based on CJ's category
- * Auto-fixes malformed existing categories
- */
 export function classifyProduct(
   title?: string,
   description?: string,
@@ -77,7 +73,6 @@ export function classifyProduct(
     return 'general'
   }
   
-  // Extract first level if it's a hierarchy (has / or >)
   let categoryToNormalize = cjCategory
   
   if (cjCategory.includes('/') || cjCategory.includes('>')) {
@@ -85,22 +80,17 @@ export function classifyProduct(
     console.log('📊 Category hierarchy detected, parts:', parts)
     if (parts.length > 0) {
       categoryToNormalize = parts[0]
-      console.log('📍 Using first level:', categoryToNormalize)
     }
   }
   
-  // Normalize the category
   const normalized = normalizeCategorySlug(categoryToNormalize)
   
-  console.log(`✅ Final category: "${categoryToNormalize}" → "${normalized}"`)
+  console.log(`✅ Final: "${categoryToNormalize}" → "${normalized}"`)
   console.log('🔍 ===== END DEBUG =====\n')
   
   return normalized || 'general'
 }
 
-/**
- * Formats a category slug for display
- */
 export function formatCategoryName(slug: string): string {
   if (!slug || slug === 'general') return 'All Products'
   
@@ -118,9 +108,6 @@ export function formatCategoryName(slug: string): string {
     .join(' ')
 }
 
-/**
- * Gets a category icon based on keywords
- */
 export function getCategoryIcon(slug: string): string {
   const lower = slug.toLowerCase()
   
