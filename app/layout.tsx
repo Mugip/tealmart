@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
+import { SessionProvider } from 'next-auth/react'
 import { Toaster } from 'react-hot-toast'
 import { CartProvider } from '@/lib/contexts/CartContext'
 import Header from '@/components/layout/Header'
@@ -29,6 +30,7 @@ export default function RootLayout({
     <html lang="en">
       <body className={inter.className}>
         <ErrorCatcher />
+        <SessionProvider>
         <CartProvider>
           <div className="flex flex-col min-h-screen">
             <Header />
@@ -39,6 +41,7 @@ export default function RootLayout({
           </div>
           <Toaster position="top-right" />
         </CartProvider>
+        <SessionProvider>
       </body>
     </html>
   )
