@@ -35,8 +35,8 @@
     "react-hot-toast": "^2.4.1",
     "resend": "^3.2.0",
     "stripe": "^20.4.0",
-    "openai": "^6.26.0",
-    "wordsegment": "^1.0.0",
+    "wink-nlp": "^1.14.2",
+    "wink-eng-lite-web-model": "^1.5.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {
