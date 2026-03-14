@@ -22,14 +22,14 @@ export function classifyProduct(
       // Use the FIRST category from CJ and normalize consistently
       const firstCategory = parts[0]
         .toLowerCase()
-        .replace(/&/g, 'and')           // & → and
-        .replace(/,/g, '')               // Remove commas
-        .replace(/'/g, '')               // Remove apostrophes (Women's → Womens)
-        .replace(/[^a-z0-9\s]/g, '')     // Remove other special chars
-        .replace(/\s+/g, '-')            // Spaces → dashes
-        .replace(/-+/g, '-')             // Multiple dashes → single dash
+        .replace(/\s*&\s*/g, '-and-')    // " & " → "-and-"
+        .replace(/,\s*/g, '-')            // ", " → "-"
+        .replace(/'/g, '')                // Remove apostrophes
+        .replace(/[^a-z0-9\s-]/g, '')     // Keep letters, numbers, spaces, and dashes
+        .replace(/\s+/g, '-')             // Spaces → dashes
+        .replace(/-+/g, '-')              // Multiple dashes → single dash
         .trim()
-        .replace(/^-|-$/g, '')           // Remove leading/trailing dashes
+        .replace(/^-+|-+$/g, '')          // Remove leading/trailing dashes
       
       console.log(`✅ Using first CJ category: "${parts[0]}" → "${firstCategory}"`)
       console.log('🔍 ===== END DEBUG =====\n')
