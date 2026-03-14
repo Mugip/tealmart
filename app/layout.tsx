@@ -1,7 +1,8 @@
+// app/layout.tsx
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
-import { SessionProvider } from 'next-auth/react'
+import { SessionProvider } from '@/components/providers/SessionProvider'
 import { Toaster } from 'react-hot-toast'
 import { CartProvider } from '@/lib/contexts/CartContext'
 import Header from '@/components/layout/Header'
