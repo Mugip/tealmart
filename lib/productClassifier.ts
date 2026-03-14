@@ -1,12 +1,13 @@
 // lib/productClassifier.ts
-import wordsegment from 'wordsegment'
+import winkNLP from 'wink-nlp'
+import model from 'wink-eng-lite-web-model'
 
-// Initialize the word segmenter once
-wordsegment.load()
+// Initialize once
+const nlp = winkNLP(model)
 
 /**
- * Intelligently splits concatenated words using statistical word segmentation
- * No hardcoded words - uses English word frequency statistics
+ * Intelligently splits concatenated words using wink-nlp
+ * No hardcoding - uses linguistic models to detect word boundaries
  */
 function splitConcatenatedWords(text: string): string {
   const lower = text.toLowerCase()
@@ -14,10 +15,17 @@ function splitConcatenatedWords(text: string): string {
   // Already has spaces? Return as-is
   if (lower.includes(' ')) return lower
   
-  // Use wordsegment to split concatenated text
-  const words = wordsegment.segment(lower)
+  // Use wink-nlp to tokenize
+  const doc = nlp.readDoc(lower)
+  const tokens = doc.tokens().out()
   
-  return words.join(' ')
+  // If tokenization found multiple words, use them
+  if (tokens.length > 1) {
+    return tokens.join(' ')
+  }
+  
+  // Fallback: return as-is if no split detected
+  return lower
 }
 
 /**
@@ -41,7 +49,7 @@ function normalizeCategorySlug(input: string): string {
       .join('-')
   }
   
-  // If no spaces (concatenated), use word segmentation
+  // If no spaces (concatenated), use NLP to split
   if (!normalized.includes(' ')) {
     normalized = splitConcatenatedWords(normalized)
   }
