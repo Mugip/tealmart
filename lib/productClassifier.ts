@@ -1,41 +1,66 @@
 // lib/productClassifier.ts
 
 /**
- * Normalizes any category slug to a consistent format
- * This handles BOTH old malformed categories AND new CJ categories
- * @example "home garden-furniture" → "home-garden-furniture"
- * @example "toyskidsbaby" → "toys-kids-baby"
- * @example "Jewelry & Watches" → "jewelry-and-watches"
+ * Intelligently adds spaces to a slug/camelCase/PascalCase string
+ * @example "toyskidsbaby" → "toys kids baby"
+ * @example "homegardenfurniture" → "home garden furniture"
+ * @example "JewelryWatches" → "Jewelry Watches"
  */
-function normalizeCategorySlug(category: string): string {
-  return category
+function addSpacesToSlug(text: string): string {
+  return text
+    // Add space before capital letters (PascalCase/camelCase)
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    // Add space before numbers
+    .replace(/([a-zA-Z])(\d)/g, '$1 $2')
+    .replace(/(\d)([a-zA-Z])/g, '$1 $2')
+    // Common word boundaries - add spaces intelligently
+    // This handles compounds like "toyskids" → "toys kids"
+    .replace(/([a-z])(kids|baby|mens|womens|shoes|bags|office|home|garden)/gi, '$1 $2')
     .toLowerCase()
     .trim()
-    // Convert common separators to spaces first
-    .replace(/\s*&\s*/g, ' and ')        // " & " → " and "
-    .replace(/,\s*/g, ' ')                // ", " → " "
-    .replace(/\//g, ' ')                  // "/" → " "
-    .replace(/>/g, ' ')                   // ">" → " "
-    .replace(/'/g, '')                    // Remove apostrophes
-    // Now we have words separated by spaces
-    // Insert spaces before capitals in camelCase/PascalCase
-    .replace(/([a-z])([A-Z])/g, '$1 $2')  // "toysKidsBaby" → "toys Kids Baby"
-    // Remove special characters but keep spaces
-    .replace(/[^a-z0-9\s]/g, '')
-    // Normalize multiple spaces to single space
-    .replace(/\s+/g, ' ')
-    .trim()
-    // Convert spaces to dashes
-    .replace(/\s/g, '-')
-    // Remove any duplicate dashes
-    .replace(/-+/g, '-')
-    // Remove leading/trailing dashes
-    .replace(/^-+|-+$/g, '')
 }
 
 /**
- * Classifies a product based on CJ's category hierarchy
- * Also auto-fixes any existing malformed categories
+ * Normalizes any category to a consistent format
+ * Handles: CJ categories, old slugs, malformed slugs
+ */
+function normalizeCategorySlug(input: string): string {
+  // Step 1: Replace common separators with spaces
+  let normalized = input
+    .toLowerCase()
+    .trim()
+    .replace(/\s*&\s*/g, ' and ')       // "&" → " and "
+    .replace(/,\s*/g, ' ')              // "," → " "
+    .replace(/[/>]/g, ' ')              // "/" or ">" → " "
+    .replace(/'/g, '')                  // Remove apostrophes
+  
+  // Step 2: If it's already a slug (contains dashes), just clean it
+  if (normalized.includes('-')) {
+    return normalized
+      .split('-')
+      .map(word => word.trim())
+      .filter(Boolean)
+      .join('-')
+  }
+  
+  // Step 3: If it's a concatenated word (no spaces or dashes), add spaces
+  if (!normalized.includes(' ')) {
+    normalized = addSpacesToSlug(normalized)
+  }
+  
+  // Step 4: Convert to final slug format
+  return normalized
+    .replace(/[^a-z0-9\s]/g, ' ')      // Replace special chars with space
+    .replace(/\s+/g, ' ')               // Multiple spaces → single space
+    .trim()
+    .split(' ')
+    .filter(Boolean)
+    .join('-')
+}
+
+/**
+ * Classifies a product based on CJ's category
+ * Auto-fixes malformed existing categories
  */
 export function classifyProduct(
   title?: string,
@@ -46,39 +71,35 @@ export function classifyProduct(
   console.log('📝 Title:', title?.substring(0, 100))
   console.log('🏷️  CJ Category (RAW):', cjCategory)
   
-  if (cjCategory) {
-    // Check if this is already a slug (from database remapping)
-    const isExistingSlug = cjCategory.includes('-') && !cjCategory.includes('/') && !cjCategory.includes('>')
-    
-    if (isExistingSlug) {
-      // This is an old category from database - normalize it
-      const normalized = normalizeCategorySlug(cjCategory)
-      console.log(`🔧 Normalizing existing category: "${cjCategory}" → "${normalized}"`)
-      console.log('🔍 ===== END DEBUG =====\n')
-      return normalized || 'general'
-    }
-    
-    // This is a fresh CJ category - extract first level
+  if (!cjCategory) {
+    console.log('⚠️  No CJ category - defaulting to "general"')
+    console.log('🔍 ===== END DEBUG =====\n')
+    return 'general'
+  }
+  
+  // Extract first level if it's a hierarchy (has / or >)
+  let categoryToNormalize = cjCategory
+  
+  if (cjCategory.includes('/') || cjCategory.includes('>')) {
     const parts = cjCategory.split(/[/>]/).map(p => p.trim()).filter(Boolean)
-    console.log('📊 Category parts:', parts)
-    
+    console.log('📊 Category hierarchy detected, parts:', parts)
     if (parts.length > 0) {
-      const normalized = normalizeCategorySlug(parts[0])
-      console.log(`✅ Using first CJ category: "${parts[0]}" → "${normalized}"`)
-      console.log('🔍 ===== END DEBUG =====\n')
-      return normalized || 'general'
+      categoryToNormalize = parts[0]
+      console.log('📍 Using first level:', categoryToNormalize)
     }
   }
   
-  console.log('⚠️  No CJ category - defaulting to "general"')
+  // Normalize the category
+  const normalized = normalizeCategorySlug(categoryToNormalize)
+  
+  console.log(`✅ Final category: "${categoryToNormalize}" → "${normalized}"`)
   console.log('🔍 ===== END DEBUG =====\n')
   
-  return 'general'
+  return normalized || 'general'
 }
 
 /**
- * Formats a category slug for display to users
- * Automatically handles any category format intelligently
+ * Formats a category slug for display
  */
 export function formatCategoryName(slug: string): string {
   if (!slug || slug === 'general') return 'All Products'
@@ -86,28 +107,23 @@ export function formatCategoryName(slug: string): string {
   return slug
     .split('-')
     .map((word) => {
-      // Convert 'and' back to '&'
       if (word === 'and') return '&'
-      
-      // Add apostrophe for possessives
       if (word === 'womens') return "Women's"
       if (word === 'mens') return "Men's"
       if (word === 'kids') return "Kids'"
       if (word === 'childrens') return "Children's"
       
-      // Capitalize first letter
       return word.charAt(0).toUpperCase() + word.slice(1)
     })
     .join(' ')
 }
 
 /**
- * Gets a category icon emoji based on keywords in the category slug
+ * Gets a category icon based on keywords
  */
 export function getCategoryIcon(slug: string): string {
   const lower = slug.toLowerCase()
   
-  // Pattern matching for automatic icon selection
   if (lower.includes('jewelry') || lower.includes('watch')) return '💍'
   if (lower.includes('women') || lower.includes('dress') || lower.includes('ladies')) return '👗'
   if (lower.includes('men') || lower.includes('mens')) return '👔'
