@@ -4,6 +4,7 @@ import { PrismaClient } from "@prisma/client"
 import Stripe from "stripe"
 import { getCJToken } from "@/lib/cjToken"
 import countries from "i18n-iso-countries"
+import { sendOrderConfirmationEmail } from '@/lib/email'
 
 countries.registerLocale(require("i18n-iso-countries/langs/en.json"))
 
@@ -165,6 +166,33 @@ async function forwardOrderToCJ(order: any) {
     return { success: false, error: error.message }
   }
 }
+
+// After creating order, add:
+await sendOrderConfirmationEmail({
+  to: order.email,
+  orderNumber: order.orderNumber,
+  customerName: order.shippingName,
+  orderDate: new Date().toLocaleDateString(),
+  items: order.items.map(item => ({
+    name: item.product.title,
+    quantity: item.quantity,
+    price: item.price,
+    image: item.product.images[0] || '',
+  })),
+  subtotal: order.subtotal,
+  shipping: order.shipping,
+  tax: order.tax,
+  total: order.total,
+  shippingAddress: {
+    name: order.shippingName,
+    address: order.shippingAddress,
+    city: order.shippingCity,
+    state: order.shippingState,
+    zip: order.shippingZip,
+    country: order.shippingCountry,
+    phone: order.shippingPhone,
+  },
+})
 
 export async function POST(req: NextRequest) {
   try {
