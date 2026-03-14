@@ -240,7 +240,6 @@ export async function POST(req: NextRequest) {
             state: order.shippingState,
             zip: order.shippingZip,
             country: order.shippingCountry,
-            phone: order.shippingPhone || '',
           },
         })
         console.log(`✅ Order confirmation email sent to ${order.email}`)
