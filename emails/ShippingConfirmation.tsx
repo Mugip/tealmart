@@ -68,7 +68,7 @@ export const ShippingConfirmationEmail = ({
           <Section style={trackingBox}>
             <Text style={label}>Tracking Number</Text>
             <Text style={trackingNumberStyle}>{trackingNumber}</Text>
-            <Text style={carrier}>via {carrier}</Text>
+            <Text style={carrierStyle}>via {carrier}</Text>
             <Text style={delivery}>
               Estimated Delivery: <strong>{estimatedDelivery}</strong>
             </Text>
@@ -209,7 +209,7 @@ const trackingNumberStyle = {
   fontFamily: 'monospace',
 }
 
-const carrier = {
+const carrierStyle = {
   fontSize: '14px',
   color: '#666',
   margin: '0 0 16px',
