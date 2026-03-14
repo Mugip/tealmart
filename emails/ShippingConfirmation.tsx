@@ -67,7 +67,7 @@ export const ShippingConfirmationEmail = ({
           {/* Tracking Info */}
           <Section style={trackingBox}>
             <Text style={label}>Tracking Number</Text>
-            <Text style={trackingNumber}>{trackingNumber}</Text>
+            <Text style={trackingNumberStyle}>{trackingNumber}</Text>
             <Text style={carrier}>via {carrier}</Text>
             <Text style={delivery}>
               Estimated Delivery: <strong>{estimatedDelivery}</strong>
@@ -201,7 +201,7 @@ const label = {
   margin: '0 0 8px',
 }
 
-const trackingNumber = {
+const trackingNumberStyle = {
   fontSize: '28px',
   fontWeight: 'bold',
   color: '#0d9488',
