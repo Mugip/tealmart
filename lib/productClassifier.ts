@@ -1,25 +1,23 @@
 // lib/productClassifier.ts
-import nlp from 'compromise'
+import wordsegment from 'wordsegment'
+
+// Initialize the word segmenter once
+wordsegment.load()
 
 /**
- * Intelligently splits concatenated words using NLP
+ * Intelligently splits concatenated words using statistical word segmentation
+ * No hardcoded words - uses English word frequency statistics
  */
 function splitConcatenatedWords(text: string): string {
-  const doc = nlp(text.toLowerCase())
+  const lower = text.toLowerCase()
   
-  // Try to identify terms/nouns
-  const terms = doc.terms().out('array')
+  // Already has spaces? Return as-is
+  if (lower.includes(' ')) return lower
   
-  // If NLP found multiple terms, use them
-  if (terms.length > 1) {
-    return terms.join(' ')
-  }
+  // Use wordsegment to split concatenated text
+  const words = wordsegment.segment(lower)
   
-  // Fallback: try to detect word boundaries using common patterns
-  return text
-    .replace(/([a-z])([A-Z])/g, '$1 $2') // camelCase
-    .replace(/([a-z])([0-9])/g, '$1 $2') // letter+number
-    .toLowerCase()
+  return words.join(' ')
 }
 
 /**
@@ -43,7 +41,7 @@ function normalizeCategorySlug(input: string): string {
       .join('-')
   }
   
-  // If no spaces (concatenated), use NLP to split
+  // If no spaces (concatenated), use word segmentation
   if (!normalized.includes(' ')) {
     normalized = splitConcatenatedWords(normalized)
   }
