@@ -1,8 +1,41 @@
 // lib/productClassifier.ts
 
 /**
+ * Normalizes any category slug to a consistent format
+ * This handles BOTH old malformed categories AND new CJ categories
+ * @example "home garden-furniture" → "home-garden-furniture"
+ * @example "toyskidsbaby" → "toys-kids-baby"
+ * @example "Jewelry & Watches" → "jewelry-and-watches"
+ */
+function normalizeCategorySlug(category: string): string {
+  return category
+    .toLowerCase()
+    .trim()
+    // Convert common separators to spaces first
+    .replace(/\s*&\s*/g, ' and ')        // " & " → " and "
+    .replace(/,\s*/g, ' ')                // ", " → " "
+    .replace(/\//g, ' ')                  // "/" → " "
+    .replace(/>/g, ' ')                   // ">" → " "
+    .replace(/'/g, '')                    // Remove apostrophes
+    // Now we have words separated by spaces
+    // Insert spaces before capitals in camelCase/PascalCase
+    .replace(/([a-z])([A-Z])/g, '$1 $2')  // "toysKidsBaby" → "toys Kids Baby"
+    // Remove special characters but keep spaces
+    .replace(/[^a-z0-9\s]/g, '')
+    // Normalize multiple spaces to single space
+    .replace(/\s+/g, ' ')
+    .trim()
+    // Convert spaces to dashes
+    .replace(/\s/g, '-')
+    // Remove any duplicate dashes
+    .replace(/-+/g, '-')
+    // Remove leading/trailing dashes
+    .replace(/^-+|-+$/g, '')
+}
+
+/**
  * Classifies a product based on CJ's category hierarchy
- * Returns a URL-friendly slug for storage
+ * Also auto-fixes any existing malformed categories
  */
 export function classifyProduct(
   title?: string,
@@ -14,27 +47,26 @@ export function classifyProduct(
   console.log('🏷️  CJ Category (RAW):', cjCategory)
   
   if (cjCategory) {
-    // Split by / or > to get hierarchy
+    // Check if this is already a slug (from database remapping)
+    const isExistingSlug = cjCategory.includes('-') && !cjCategory.includes('/') && !cjCategory.includes('>')
+    
+    if (isExistingSlug) {
+      // This is an old category from database - normalize it
+      const normalized = normalizeCategorySlug(cjCategory)
+      console.log(`🔧 Normalizing existing category: "${cjCategory}" → "${normalized}"`)
+      console.log('🔍 ===== END DEBUG =====\n')
+      return normalized || 'general'
+    }
+    
+    // This is a fresh CJ category - extract first level
     const parts = cjCategory.split(/[/>]/).map(p => p.trim()).filter(Boolean)
     console.log('📊 Category parts:', parts)
     
     if (parts.length > 0) {
-      // Use the FIRST category from CJ and normalize consistently
-      const firstCategory = parts[0]
-        .toLowerCase()
-        .replace(/\s*&\s*/g, '-and-')    // " & " → "-and-"
-        .replace(/,\s*/g, '-')            // ", " → "-"
-        .replace(/'/g, '')                // Remove apostrophes
-        .replace(/[^a-z0-9\s-]/g, '')     // Keep letters, numbers, spaces, and dashes
-        .replace(/\s+/g, '-')             // Spaces → dashes
-        .replace(/-+/g, '-')              // Multiple dashes → single dash
-        .trim()
-        .replace(/^-+|-+$/g, '')          // Remove leading/trailing dashes
-      
-      console.log(`✅ Using first CJ category: "${parts[0]}" → "${firstCategory}"`)
+      const normalized = normalizeCategorySlug(parts[0])
+      console.log(`✅ Using first CJ category: "${parts[0]}" → "${normalized}"`)
       console.log('🔍 ===== END DEBUG =====\n')
-      
-      return firstCategory || 'general'
+      return normalized || 'general'
     }
   }
   
