@@ -1,4 +1,4 @@
-// app/api/webhooks/stripe/route.ts - FINAL FIX using VID instead of SKU
+// app/api/webhooks/stripe/route.ts
 import { NextRequest, NextResponse } from "next/server"
 import { PrismaClient } from "@prisma/client"
 import Stripe from "stripe"
@@ -54,10 +54,9 @@ async function forwardOrderToCJ(order: any) {
   try {
     const token = await getCJToken()
 
-    // Build products array - Use variant VID (the UUID), NOT the SKU
     const products = order.items.map((item: any) => {
       const product = item.product
-      let vid = product.externalId // Default to product PID
+      let vid = product.externalId
       let vidSource = "product PID"
       
       console.log(`🔍 Processing product:`, {
@@ -67,7 +66,6 @@ async function forwardOrderToCJ(order: any) {
         hasVariants: !!product.variants,
       })
       
-      // If product has variants, use the first variant's VID (the UUID id field, NOT sku)
       if (product.variants && typeof product.variants === 'object') {
         const variantsData = product.variants as any
         
@@ -75,8 +73,7 @@ async function forwardOrderToCJ(order: any) {
         
         if (variantsData.items && Array.isArray(variantsData.items) && variantsData.items.length > 0) {
           const firstVariant = variantsData.items[0]
-          // CRITICAL: Use the 'id' field (UUID), NOT the 'sku' field
-          vid = firstVariant.id // This is the VID (UUID format like 05EDFE5D-1909-4317-A888-F5AABC5267B7)
+          vid = firstVariant.id
           vidSource = "variant VID (UUID)"
           console.log(`✅ Using variant VID (UUID): ${vid} instead of product PID ${product.externalId}`)
           console.log(`ℹ️ Variant SKU was: ${firstVariant.sku} (NOT used for CJ API)`)
@@ -92,7 +89,7 @@ async function forwardOrderToCJ(order: any) {
       }
       
       return {
-        vid: String(vid), // Send the UUID variant ID
+        vid: String(vid),
         quantity: parseInt(item.quantity),
       }
     })
@@ -140,13 +137,6 @@ async function forwardOrderToCJ(order: any) {
       return { success: true, cjOrderNumber: data.data?.orderNum }
     } else {
       console.error(`❌ CJ API error:`, data)
-      console.error(`📋 Full product info:`, order.items.map((i: any) => ({
-        productId: i.product.id,
-        externalId: i.product.externalId,
-        title: i.product.title,
-        hasVariants: !!i.product.variants,
-        variantsData: i.product.variants,
-      })))
       
       await prisma.order.update({
         where: { id: order.id },
@@ -166,33 +156,6 @@ async function forwardOrderToCJ(order: any) {
     return { success: false, error: error.message }
   }
 }
-
-// After creating order, add:
-await sendOrderConfirmationEmail({
-  to: order.email,
-  orderNumber: order.orderNumber,
-  customerName: order.shippingName,
-  orderDate: new Date().toLocaleDateString(),
-  items: order.items.map(item => ({
-    name: item.product.title,
-    quantity: item.quantity,
-    price: item.price,
-    image: item.product.images[0] || '',
-  })),
-  subtotal: order.subtotal,
-  shipping: order.shipping,
-  tax: order.tax,
-  total: order.total,
-  shippingAddress: {
-    name: order.shippingName,
-    address: order.shippingAddress,
-    city: order.shippingCity,
-    state: order.shippingState,
-    zip: order.shippingZip,
-    country: order.shippingCountry,
-    phone: order.shippingPhone,
-  },
-})
 
 export async function POST(req: NextRequest) {
   try {
@@ -244,12 +207,46 @@ export async function POST(req: NextRequest) {
 
       console.log(`📦 Processing order ${order.orderNumber} with ${order.items.length} items`)
 
+      // Forward to CJ
       const result = await forwardOrderToCJ(order)
 
       if (result.success) {
         console.log(`✅ Order ${order.orderNumber} forwarded to CJ: ${result.cjOrderNumber}`)
       } else {
         console.error(`❌ Failed to forward order ${order.orderNumber}: ${result.error}`)
+      }
+
+      // MOVED HERE: Send order confirmation email
+      try {
+        await sendOrderConfirmationEmail({
+          to: order.email,
+          orderNumber: order.orderNumber,
+          customerName: order.shippingName,
+          orderDate: new Date().toLocaleDateString(),
+          items: order.items.map(item => ({
+            name: item.product.title,
+            quantity: item.quantity,
+            price: item.price,
+            image: item.product.images[0] || '',
+          })),
+          subtotal: order.subtotal,
+          shipping: order.shipping,
+          tax: order.tax,
+          total: order.total,
+          shippingAddress: {
+            name: order.shippingName,
+            address: order.shippingAddress,
+            city: order.shippingCity,
+            state: order.shippingState,
+            zip: order.shippingZip,
+            country: order.shippingCountry,
+            phone: order.shippingPhone || '',
+          },
+        })
+        console.log(`✅ Order confirmation email sent to ${order.email}`)
+      } catch (emailError: any) {
+        console.error(`❌ Failed to send email:`, emailError)
+        // Don't fail the whole webhook if email fails
       }
     }
 
