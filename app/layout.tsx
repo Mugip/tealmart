@@ -31,17 +31,17 @@ export default function RootLayout({
       <body className={inter.className}>
         <ErrorCatcher />
         <SessionProvider>
-        <CartProvider>
-          <div className="flex flex-col min-h-screen">
-            <Header />
-            <main className="flex-grow">
-              {children}
-            </main>
-            <Footer />
-          </div>
-          <Toaster position="top-right" />
-        </CartProvider>
-        <SessionProvider>
+          <CartProvider>
+            <div className="flex flex-col min-h-screen">
+              <Header />
+              <main className="flex-grow">
+                {children}
+              </main>
+              <Footer />
+            </div>
+            <Toaster position="top-right" />
+          </CartProvider>
+        </SessionProvider>
       </body>
     </html>
   )
