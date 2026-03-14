@@ -76,7 +76,7 @@ export const OrderConfirmationEmail = ({
             <Text style={orderNumberStyle}>
               Order #{orderNumber}
             </Text>
-            <Text style={orderDate}>
+            <Text style={orderDateStyle}>
               Placed on {orderDate}
             </Text>
           </Section>
@@ -261,7 +261,7 @@ const orderNumberStyle = {
   margin: '0 0 4px',
 }
 
-const orderDate = {
+const orderDateStyle = {
   fontSize: '14px',
   color: '#666',
   margin: '0',
