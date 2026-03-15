@@ -12,6 +12,7 @@ function ProductsContent() {
   const categoryParam = searchParams.get('category')
   const sortParam = searchParams.get('sort')
   const featuredParam = searchParams.get('featured')
+  const searchFromUrl = searchParams.get('search') || ''
 
   const [products, setProducts] = useState<any[]>([])
   const [filteredProducts, setFilteredProducts] = useState<any[]>([])
@@ -20,7 +21,7 @@ function ProductsContent() {
   const [selectedCategory, setSelectedCategory] = useState(categoryParam || '')
   const [sortBy, setSortBy] = useState(sortParam || 'newest')
   const [featuredOnly, setFeaturedOnly] = useState(featuredParam === 'true')
-  const [searchQuery, setSearchQuery] = useState('')
+  const [searchQuery, setSearchQuery] = useState(searchFromUrl)
 
   // Fetch products
   useEffect(() => {
