@@ -11,12 +11,12 @@ interface Category {
   name: string
   count: number
   slug: string
-  sampleProduct?: {
+  sampleProduct: {
     id: string
     title: string
     price: number
     images: string[]
-  }
+  } | null  // Changed from undefined to null
 }
 
 interface FeaturedCategoriesProps {
@@ -91,7 +91,7 @@ export default function FeaturedCategories({ categories }: FeaturedCategoriesPro
               className="flex transition-transform duration-500 ease-out"
               style={{ transform: `translateX(-${currentIndex * 100}%)` }}
             >
-              {categories.map((category, index) => (
+              {categories.map((category) => (
                 <div
                   key={category.slug}
                   className="w-full flex-shrink-0 px-2"
@@ -177,4 +177,4 @@ export default function FeaturedCategories({ categories }: FeaturedCategoriesPro
       </div>
     </section>
   )
-                      }
+}
