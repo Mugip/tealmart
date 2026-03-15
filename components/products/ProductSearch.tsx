@@ -1,16 +1,26 @@
 // components/products/ProductSearch.tsx
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Search, X } from 'lucide-react'
 
 interface ProductSearchProps {
   onSearch: (query: string) => void
   placeholder?: string
+  initialValue?: string
 }
 
-export default function ProductSearch({ onSearch, placeholder = "Search products..." }: ProductSearchProps) {
-  const [query, setQuery] = useState('')
+export default function ProductSearch({ 
+  onSearch, 
+  placeholder = "Search products...",
+  initialValue = ''
+}: ProductSearchProps) {
+  const [query, setQuery] = useState(initialValue)
+
+  // Update local state when initialValue changes (from URL)
+  useEffect(() => {
+    setQuery(initialValue)
+  }, [initialValue])
 
   const handleSearch = (value: string) => {
     setQuery(value)
@@ -29,7 +39,7 @@ export default function ProductSearch({ onSearch, placeholder = "Search products
           <Search className="h-5 w-5 text-gray-400" />
         </div>
         <input
-          type="search"
+          type="text"
           value={query}
           onChange={(e) => handleSearch(e.target.value)}
           placeholder={placeholder}
@@ -38,6 +48,7 @@ export default function ProductSearch({ onSearch, placeholder = "Search products
         {query && (
           <button
             onClick={clearSearch}
+            type="button"
             className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-gray-600 transition-colors"
           >
             <X className="h-5 w-5" />
@@ -52,4 +63,4 @@ export default function ProductSearch({ onSearch, placeholder = "Search products
       )}
     </div>
   )
-}
+            }
