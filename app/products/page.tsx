@@ -1,101 +1,86 @@
 // app/products/page.tsx
-'use client'
-
-import { useState, useEffect, Suspense } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { prisma } from '@/lib/db'
 import ProductCard from '@/components/products/ProductCard'
-import ProductSearch from '@/components/products/ProductSearch'
 import { formatCategoryName } from '@/lib/productClassifier'
+import { Search } from 'lucide-react'
 
-function ProductsContent() {
-  const searchParams = useSearchParams()
-  const categoryParam = searchParams.get('category')
-  const sortParam = searchParams.get('sort')
-  const featuredParam = searchParams.get('featured')
-  const searchFromUrl = searchParams.get('search') || ''
+type SearchParams = {
+  category?: string
+  sort?: string
+  featured?: string
+  search?: string
+}
 
-  const [products, setProducts] = useState<any[]>([])
-  const [filteredProducts, setFilteredProducts] = useState<any[]>([])
-  const [categories, setCategories] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-  const [selectedCategory, setSelectedCategory] = useState(categoryParam || '')
-  const [sortBy, setSortBy] = useState(sortParam || 'newest')
-  const [featuredOnly, setFeaturedOnly] = useState(featuredParam === 'true')
-  const [searchQuery, setSearchQuery] = useState(searchFromUrl)
+export default async function ProductsPage({
+  searchParams,
+}: {
+  searchParams: SearchParams
+}) {
+  const { category, sort, featured, search } = searchParams
 
-  // Fetch products
-  useEffect(() => {
-    async function fetchProducts() {
-      setLoading(true)
-      try {
-        const params = new URLSearchParams()
-        if (selectedCategory) params.append('category', selectedCategory)
-        if (sortBy) params.append('sort', sortBy)
-        if (featuredOnly) params.append('featured', 'true')
-
-        const res = await fetch(`/api/products?${params}`)
-        const data = await res.json()
-        
-        setProducts(data.products || [])
-        setCategories(data.categories || [])
-      } catch (error) {
-        console.error('Failed to fetch products:', error)
-        setProducts([])
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchProducts()
-  }, [selectedCategory, sortBy, featuredOnly])
-
-  // Apply search filtering whenever products or searchQuery changes
-  useEffect(() => {
-    if (!searchQuery.trim()) {
-      setFilteredProducts(products)
-      return
-    }
-
-    const query = searchQuery.toLowerCase().trim()
-    console.log('Searching for:', query)
-    console.log('Total products:', products.length)
-    
-    const filtered = products.filter((product) => {
-      const titleMatch = product.title?.toLowerCase().includes(query)
-      const descriptionMatch = product.description?.toLowerCase().includes(query)
-      const categoryMatch = product.category?.toLowerCase().includes(query)
-      const tagsMatch = product.tags?.some((tag: string) => tag.toLowerCase().includes(query))
-
-      return titleMatch || descriptionMatch || categoryMatch || tagsMatch
-    })
-
-    console.log('Filtered products:', filtered.length)
-    setFilteredProducts(filtered)
-  }, [searchQuery, products])
-
-  const handleSearch = (query: string) => {
-    console.log('Search query updated:', query)
-    setSearchQuery(query)
+  // Build where clause
+  const where: any = { isActive: true }
+  
+  if (category && category !== 'all') {
+    where.category = category
+  }
+  
+  if (featured === 'true') {
+    where.isFeatured = true
+  }
+  
+  if (search) {
+    where.OR = [
+      { title: { contains: search, mode: 'insensitive' } },
+      { description: { contains: search, mode: 'insensitive' } },
+      { category: { contains: search, mode: 'insensitive' } },
+    ]
   }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-tiffany-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading products...</p>
-        </div>
-      </div>
-    )
+  // Build orderBy clause
+  let orderBy: any = { createdAt: 'desc' }
+  
+  if (sort === 'price-asc') {
+    orderBy = { price: 'asc' }
+  } else if (sort === 'price-desc') {
+    orderBy = { price: 'desc' }
+  } else if (sort === 'rating') {
+    orderBy = { rating: 'desc' }
+  } else if (sort === 'popular') {
+    orderBy = { views: 'desc' }
   }
+
+  const [products, categories] = await Promise.all([
+    prisma.product.findMany({
+      where,
+      orderBy,
+      take: 500, // Increased limit
+    }),
+    prisma.product.groupBy({
+      by: ['category'],
+      where: { isActive: true },
+      _count: { category: true },
+      orderBy: { _count: { category: 'desc' } }
+    }),
+  ])
+
+  const categoryList = categories.map(c => ({
+    name: c.category,
+    count: c._count.category
+  }))
+
+  const displayTitle = category 
+    ? formatCategoryName(category)
+    : 'All Products'
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        
         {/* Header */}
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold text-gray-900 mb-4">
-            {selectedCategory ? formatCategoryName(selectedCategory) : 'All Products'}
+            {displayTitle}
           </h1>
           <p className="text-gray-600">
             Discover amazing products at unbeatable prices
@@ -103,11 +88,34 @@ function ProductsContent() {
         </div>
 
         {/* Search Bar */}
-        <ProductSearch 
-          onSearch={handleSearch}
-          initialValue={searchQuery}
-          placeholder="Search by product name, category, or keywords..."
-        />
+        <div className="mb-8 max-w-2xl mx-auto">
+          <form action="/products" method="get" className="relative">
+            <input
+              type="text"
+              name="search"
+              defaultValue={search}
+              placeholder="Search by product name, category, or keywords..."
+              className="w-full px-6 py-4 pl-14 rounded-xl border border-gray-300 focus:border-tiffany-500 focus:ring-2 focus:ring-tiffany-500 outline-none transition-all text-base shadow-sm"
+            />
+            <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+            {category && <input type="hidden" name="category" value={category} />}
+            {sort && <input type="hidden" name="sort" value={sort} />}
+            {featured && <input type="hidden" name="featured" value={featured} />}
+          </form>
+        </div>
+
+        {/* Active Search Query */}
+        {search && (
+          <div className="mb-6 text-center">
+            <p className="text-sm text-gray-600">
+              Searching for: <span className="font-semibold text-tiffany-600">"{search}"</span>
+              {' '}- 
+              <a href={`/products${category ? `?category=${category}` : ''}`} className="text-tiffany-600 hover:text-tiffany-700 ml-2 underline">
+                Clear search
+              </a>
+            </p>
+          </div>
+        )}
 
         {/* Filters */}
         <div className="mb-8 flex flex-wrap gap-4 items-center justify-between">
@@ -117,12 +125,21 @@ function ProductsContent() {
               Category
             </label>
             <select
-              value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
+              name="category"
+              defaultValue={category || ''}
+              onChange={(e) => {
+                const url = new URL(window.location.href)
+                if (e.target.value) {
+                  url.searchParams.set('category', e.target.value)
+                } else {
+                  url.searchParams.delete('category')
+                }
+                window.location.href = url.toString()
+              }}
               className="block w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-tiffany-500 focus:border-tiffany-500"
             >
               <option value="">All Products</option>
-              {categories.map((cat) => (
+              {categoryList.map((cat) => (
                 <option key={cat.name} value={cat.name}>
                   {formatCategoryName(cat.name)} ({cat.count})
                 </option>
@@ -136,8 +153,13 @@ function ProductsContent() {
               Sort By
             </label>
             <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
+              name="sort"
+              defaultValue={sort || 'newest'}
+              onChange={(e) => {
+                const url = new URL(window.location.href)
+                url.searchParams.set('sort', e.target.value)
+                window.location.href = url.toString()
+              }}
               className="block w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-tiffany-500 focus:border-tiffany-500"
             >
               <option value="newest">Newest</option>
@@ -153,8 +175,16 @@ function ProductsContent() {
             <input
               type="checkbox"
               id="featured"
-              checked={featuredOnly}
-              onChange={(e) => setFeaturedOnly(e.target.checked)}
+              defaultChecked={featured === 'true'}
+              onChange={(e) => {
+                const url = new URL(window.location.href)
+                if (e.target.checked) {
+                  url.searchParams.set('featured', 'true')
+                } else {
+                  url.searchParams.delete('featured')
+                }
+                window.location.href = url.toString()
+              }}
               className="h-4 w-4 text-tiffany-600 focus:ring-tiffany-500 border-gray-300 rounded"
             />
             <label htmlFor="featured" className="text-sm font-medium text-gray-700">
@@ -164,79 +194,42 @@ function ProductsContent() {
         </div>
 
         {/* Results Info */}
-        <div className="mb-6 flex items-center justify-between">
+        <div className="mb-6">
           <p className="text-gray-600">
-            {searchQuery ? (
-              <>
-                Showing <span className="font-semibold">{filteredProducts.length}</span> of{' '}
-                <span className="font-semibold">{products.length}</span> products
-              </>
-            ) : (
-              <>
-                Showing <span className="font-semibold">{filteredProducts.length}</span> products
-              </>
-            )}
+            Showing <span className="font-semibold">{products.length}</span> products
           </p>
-          
-          {searchQuery && (
-            <button
-              onClick={() => setSearchQuery('')}
-              className="text-tiffany-600 hover:text-tiffany-700 text-sm font-medium"
-            >
-              Clear search
-            </button>
-          )}
         </div>
 
         {/* No Results */}
-        {filteredProducts.length === 0 && (
+        {products.length === 0 && (
           <div className="text-center py-12">
             <div className="text-6xl mb-4">🔍</div>
             <h3 className="text-xl font-semibold text-gray-900 mb-2">No products found</h3>
             <p className="text-gray-600 mb-6">
-              {searchQuery ? (
-                <>No products match your search for "{searchQuery}"</>
+              {search ? (
+                <>No products match your search for "{search}"</>
               ) : (
-                <>No products available{selectedCategory ? ' in this category' : ''}</>
+                <>No products available{category ? ' in this category' : ''}</>
               )}
             </p>
-            <button
-              onClick={() => {
-                setSearchQuery('')
-                setSelectedCategory('')
-                setFeaturedOnly(false)
-              }}
-              className="px-6 py-3 bg-tiffany-600 text-white rounded-lg hover:bg-tiffany-700 transition-colors"
+            <a
+              href="/products"
+              className="inline-block px-6 py-3 bg-tiffany-600 text-white rounded-lg hover:bg-tiffany-700 transition-colors"
             >
               Clear all filters
-            </button>
+            </a>
           </div>
         )}
 
         {/* Products Grid */}
-        {filteredProducts.length > 0 && (
+        {products.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {filteredProducts.map((product) => (
+            {products.map((product) => (
               <ProductCard key={product.id} product={product} />
             ))}
           </div>
         )}
       </div>
     </div>
-  )
-}
-
-export default function ProductsPage() {
-  return (
-    <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-tiffany-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading products...</p>
-        </div>
-      </div>
-    }>
-      <ProductsContent />
-    </Suspense>
   )
 }
