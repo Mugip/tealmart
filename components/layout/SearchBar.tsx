@@ -12,7 +12,6 @@ export default function SearchBar() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (query.trim()) {
-      // Redirect to products page (the search will happen there)
       router.push(`/products?search=${encodeURIComponent(query)}`)
     } else {
       router.push('/products')
@@ -20,7 +19,7 @@ export default function SearchBar() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex-1 max-w-md mx-4">
+    <form onSubmit={handleSubmit} className="w-full">
       <div className="relative">
         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
           <Search className="h-4 w-4 text-gray-400" />
