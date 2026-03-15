@@ -41,11 +41,33 @@ async function getCategories() {
     take: 8,
   })
 
-  return categories.map(c => ({
-    name: c.category,
-    count: c._count.category,
-    slug: c.category,
-  }))
+  // Fetch one sample product per category
+  const categoriesWithSamples = await Promise.all(
+    categories.map(async (c) => {
+      const sampleProduct = await prisma.product.findFirst({
+        where: {
+          category: c.category,
+          isActive: true,
+        },
+        select: {
+          id: true,
+          title: true,
+          price: true,
+          images: true,
+        },
+        orderBy: { views: 'desc' }, // Get most viewed product
+      })
+
+      return {
+        name: c.category,
+        count: c._count.category,
+        slug: c.category,
+        sampleProduct,
+      }
+    })
+  )
+
+  return categoriesWithSamples
 }
 
 async function getStats() {
