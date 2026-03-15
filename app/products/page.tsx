@@ -2,6 +2,7 @@
 import { prisma } from '@/lib/db'
 import ProductCard from '@/components/products/ProductCard'
 import { formatCategoryName } from '@/lib/productClassifier'
+import { CategoryFilter, SortFilter, FeaturedToggle } from '@/components/products/ProductFiltersClient'
 import { Search } from 'lucide-react'
 
 type SearchParams = {
@@ -54,7 +55,7 @@ export default async function ProductsPage({
     prisma.product.findMany({
       where,
       orderBy,
-      take: 500, // Increased limit
+      take: 500,
     }),
     prisma.product.groupBy({
       by: ['category'],
@@ -119,78 +120,9 @@ export default async function ProductsPage({
 
         {/* Filters */}
         <div className="mb-8 flex flex-wrap gap-4 items-center justify-between">
-          {/* Category Filter */}
-          <div className="flex-1 min-w-[200px]">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Category
-            </label>
-            <select
-              name="category"
-              defaultValue={category || ''}
-              onChange={(e) => {
-                const url = new URL(window.location.href)
-                if (e.target.value) {
-                  url.searchParams.set('category', e.target.value)
-                } else {
-                  url.searchParams.delete('category')
-                }
-                window.location.href = url.toString()
-              }}
-              className="block w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-tiffany-500 focus:border-tiffany-500"
-            >
-              <option value="">All Products</option>
-              {categoryList.map((cat) => (
-                <option key={cat.name} value={cat.name}>
-                  {formatCategoryName(cat.name)} ({cat.count})
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Sort Filter */}
-          <div className="flex-1 min-w-[200px]">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Sort By
-            </label>
-            <select
-              name="sort"
-              defaultValue={sort || 'newest'}
-              onChange={(e) => {
-                const url = new URL(window.location.href)
-                url.searchParams.set('sort', e.target.value)
-                window.location.href = url.toString()
-              }}
-              className="block w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-tiffany-500 focus:border-tiffany-500"
-            >
-              <option value="newest">Newest</option>
-              <option value="price-asc">Price: Low to High</option>
-              <option value="price-desc">Price: High to Low</option>
-              <option value="rating">Top Rated</option>
-              <option value="popular">Most Popular</option>
-            </select>
-          </div>
-
-          {/* Featured Toggle */}
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="featured"
-              defaultChecked={featured === 'true'}
-              onChange={(e) => {
-                const url = new URL(window.location.href)
-                if (e.target.checked) {
-                  url.searchParams.set('featured', 'true')
-                } else {
-                  url.searchParams.delete('featured')
-                }
-                window.location.href = url.toString()
-              }}
-              className="h-4 w-4 text-tiffany-600 focus:ring-tiffany-500 border-gray-300 rounded"
-            />
-            <label htmlFor="featured" className="text-sm font-medium text-gray-700">
-              Featured Only
-            </label>
-          </div>
+          <CategoryFilter categories={categoryList} currentCategory={category} />
+          <SortFilter currentSort={sort} />
+          <FeaturedToggle isFeatured={featured === 'true'} />
         </div>
 
         {/* Results Info */}
