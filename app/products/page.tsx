@@ -26,6 +26,7 @@ function ProductsContent() {
   // Fetch products
   useEffect(() => {
     async function fetchProducts() {
+      setLoading(true)
       try {
         const params = new URLSearchParams()
         if (selectedCategory) params.append('category', selectedCategory)
@@ -34,38 +35,37 @@ function ProductsContent() {
 
         const res = await fetch(`/api/products?${params}`)
         const data = await res.json()
-        setProducts(data.products || [])
-        setFilteredProducts(data.products || [])
+        
+        const fetchedProducts = data.products || []
+        setProducts(fetchedProducts)
         setCategories(data.categories || [])
+        
+        // Apply search filter if there's a query
+        if (searchQuery.trim()) {
+          const query = searchQuery.toLowerCase()
+          const filtered = fetchedProducts.filter((product: any) => {
+            const titleMatch = product.title?.toLowerCase().includes(query)
+            const descriptionMatch = product.description?.toLowerCase().includes(query)
+            const categoryMatch = product.category?.toLowerCase().includes(query)
+            const tagsMatch = product.tags?.some((tag: string) => tag.toLowerCase().includes(query))
+
+            return titleMatch || descriptionMatch || categoryMatch || tagsMatch
+          })
+          setFilteredProducts(filtered)
+        } else {
+          setFilteredProducts(fetchedProducts)
+        }
       } catch (error) {
         console.error('Failed to fetch products:', error)
+        setProducts([])
+        setFilteredProducts([])
       } finally {
         setLoading(false)
       }
     }
 
     fetchProducts()
-  }, [selectedCategory, sortBy, featuredOnly])
-
-  // Handle search filtering
-  useEffect(() => {
-    if (!searchQuery.trim()) {
-      setFilteredProducts(products)
-      return
-    }
-
-    const query = searchQuery.toLowerCase()
-    const filtered = products.filter(product => {
-      const titleMatch = product.title?.toLowerCase().includes(query)
-      const descriptionMatch = product.description?.toLowerCase().includes(query)
-      const categoryMatch = product.category?.toLowerCase().includes(query)
-      const tagsMatch = product.tags?.some((tag: string) => tag.toLowerCase().includes(query))
-
-      return titleMatch || descriptionMatch || categoryMatch || tagsMatch
-    })
-
-    setFilteredProducts(filtered)
-  }, [searchQuery, products])
+  }, [selectedCategory, sortBy, featuredOnly, searchQuery])
 
   const handleSearch = (query: string) => {
     setSearchQuery(query)
@@ -100,6 +100,15 @@ function ProductsContent() {
           onSearch={handleSearch}
           placeholder="Search by product name, category, or keywords..."
         />
+
+        {/* Show current search query if searching from URL */}
+        {searchFromUrl && (
+          <div className="mb-6 text-center">
+            <p className="text-sm text-gray-600">
+              Searching for: <span className="font-semibold text-tiffany-600">"{searchFromUrl}"</span>
+            </p>
+          </div>
+        )}
 
         {/* Filters */}
         <div className="mb-8 flex flex-wrap gap-4 items-center justify-between">
@@ -170,7 +179,7 @@ function ProductsContent() {
             )}
           </p>
           
-          {searchQuery && filteredProducts.length === 0 && (
+          {searchQuery && (
             <button
               onClick={() => setSearchQuery('')}
               className="text-tiffany-600 hover:text-tiffany-700 text-sm font-medium"
