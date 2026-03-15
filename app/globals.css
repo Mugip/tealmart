@@ -1,3 +1,4 @@
+/* app/globals.css */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -19,6 +20,22 @@
 
   body {
     @apply bg-katak-50 text-gray-900;
+    /* Prevent text size adjustment on mobile */
+    -webkit-text-size-adjust: 100%;
+    -moz-text-size-adjust: 100%;
+    -ms-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  /* Ensure smooth scrolling */
+  html {
+    scroll-behavior: smooth;
+  }
+
+  /* Better mobile tap targets */
+  button,
+  a {
+    -webkit-tap-highlight-color: rgba(20, 184, 166, 0.1);
   }
 }
 
