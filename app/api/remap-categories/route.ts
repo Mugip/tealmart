@@ -4,7 +4,6 @@ import { PrismaClient } from '@prisma/client'
 import { classifyProduct } from '@/lib/productClassifier'
 
 const prisma = new PrismaClient()
-
 const INGESTION_API_KEY = process.env.INGESTION_API_KEY!
 
 export async function POST(req: NextRequest) {
@@ -17,14 +16,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    console.log('🔄 Starting category remapping...')
+    console.log('🔄 Starting category normalization...')
 
     // Get optional parameters
     const body = await req.json().catch(() => ({}))
-    const limit = body.limit // Optional: limit number of products to remap
-    const dryRun = body.dryRun === true // Optional: preview changes without updating
+    const limit = body.limit || 100 // Process in batches
+    const dryRun = body.dryRun === true // Preview changes without updating
+    const offset = body.offset || 0 // For pagination
 
-    // Fetch products
+    // Fetch products to remap
     const products = await prisma.product.findMany({
       select: {
         id: true,
@@ -32,10 +32,11 @@ export async function POST(req: NextRequest) {
         description: true,
         category: true,
       },
-      ...(limit ? { take: limit } : {}),
+      skip: offset,
+      take: limit,
     })
 
-    console.log(`✅ Found ${products.length} products`)
+    console.log(`✅ Found ${products.length} products to normalize`)
 
     if (products.length === 0) {
       return NextResponse.json({
@@ -47,6 +48,7 @@ export async function POST(req: NextRequest) {
           unchanged: 0,
           errors: 0,
         },
+        nextOffset: offset,
       })
     }
 
@@ -57,8 +59,8 @@ export async function POST(req: NextRequest) {
     const categoryChanges: Array<{
       productId: string
       title: string
-      from: string
-      to: string
+      oldCategory: string
+      newCategory: string
     }> = []
 
     const changeSummary: Record<string, number> = {}
@@ -66,16 +68,21 @@ export async function POST(req: NextRequest) {
     // Process each product
     for (const product of products) {
       try {
-        // Classify with the new classifier
+        // Key insight: Treat the current category as if it were a CJ-style category
+        // by passing it to classifyProduct. The classifier will:
+        // 1. Extract the first part if it's hierarchical (e.g., "home-and-garden" stays as-is)
+        // 2. Normalize spaces, dashes, special characters
+        // 3. Standardize possessives (women's → womens)
+        // 4. Create a consistent slug format
+        
         const newCategory = classifyProduct(
           product.title,
           product.description,
-          product.category
+          product.category // Use existing category as source
         )
 
         if (newCategory !== product.category) {
           if (!dryRun) {
-            // Actually update the database
             await prisma.product.update({
               where: { id: product.id },
               data: { category: newCategory },
@@ -85,15 +92,17 @@ export async function POST(req: NextRequest) {
           categoryChanges.push({
             productId: product.id,
             title: product.title.substring(0, 60),
-            from: product.category,
-            to: newCategory,
+            oldCategory: product.category,
+            newCategory,
           })
 
           const changeKey = `${product.category} → ${newCategory}`
           changeSummary[changeKey] = (changeSummary[changeKey] || 0) + 1
 
           updated++
-          console.log(`✏️  ${product.category} → ${newCategory}: ${product.title.substring(0, 50)}`)
+          console.log(
+            `✏️  "${product.category}" → "${newCategory}" | ${product.title.substring(0, 50)}`
+          )
         } else {
           unchanged++
         }
@@ -103,7 +112,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Get new category distribution
+    // Get current category distribution
     const categoryStats = await prisma.product.groupBy({
       by: ['category'],
       _count: {
@@ -119,35 +128,39 @@ export async function POST(req: NextRequest) {
     const categoryDistribution = categoryStats.map((stat) => ({
       category: stat.category,
       count: stat._count.id,
-      percentage: ((stat._count.id / products.length) * 100).toFixed(1),
     }))
 
-    const endTime = Date.now()
-    const duration = ((endTime - startTime) / 1000).toFixed(2)
+    const duration = Date.now() - startTime
 
-    console.log(`✅ Remapping complete: ${updated} updated, ${unchanged} unchanged, ${errors} errors`)
+    console.log(`✅ Processed ${products.length} products in ${duration}ms`)
+    console.log(
+      `📊 Updated: ${updated}, Unchanged: ${unchanged}, Errors: ${errors}`
+    )
 
     return NextResponse.json({
       success: true,
+      message: dryRun 
+        ? `Dry run: ${updated} categories would be updated` 
+        : `Successfully normalized ${updated} categories`,
       dryRun,
       stats: {
         total: products.length,
         updated,
         unchanged,
         errors,
-        duration: `${duration}s`,
       },
-      changes: categoryChanges.slice(0, 100), // First 50 changes for preview
-      changeSummary,
       categoryDistribution,
-      message: dryRun
-        ? `Preview: ${updated} products would be updated`
-        : `Successfully remapped ${updated} products`,
+      categoryChanges: categoryChanges.slice(0, 50), // Return first 50 for preview
+      changeSummary,
+      processingTimeMs: duration,
+      // For pagination - use this offset for the next batch
+      nextOffset: offset + limit,
+      hasMore: products.length === limit, // Will be true if there might be more
     })
   } catch (error: any) {
-    console.error('❌ Remapping error:', error)
+    console.error('❌ Error in remap-categories:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to remap categories' },
+      { error: error.message || 'Internal server error' },
       { status: 500 }
     )
   } finally {
