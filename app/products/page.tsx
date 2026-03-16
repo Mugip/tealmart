@@ -70,11 +70,13 @@ export default async function ProductsPage({
     count: c._count.category
   }))
 
-  const displayTitle = category 
-    ? formatCategoryName(category)
-    : 'All Products'
+  const displayTitle = featured === 'true'
+    ? 'Featured Products'
+    : category 
+      ? formatCategoryName(category)
+      : 'All Products'
 
-  const categoryIcon = category ? getCategoryIcon(category) : '🛍️'
+  const categoryIcon = category ? getCategoryIcon(category) : featured === 'true' ? '⭐' : '🛍️'
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
@@ -86,14 +88,19 @@ export default async function ProductsPage({
             <div className="text-center sm:text-left">
               <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-sm px-4 py-2 rounded-full mb-3">
                 <TrendingUp className="w-4 h-4" />
-                <span className="text-sm font-medium">Trending Products</span>
+                <span className="text-sm font-medium">
+                  {featured === 'true' ? 'Handpicked For You' : 'Trending Products'}
+                </span>
               </div>
               <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-2 flex items-center justify-center sm:justify-start gap-3">
                 <span className="text-4xl">{categoryIcon}</span>
                 {displayTitle}
               </h1>
               <p className="text-tiffany-100 text-base sm:text-lg">
-                Discover amazing products at unbeatable prices
+                {featured === 'true' 
+                  ? 'Our best products, carefully selected for quality'
+                  : 'Discover amazing products at unbeatable prices'
+                }
               </p>
             </div>
             <div className="bg-white/20 backdrop-blur-sm rounded-2xl px-6 py-4 border border-white/30">
@@ -129,7 +136,7 @@ export default async function ProductsPage({
             <p className="text-xs sm:text-sm text-gray-600">
               Searching for: <span className="font-semibold text-tiffany-600">"{search}"</span>
               {' '}- 
-              <a href={`/products${category ? `?category=${category}` : ''}`} className="text-tiffany-600 hover:text-tiffany-700 ml-2 underline">
+              <a href={`/products${category ? `?category=${category}` : ''}${featured === 'true' ? `${category ? '&' : '?'}featured=true` : ''}`} className="text-tiffany-600 hover:text-tiffany-700 ml-2 underline">
                 Clear
               </a>
             </p>
@@ -156,6 +163,9 @@ export default async function ProductsPage({
         <div className="mb-4 sm:mb-6">
           <p className="text-sm sm:text-base text-gray-600">
             Showing <span className="font-bold text-gray-900">{products.length}</span> products
+            {featured === 'true' && (
+              <span className="ml-2 text-yellow-600 font-semibold">★ Featured Only</span>
+            )}
             {category && (
               <span className="ml-2 text-tiffany-600">
                 in {formatCategoryName(category)}
@@ -167,10 +177,16 @@ export default async function ProductsPage({
         {/* No Results */}
         {products.length === 0 && (
           <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg border border-gray-200 p-8 sm:p-16 text-center">
-            <div className="text-5xl sm:text-6xl mb-4">🔍</div>
-            <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">No products found</h3>
+            <div className="text-5xl sm:text-6xl mb-4">
+              {featured === 'true' ? '⭐' : '🔍'}
+            </div>
+            <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">
+              {featured === 'true' ? 'No featured products yet' : 'No products found'}
+            </h3>
             <p className="text-sm sm:text-base text-gray-600 mb-6">
-              {search ? (
+              {featured === 'true' ? (
+                <>Check back soon for our handpicked favorites!</>
+              ) : search ? (
                 <>No products match your search for "{search}"</>
               ) : (
                 <>Try adjusting your filters or search terms</>
@@ -187,7 +203,7 @@ export default async function ProductsPage({
 
         {/* Products Grid */}
         {products.length > 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
+          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
             {products.map((product) => (
               <ProductCard key={product.id} product={product} />
             ))}
