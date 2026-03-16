@@ -1,5 +1,5 @@
-‎// lib/productClassifier.ts
-‎
+// lib/productClassifier.ts
+
 ‎/**
 ‎ * Extracts the MOST SPECIFIC category from CJ's hierarchical format
 ‎ * This is better for e-commerce - users search for specific items, not broad categories
