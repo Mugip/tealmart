@@ -16,13 +16,13 @@ export default function Header() {
   return (
     <header className="bg-white shadow-sm sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-14 sm:h-16 gap-4">
+        <div className="flex items-center justify-between h-14 sm:h-16 gap-2 sm:gap-4">
           {/* Logo */}
-          <Link href="/" className="flex items-center space-x-2 flex-shrink-0">
+          <Link href="/" className="flex items-center space-x-1.5 sm:space-x-2 flex-shrink-0">
             <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-tiffany-500 to-tiffany-600 rounded-lg flex items-center justify-center">
               <span className="text-white font-bold text-lg sm:text-xl">T</span>
             </div>
-            <span className="text-xl sm:text-2xl font-bold text-gray-900 hidden sm:inline">TealMart</span>
+            <span className="text-lg sm:text-2xl font-bold text-gray-900">TealMart</span>
           </Link>
 
           {/* Search bar in middle (desktop only) */}
@@ -66,7 +66,7 @@ export default function Header() {
               onClick={() => setIsMenuOpen(!isMenuOpen)}
               aria-label="Toggle menu"
             >
-              <Menu size={22} />
+              <Menu size={20} className="sm:w-[22px] sm:h-[22px]" />
             </button>
           </div>
         </div>
