@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from 'react'
 import Image from 'next/image'
-import { Star, ShoppingCart, Truck, Shield, ArrowLeft } from 'lucide-react'
+import { Star, ShoppingCart, Truck, Shield, ArrowLeft, ChevronLeft, ChevronRight, X, ZoomIn } from 'lucide-react'
 import { useCart } from '@/lib/contexts/CartContext'
 import { useRouter } from 'next/navigation'
 
@@ -38,55 +38,6 @@ interface Product {
   variants?: VariantData
 }
 
-// Color mapping for common color names
-const COLOR_MAP: Record<string, string> = {
-  'red': '#EF4444',
-  'blue': '#3B82F6',
-  'green': '#10B981',
-  'yellow': '#F59E0B',
-  'orange': '#F97316',
-  'purple': '#A855F7',
-  'pink': '#EC4899',
-  'black': '#000000',
-  'white': '#FFFFFF',
-  'gray': '#6B7280',
-  'grey': '#6B7280',
-  'brown': '#92400E',
-  'navy': '#1E3A8A',
-  'gold': '#D97706',
-  'silver': '#9CA3AF',
-  'beige': '#D4B896',
-  'maroon': '#7C2D12',
-  'teal': '#14B8A6',
-  'cyan': '#06B6D4',
-  'lime': '#84CC16',
-  'indigo': '#6366F1',
-  'chocolate': '#7B3F00',
-  'coffee': '#6F4E37',
-  'camel': '#C19A6B',
-  'skyblue': '#38BDF8',
-  'royalblue': '#4169E1',
-  'olive': '#556B2F',
-  'armygreen': '#4B5320',
-  'mint': '#98FF98',
-  'wine': '#722F37',
-  'winered': '#8B0000',
-  'ivory': '#FFFFF0',
-  'cream': '#FFFDD0',
-  'khaki': '#C3B091',
-  'rosegold': '#B76E79',
-  'bronze': '#CD7F32',
-  'lavender': '#E6E6FA',
-  'violet': '#8F00FF',
-  'turquoise': '#40E0D0',
-  'aqua': '#00FFFF'
-}
-
-function getColorHex(colorName: string): string | null {
-  const normalized = colorName.toLowerCase().trim()
-  return COLOR_MAP[normalized] || null
-}
-
 export default function ProductDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter()
   const { addItem } = useCart()
@@ -96,6 +47,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
   const [selectedVariant, setSelectedVariant] = useState<Variant | null>(null)
   const [loading, setLoading] = useState(true)
   const [quantity, setQuantity] = useState(1)
+  const [isZoomed, setIsZoomed] = useState(false)
 
   useEffect(() => {
     fetch(`/api/products/${params.id}`)
@@ -153,6 +105,14 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
   const activeImage = selectedVariant?.image || product.images[selectedImage]
   const isInStock = activeStock > 0
 
+  const nextImage = () => {
+    setSelectedImage((prev) => (prev + 1) % product.images.length)
+  }
+
+  const prevImage = () => {
+    setSelectedImage((prev) => (prev - 1 + product.images.length) % product.images.length)
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 overflow-x-hidden">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -168,17 +128,49 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
           
-          {/* Image Gallery */}
+          {/* Image Gallery with Navigation */}
           <div className="space-y-4">
             <div className="bg-white rounded-2xl shadow-lg overflow-hidden sticky top-4">
-              <div className="relative aspect-square">
+              <div className="relative aspect-square group">
                 <Image
                   src={activeImage || '/placeholder.png'}
                   alt={product.title}
                   fill
-                  className="object-cover"
+                  className="object-cover cursor-pointer"
                   priority
+                  onClick={() => setIsZoomed(true)}
                 />
+                
+                {/* Zoom Icon */}
+                <button
+                  onClick={() => setIsZoomed(true)}
+                  className="absolute top-4 right-4 bg-white/90 hover:bg-white p-2 rounded-full shadow-lg transition-all opacity-0 group-hover:opacity-100"
+                >
+                  <ZoomIn size={20} className="text-gray-700" />
+                </button>
+
+                {/* Image Navigation Arrows */}
+                {product.images?.length > 1 && (
+                  <>
+                    <button
+                      onClick={prevImage}
+                      className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white p-3 rounded-full shadow-lg transition-all opacity-0 group-hover:opacity-100"
+                    >
+                      <ChevronLeft size={24} className="text-gray-700" />
+                    </button>
+                    <button
+                      onClick={nextImage}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white p-3 rounded-full shadow-lg transition-all opacity-0 group-hover:opacity-100"
+                    >
+                      <ChevronRight size={24} className="text-gray-700" />
+                    </button>
+
+                    {/* Image Counter */}
+                    <div className="absolute bottom-4 right-4 bg-black/70 text-white text-sm px-3 py-1 rounded-full">
+                      {selectedImage + 1} / {product.images.length}
+                    </div>
+                  </>
+                )}
                 
                 {/* Badges */}
                 <div className="absolute top-4 left-4 flex flex-col gap-2">
@@ -203,27 +195,31 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
               </div>
             </div>
 
-            {/* Thumbnail Grid */}
+            {/* Scrollable Thumbnail Strip */}
             {product.images?.length > 1 && (
-              <div className="grid grid-cols-5 gap-2">
-                {product.images.map((image: string, index: number) => (
-                  <button
-                    key={index}
-                    onClick={() => setSelectedImage(index)}
-                    className={`relative aspect-square bg-white rounded-lg overflow-hidden transition-all ${
-                      selectedImage === index
-                        ? 'ring-4 ring-tiffany-500 shadow-lg scale-105'
-                        : 'ring-1 ring-gray-200 hover:ring-2 hover:ring-tiffany-300'
-                    }`}
-                  >
-                    <Image
-                      src={image}
-                      alt={`${product.title} - ${index + 1}`}
-                      fill
-                      className="object-cover"
-                    />
-                  </button>
-                ))}
+              <div className="relative">
+                <div className="overflow-x-auto pb-2 scrollbar-hide">
+                  <div className="flex gap-2" style={{ minWidth: 'min-content' }}>
+                    {product.images.map((image: string, index: number) => (
+                      <button
+                        key={index}
+                        onClick={() => setSelectedImage(index)}
+                        className={`flex-shrink-0 w-20 h-20 relative bg-white rounded-lg overflow-hidden transition-all ${
+                          selectedImage === index
+                            ? 'ring-4 ring-tiffany-500 shadow-lg scale-105'
+                            : 'ring-1 ring-gray-200 hover:ring-2 hover:ring-tiffany-300'
+                        }`}
+                      >
+                        <Image
+                          src={image}
+                          alt={`${product.title} - ${index + 1}`}
+                          fill
+                          className="object-cover"
+                        />
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
             )}
           </div>
@@ -284,7 +280,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
               )}
             </div>
 
-            {/* Horizontal Scrollable Variants */}
+            {/* Horizontal Scrollable Variants - Removed Color Mapping */}
             {product.variants?.items && product.variants.items.length > 0 && (
               <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-gray-200">
                 <h3 className="font-bold text-gray-900 text-base sm:text-lg mb-4 break-words">
@@ -297,9 +293,6 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                       {product.variants.items.map((variant) => {
                         const isSelected = selectedVariant?.id === variant.id
                         const hasStock = variant.stock > 0
-                        
-                        const colorValue = variant.options['Color'] || variant.options['color']
-                        const colorHex = colorValue ? getColorHex(colorValue) : null
                         
                         return (
                           <button
@@ -319,18 +312,6 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                                 : 'border-gray-200 bg-gray-50 opacity-50 cursor-not-allowed'
                             }`}
                           >
-                            {colorHex && (
-                              <div className="flex justify-center mb-2">
-                                <div 
-                                  className="w-8 h-8 rounded-full border-2 border-gray-300"
-                                  style={{ 
-                                    backgroundColor: colorHex,
-                                    boxShadow: colorHex === '#FFFFFF' ? 'inset 0 0 0 1px #e5e7eb' : 'none'
-                                  }}
-                                />
-                              </div>
-                            )}
-                            
                             {variant.image && (
                               <div className="relative w-full aspect-square mb-2 rounded-lg overflow-hidden">
                                 <Image
@@ -441,7 +422,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
               </div>
             </div>
 
-            {/* Description - FIXED WRAPPING */}
+            {/* Description */}
             <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-gray-200 overflow-hidden">
               <h3 className="font-bold text-gray-900 text-base sm:text-lg mb-4">Product Details</h3>
               <div
@@ -467,6 +448,59 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
         </div>
       </div>
 
+      {/* Zoom Modal */}
+      {isZoomed && (
+        <div 
+          className="fixed inset-0 bg-black/95 z-50 flex items-center justify-center p-4"
+          onClick={() => setIsZoomed(false)}
+        >
+          <button
+            onClick={() => setIsZoomed(false)}
+            className="absolute top-4 right-4 bg-white/10 hover:bg-white/20 p-3 rounded-full transition-all"
+          >
+            <X size={24} className="text-white" />
+          </button>
+
+          <div className="relative max-w-6xl max-h-[90vh] w-full h-full">
+            <Image
+              src={activeImage || '/placeholder.png'}
+              alt={product.title}
+              fill
+              className="object-contain"
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
+
+          {/* Navigation in zoom mode */}
+          {product.images?.length > 1 && (
+            <>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  prevImage()
+                }}
+                className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/10 hover:bg-white/20 p-4 rounded-full transition-all"
+              >
+                <ChevronLeft size={32} className="text-white" />
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  nextImage()
+                }}
+                className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/10 hover:bg-white/20 p-4 rounded-full transition-all"
+              >
+                <ChevronRight size={32} className="text-white" />
+              </button>
+
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/70 text-white text-sm px-4 py-2 rounded-full">
+                {selectedImage + 1} / {product.images.length}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
       <style jsx global>{`
         .scrollbar-hide::-webkit-scrollbar {
           display: none;
@@ -476,7 +510,6 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
           scrollbar-width: none;
         }
         
-        /* Force text wrapping in descriptions */
         .prose {
           word-wrap: break-word;
           overflow-wrap: break-word;
@@ -495,14 +528,13 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
         
         .prose table {
           display: block;
-          overflow-x: auto;
+          overflow-x-auto;
         }
         
-        /* Prevent horizontal overflow */
         .overflow-wrap-anywhere {
           overflow-wrap: anywhere;
         }
       `}</style>
     </div>
   )
-}
+  }
