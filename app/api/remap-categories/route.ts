@@ -22,6 +22,11 @@ function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms))
 }
 
+// Auto-generate slug from display name
+function toSlug(displayName: string) {
+  return displayName.toLowerCase().replace(/&/g, "and").replace(/\s+/g, "-")
+}
+
 async function cjFetch(url: string) {
   const token = await getCJToken()
 
@@ -43,13 +48,11 @@ export async function POST(req: NextRequest) {
 
   try {
     const key = req.headers.get("x-api-key")
-
     if (!INGESTION_API_KEY || key !== INGESTION_API_KEY) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
     const body = await req.json().catch(() => ({}))
-
     const maxProducts = body.count || 500
     const dryRun = body.dryRun === true
 
@@ -60,7 +63,6 @@ export async function POST(req: NextRequest) {
     let updated = 0
     let unchanged = 0
     let errors = 0
-
     const changes: any[] = []
 
     while (processed < maxProducts) {
@@ -73,6 +75,8 @@ export async function POST(req: NextRequest) {
           title: true,
           description: true,
           category: true,
+          displayCategory: true,
+          slugCategory: true,
         },
         where: {
           externalId: { not: null },
@@ -82,12 +86,13 @@ export async function POST(req: NextRequest) {
         take: BATCH_SIZE,
       })
 
-      if (products.length === 0) break
+      if (!products.length) break
 
       for (const product of products) {
         try {
           if (!product.externalId) {
             unchanged++
+            processed++
             continue
           }
 
@@ -96,16 +101,13 @@ export async function POST(req: NextRequest) {
           const cjData = await cjFetch(
             `${CJ_API_URL}/product/query?pid=${product.externalId}`
           )
-
           const detail = cjData.data
-
           const cjCategory =
-            detail?.categoryName ||
-            detail?.threeCategoryName ||
-            ""
+            detail?.categoryName || detail?.threeCategoryName || ""
 
           if (!cjCategory) {
             unchanged++
+            processed++
             continue
           }
 
@@ -115,42 +117,51 @@ export async function POST(req: NextRequest) {
             cjCategory
           )
 
-          if (newCategory !== product.category) {
+          // Set displayCategory (for UI) and slugCategory (for URLs)
+          const displayCategory = newCategory
+          const slugCategory = toSlug(displayCategory)
+
+          const hasChange =
+            displayCategory !== product.displayCategory ||
+            slugCategory !== product.slugCategory
+
+          if (hasChange) {
             if (!dryRun) {
               await prisma.product.update({
                 where: { id: product.id },
-                data: { category: newCategory },
+                data: {
+                  category: newCategory,
+                  displayCategory,
+                  slugCategory,
+                },
               })
             }
 
             updated++
-
             if (changes.length < 50) {
               changes.push({
                 productId: product.id,
                 title: product.title.substring(0, 60),
                 oldCategory: product.category,
                 newCategory,
+                displayCategory,
+                slugCategory,
                 cjCategory,
               })
             }
 
-            console.log(
-              `✏️ ${product.category} → ${newCategory}`
-            )
+            console.log(`✏️ ${product.category} → ${displayCategory} (${slugCategory})`)
           } else {
             unchanged++
           }
 
           processed++
-
           await sleep(1100)
-
           if (processed >= maxProducts) break
-
         } catch (err) {
           console.error(`❌ Error processing ${product.id}`, err)
           errors++
+          processed++
         }
       }
 
@@ -160,30 +171,18 @@ export async function POST(req: NextRequest) {
     const duration = Date.now() - startTime
 
     console.log(`✅ Remap complete`)
-    console.log(`Processed: ${processed}`)
-    console.log(`Updated: ${updated}`)
-    console.log(`Unchanged: ${unchanged}`)
+    console.log(`Processed: ${processed}, Updated: ${updated}, Unchanged: ${unchanged}`)
 
     return NextResponse.json({
       success: true,
-      stats: {
-        processed,
-        updated,
-        unchanged,
-        errors,
-      },
+      stats: { processed, updated, unchanged, errors },
       preview: changes,
       time: `${duration}ms`,
     })
-
   } catch (error: any) {
     console.error("❌ remap-categories error:", error)
-
-    return NextResponse.json(
-      { error: error.message },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: error.message }, { status: 500 })
   } finally {
     await prisma.$disconnect()
   }
-            }
+}
