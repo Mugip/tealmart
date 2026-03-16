@@ -26,9 +26,8 @@ export default async function ProductsPage({
     where.category = category
   }
   
-  if (featured === 'true') {
-    where.isFeatured = true
-  }
+  // REMOVED: Strict featured filtering
+  // We'll handle featured with smart logic below instead
   
   if (search) {
     where.OR = [
@@ -51,19 +50,47 @@ export default async function ProductsPage({
     orderBy = { views: 'desc' }
   }
 
-  const [products, categories] = await Promise.all([
-    prisma.product.findMany({
+  // Smart Featured Logic - same as homepage
+  let products
+  
+  if (featured === 'true') {
+    // First try to get manually featured products
+    const manuallyFeatured = await prisma.product.findMany({
+      where: { ...where, isFeatured: true },
+      orderBy,
+      take: 500,
+    })
+
+    // If we have enough manually featured, use them
+    if (manuallyFeatured.length >= 8) {
+      products = manuallyFeatured
+    } else {
+      // Otherwise fall back to smart selection
+      products = await prisma.product.findMany({
+        where,
+        orderBy: [
+          { isFeatured: 'desc' }, // Featured first
+          { views: 'desc' },      // Then popular
+          { createdAt: 'desc' }   // Then newest
+        ],
+        take: 500,
+      })
+    }
+  } else {
+    // Normal product listing
+    products = await prisma.product.findMany({
       where,
       orderBy,
       take: 500,
-    }),
-    prisma.product.groupBy({
-      by: ['category'],
-      where: { isActive: true },
-      _count: { category: true },
-      orderBy: { _count: { category: 'desc' } }
-    }),
-  ])
+    })
+  }
+
+  const categories = await prisma.product.groupBy({
+    by: ['category'],
+    where: { isActive: true },
+    _count: { category: true },
+    orderBy: { _count: { category: 'desc' } }
+  })
 
   const categoryList = categories.map(c => ({
     name: c.category,
@@ -164,7 +191,7 @@ export default async function ProductsPage({
           <p className="text-sm sm:text-base text-gray-600">
             Showing <span className="font-bold text-gray-900">{products.length}</span> products
             {featured === 'true' && (
-              <span className="ml-2 text-yellow-600 font-semibold">★ Featured Only</span>
+              <span className="ml-2 text-yellow-600 font-semibold">★ Featured Selection</span>
             )}
             {category && (
               <span className="ml-2 text-tiffany-600">
@@ -174,19 +201,15 @@ export default async function ProductsPage({
           </p>
         </div>
 
-        {/* No Results */}
+        {/* No Results - This should never show now with smart logic */}
         {products.length === 0 && (
           <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg border border-gray-200 p-8 sm:p-16 text-center">
-            <div className="text-5xl sm:text-6xl mb-4">
-              {featured === 'true' ? '⭐' : '🔍'}
-            </div>
+            <div className="text-5xl sm:text-6xl mb-4">🔍</div>
             <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">
-              {featured === 'true' ? 'No featured products yet' : 'No products found'}
+              No products found
             </h3>
             <p className="text-sm sm:text-base text-gray-600 mb-6">
-              {featured === 'true' ? (
-                <>Check back soon for our handpicked favorites!</>
-              ) : search ? (
+              {search ? (
                 <>No products match your search for "{search}"</>
               ) : (
                 <>Try adjusting your filters or search terms</>
