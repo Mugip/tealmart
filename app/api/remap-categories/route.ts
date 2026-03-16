@@ -15,31 +15,29 @@ if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma
 
 const INGESTION_API_KEY = process.env.INGESTION_API_KEY!
 const CJ_API_URL = "https://developers.cjdropshipping.com/api2.0/v1"
-
 const BATCH_SIZE = 20
 
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms))
 }
 
-// Auto-generate slug from display name
-function toSlug(displayName: string) {
-  return displayName.toLowerCase().replace(/&/g, "and").replace(/\s+/g, "-")
+function slugify(text: string) {
+  return text
+    .toLowerCase()
+    .replace(/&/g, "and")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
 }
 
 async function cjFetch(url: string) {
   const token = await getCJToken()
-
   const res = await fetch(url, {
     headers: { "CJ-Access-Token": token },
   })
-
   const data = await res.json()
-
   if (data.code !== 200) {
     throw new Error(`CJ API error: ${data.message || data.code}`)
   }
-
   return data
 }
 
@@ -86,13 +84,12 @@ export async function POST(req: NextRequest) {
         take: BATCH_SIZE,
       })
 
-      if (!products.length) break
+      if (products.length === 0) break
 
       for (const product of products) {
         try {
           if (!product.externalId) {
             unchanged++
-            processed++
             continue
           }
 
@@ -101,31 +98,27 @@ export async function POST(req: NextRequest) {
           const cjData = await cjFetch(
             `${CJ_API_URL}/product/query?pid=${product.externalId}`
           )
+
           const detail = cjData.data
-          const cjCategory =
-            detail?.categoryName || detail?.threeCategoryName || ""
+          const cjCategory = detail?.categoryName || detail?.threeCategoryName || ""
 
           if (!cjCategory) {
             unchanged++
-            processed++
             continue
           }
 
+          // Get new category from classifier
           const newCategory = classifyProduct(
             product.title,
             product.description,
             cjCategory
           )
 
-          // Set displayCategory (for UI) and slugCategory (for URLs)
+          // Generate display and slug
           const displayCategory = newCategory
-          const slugCategory = toSlug(displayCategory)
+          const slugCategory = slugify(newCategory)
 
-          const hasChange =
-            displayCategory !== product.displayCategory ||
-            slugCategory !== product.slugCategory
-
-          if (hasChange) {
+          if (newCategory !== product.category) {
             if (!dryRun) {
               await prisma.product.update({
                 where: { id: product.id },
@@ -150,18 +143,18 @@ export async function POST(req: NextRequest) {
               })
             }
 
-            console.log(`✏️ ${product.category} → ${displayCategory} (${slugCategory})`)
+            console.log(`✏️ ${product.category} → ${newCategory} (slug: ${slugCategory})`)
           } else {
             unchanged++
           }
 
           processed++
           await sleep(1100)
+
           if (processed >= maxProducts) break
         } catch (err) {
           console.error(`❌ Error processing ${product.id}`, err)
           errors++
-          processed++
         }
       }
 
@@ -169,9 +162,7 @@ export async function POST(req: NextRequest) {
     }
 
     const duration = Date.now() - startTime
-
-    console.log(`✅ Remap complete`)
-    console.log(`Processed: ${processed}, Updated: ${updated}, Unchanged: ${unchanged}`)
+    console.log(`✅ Remap complete | Processed: ${processed}, Updated: ${updated}, Unchanged: ${unchanged}`)
 
     return NextResponse.json({
       success: true,
@@ -185,4 +176,4 @@ export async function POST(req: NextRequest) {
   } finally {
     await prisma.$disconnect()
   }
-}
+          }
