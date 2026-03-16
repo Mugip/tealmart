@@ -1,4 +1,4 @@
-// components/home/FeaturedCategories.tsx
+// components/home/FeaturedCategories.tsx - Update the Link wrapper
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -16,7 +16,7 @@ interface Category {
     title: string
     price: number
     images: string[]
-  } | null  // Changed from undefined to null
+  } | null
 }
 
 interface FeaturedCategoriesProps {
@@ -27,9 +27,8 @@ export default function FeaturedCategories({ categories }: FeaturedCategoriesPro
   const [currentIndex, setCurrentIndex] = useState(0)
   const [isAutoScrolling, setIsAutoScrolling] = useState(true)
 
-  // Auto-scroll every 4 seconds
   useEffect(() => {
-    if (!isAutoScrolling) return
+    if (!isAutoScrolling || categories.length <= 1) return
 
     const interval = setInterval(() => {
       setCurrentIndex((prev) => (prev + 1) % categories.length)
@@ -38,18 +37,26 @@ export default function FeaturedCategories({ categories }: FeaturedCategoriesPro
     return () => clearInterval(interval)
   }, [isAutoScrolling, categories.length])
 
-  const scrollToIndex = (index: number) => {
-    setCurrentIndex(index)
-    setIsAutoScrolling(false)
-    setTimeout(() => setIsAutoScrolling(true), 10000) // Resume auto-scroll after 10s
-  }
-
   const nextSlide = () => {
-    scrollToIndex((currentIndex + 1) % categories.length)
+    setCurrentIndex((prev) => (prev + 1) % categories.length)
+    setIsAutoScrolling(false)
+    setTimeout(() => setIsAutoScrolling(true), 10000)
   }
 
   const prevSlide = () => {
-    scrollToIndex((currentIndex - 1 + categories.length) % categories.length)
+    setCurrentIndex((prev) => (prev - 1 + categories.length) % categories.length)
+    setIsAutoScrolling(false)
+    setTimeout(() => setIsAutoScrolling(true), 10000)
+  }
+
+  const scrollToIndex = (index: number) => {
+    setCurrentIndex(index)
+    setIsAutoScrolling(false)
+    setTimeout(() => setIsAutoScrolling(true), 10000)
+  }
+
+  if (categories.length === 0) {
+    return null
   }
 
   return (
@@ -69,21 +76,25 @@ export default function FeaturedCategories({ categories }: FeaturedCategoriesPro
         {/* Category Carousel */}
         <div className="relative">
           {/* Navigation Buttons */}
-          <button
-            onClick={prevSlide}
-            className="absolute left-0 top-1/2 -translate-y-1/2 z-10 bg-white shadow-lg rounded-full p-2 sm:p-3 hover:bg-gray-50 transition-all -ml-4 sm:-ml-6"
-            aria-label="Previous category"
-          >
-            <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6 text-gray-700" />
-          </button>
+          {categories.length > 1 && (
+            <>
+              <button
+                onClick={prevSlide}
+                className="absolute left-0 top-1/2 -translate-y-1/2 z-20 bg-white shadow-lg rounded-full p-2 sm:p-3 hover:bg-gray-50 transition-all -ml-4 sm:-ml-6"
+                aria-label="Previous category"
+              >
+                <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6 text-gray-700" />
+              </button>
 
-          <button
-            onClick={nextSlide}
-            className="absolute right-0 top-1/2 -translate-y-1/2 z-10 bg-white shadow-lg rounded-full p-2 sm:p-3 hover:bg-gray-50 transition-all -mr-4 sm:-mr-6"
-            aria-label="Next category"
-          >
-            <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6 text-gray-700" />
-          </button>
+              <button
+                onClick={nextSlide}
+                className="absolute right-0 top-1/2 -translate-y-1/2 z-20 bg-white shadow-lg rounded-full p-2 sm:p-3 hover:bg-gray-50 transition-all -mr-4 sm:-mr-6"
+                aria-label="Next category"
+              >
+                <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6 text-gray-700" />
+              </button>
+            </>
+          )}
 
           {/* Categories Container */}
           <div className="overflow-hidden">
@@ -96,72 +107,77 @@ export default function FeaturedCategories({ categories }: FeaturedCategoriesPro
                   key={category.slug}
                   className="w-full flex-shrink-0 px-2"
                 >
-                  <Link href={`/products?category=${category.slug}`}>
-                    <div className="bg-gradient-to-br from-tiffany-50 to-purple-50 rounded-2xl p-6 sm:p-8 hover:shadow-xl transition-all group cursor-pointer border-2 border-tiffany-100 hover:border-tiffany-300">
-                      
-                      {/* Category Header */}
-                      <div className="flex items-center justify-between mb-6">
-                        <div className="flex items-center gap-3">
-                          <div className="text-4xl sm:text-5xl">
-                            {getCategoryIcon(category.slug)}
+                  {/* FIXED: Changed to a clickable div with proper event handling */}
+                  <div
+                    onClick={() => window.location.href = `/products?category=${category.slug}`}
+                    className="bg-gradient-to-br from-tiffany-50 to-purple-50 rounded-2xl p-6 sm:p-8 hover:shadow-xl transition-all group cursor-pointer border-2 border-tiffany-100 hover:border-tiffany-300"
+                  >
+                    
+                    {/* Category Header */}
+                    <div className="flex items-center justify-between mb-6">
+                      <div className="flex items-center gap-3">
+                        <div className="text-4xl sm:text-5xl">
+                          {getCategoryIcon(category.slug)}
+                        </div>
+                        <div>
+                          <h3 className="text-xl sm:text-2xl font-bold text-gray-900 group-hover:text-tiffany-600 transition-colors">
+                            {formatCategoryName(category.name)}
+                          </h3>
+                          <p className="text-sm text-gray-600">
+                            {category.count} products
+                          </p>
+                        </div>
+                      </div>
+                      <ArrowRight className="w-6 h-6 text-tiffany-600 group-hover:translate-x-2 transition-transform" />
+                    </div>
+
+                    {/* Sample Product Preview */}
+                    {category.sampleProduct && category.sampleProduct.images[0] && (
+                      <div className="bg-white rounded-xl p-4 shadow-sm">
+                        <div className="flex items-center gap-4">
+                          <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
+                            <Image
+                              src={category.sampleProduct.images[0]}
+                              alt={category.sampleProduct.title}
+                              fill
+                              sizes="(max-width: 640px) 80px, 96px"
+                              className="object-cover"
+                            />
                           </div>
-                          <div>
-                            <h3 className="text-xl sm:text-2xl font-bold text-gray-900 group-hover:text-tiffany-600 transition-colors">
-                              {formatCategoryName(category.name)}
-                            </h3>
-                            <p className="text-sm text-gray-600">
-                              {category.count} products
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-900 line-clamp-2 mb-1">
+                              {category.sampleProduct.title}
+                            </p>
+                            <p className="text-lg font-bold text-tiffany-600">
+                              ${category.sampleProduct.price.toFixed(2)}
                             </p>
                           </div>
                         </div>
-                        <ArrowRight className="w-6 h-6 text-tiffany-600 group-hover:translate-x-2 transition-transform" />
                       </div>
-
-                      {/* Sample Product Preview (if available) */}
-                      {category.sampleProduct && (
-                        <div className="bg-white rounded-xl p-4 shadow-sm">
-                          <div className="flex items-center gap-4">
-                            <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
-                              <Image
-                                src={category.sampleProduct.images[0] || '/placeholder.png'}
-                                alt={category.sampleProduct.title}
-                                fill
-                                className="object-cover"
-                              />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-gray-900 line-clamp-2 mb-1">
-                                {category.sampleProduct.title}
-                              </p>
-                              <p className="text-lg font-bold text-tiffany-600">
-                                ${category.sampleProduct.price.toFixed(2)}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </Link>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
           </div>
 
           {/* Dots Indicator */}
-          <div className="flex justify-center gap-2 mt-6">
-            {categories.map((_, index) => (
-              <button
-                key={index}
-                onClick={() => scrollToIndex(index)}
-                className={`h-2 rounded-full transition-all ${
-                  index === currentIndex
-                    ? 'w-8 bg-tiffany-600'
-                    : 'w-2 bg-gray-300 hover:bg-gray-400'
-                }`}
-                aria-label={`Go to category ${index + 1}`}
-              />
-            ))}
-          </div>
+          {categories.length > 1 && (
+            <div className="flex justify-center gap-2 mt-6">
+              {categories.map((_, index) => (
+                <button
+                  key={index}
+                  onClick={() => scrollToIndex(index)}
+                  className={`h-2 rounded-full transition-all ${
+                    index === currentIndex
+                      ? 'w-8 bg-tiffany-600'
+                      : 'w-2 bg-gray-300 hover:bg-gray-400'
+                  }`}
+                  aria-label={`Go to category ${index + 1}`}
+                />
+              ))}
+            </div>
+          )}
         </div>
 
         {/* View All Categories Link */}
