@@ -8,12 +8,41 @@ import Link from 'next/link'
 
 export const revalidate = 3600
 
+/**
+ * Smart Featured Products Logic:
+ * 1. First, try to get manually featured products (isFeatured = true)
+ * 2. If we have enough (8+), use those
+ * 3. Otherwise, fall back to top products by popularity and recency
+ * This ensures the homepage always shows products!
+ */
 async function getFeaturedProducts() {
-  return await prisma.product.findMany({
+  // Try to get manually featured products first
+  const manuallyFeatured = await prisma.product.findMany({
     where: { isActive: true, isFeatured: true },
     take: 8,
     orderBy: { createdAt: 'desc' },
   })
+
+  // If we have enough manually featured products, use them
+  if (manuallyFeatured.length >= 8) {
+    return manuallyFeatured
+  }
+
+  // Otherwise, fall back to smart selection:
+  // - Featured products first (if any)
+  // - Then most viewed (popular)
+  // - Then newest
+  const smartFeatured = await prisma.product.findMany({
+    where: { isActive: true },
+    take: 8,
+    orderBy: [
+      { isFeatured: 'desc' }, // Manually featured first
+      { views: 'desc' },      // Then by popularity
+      { createdAt: 'desc' }   // Then by recency
+    ],
+  })
+
+  return smartFeatured
 }
 
 async function getLatestProducts() {
@@ -102,7 +131,7 @@ export default async function Home() {
       
       <FeaturedCategories categories={categories} />
 
-      {/* Featured Products */}
+      {/* Featured Products - Always shows because of smart fallback */}
       {featuredProducts.length > 0 && (
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16 lg:py-20">
           <div className="flex items-center justify-between mb-8 sm:mb-12">
@@ -114,7 +143,7 @@ export default async function Home() {
               <p className="text-gray-600 text-sm sm:text-base lg:text-lg">Handpicked favorites just for you</p>
             </div>
             <Link 
-              href="/products?featured=true" 
+              href="/products" 
               className="hidden md:flex items-center gap-2 px-4 sm:px-6 py-2 sm:py-3 bg-gradient-to-r from-tiffany-500 to-tiffany-600 text-white font-bold rounded-xl hover:shadow-lg transition-all group text-sm sm:text-base"
             >
               View All
