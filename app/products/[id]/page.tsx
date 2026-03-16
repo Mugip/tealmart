@@ -48,12 +48,23 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
   const [loading, setLoading] = useState(true)
   const [quantity, setQuantity] = useState(1)
   const [isZoomed, setIsZoomed] = useState(false)
+  const [allImages, setAllImages] = useState<string[]>([])
 
   useEffect(() => {
     fetch(`/api/products/${params.id}`)
       .then(res => res.json())
       .then(data => {
         setProduct(data)
+        
+        // Combine all images: product images + variant images
+        const productImages = data.images || []
+        const variantImages = data.variants?.items
+          ?.map((v: Variant) => v.image)
+          ?.filter((img: string | undefined) => img && !productImages.includes(img)) || []
+        
+        const combinedImages = [...productImages, ...variantImages]
+        setAllImages(combinedImages)
+        
         if (data.variants?.items?.[0]) {
           setSelectedVariant(data.variants.items[0])
         }
@@ -102,15 +113,15 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
 
   const activePrice = selectedVariant?.price ?? product.price
   const activeStock = selectedVariant?.stock ?? product.stock
-  const activeImage = selectedVariant?.image || product.images[selectedImage]
+  const activeImage = allImages[selectedImage] || product.images[0]
   const isInStock = activeStock > 0
 
   const nextImage = () => {
-    setSelectedImage((prev) => (prev + 1) % product.images.length)
+    setSelectedImage((prev) => (prev + 1) % allImages.length)
   }
 
   const prevImage = () => {
-    setSelectedImage((prev) => (prev - 1 + product.images.length) % product.images.length)
+    setSelectedImage((prev) => (prev - 1 + allImages.length) % allImages.length)
   }
 
   return (
@@ -150,7 +161,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                 </button>
 
                 {/* Image Navigation Arrows */}
-                {product.images?.length > 1 && (
+                {allImages.length > 1 && (
                   <>
                     <button
                       onClick={prevImage}
@@ -167,7 +178,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
 
                     {/* Image Counter */}
                     <div className="absolute bottom-4 right-4 bg-black/70 text-white text-sm px-3 py-1 rounded-full">
-                      {selectedImage + 1} / {product.images.length}
+                      {selectedImage + 1} / {allImages.length}
                     </div>
                   </>
                 )}
@@ -195,12 +206,12 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
               </div>
             </div>
 
-            {/* Scrollable Thumbnail Strip */}
-            {product.images?.length > 1 && (
+            {/* Scrollable Thumbnail Strip - Now includes variant images */}
+            {allImages.length > 1 && (
               <div className="relative">
                 <div className="overflow-x-auto pb-2 scrollbar-hide">
                   <div className="flex gap-2" style={{ minWidth: 'min-content' }}>
-                    {product.images.map((image: string, index: number) => (
+                    {allImages.map((image: string, index: number) => (
                       <button
                         key={index}
                         onClick={() => setSelectedImage(index)}
@@ -280,7 +291,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
               )}
             </div>
 
-            {/* Horizontal Scrollable Variants - Removed Color Mapping */}
+            {/* Horizontal Scrollable Variants */}
             {product.variants?.items && product.variants.items.length > 0 && (
               <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-gray-200">
                 <h3 className="font-bold text-gray-900 text-base sm:text-lg mb-4 break-words">
@@ -299,8 +310,8 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                             key={variant.id}
                             onClick={() => {
                               setSelectedVariant(variant)
-                              if (variant.image && product.images.includes(variant.image)) {
-                                setSelectedImage(product.images.indexOf(variant.image))
+                              if (variant.image && allImages.includes(variant.image)) {
+                                setSelectedImage(allImages.indexOf(variant.image))
                               }
                             }}
                             disabled={!hasStock}
@@ -422,11 +433,11 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
               </div>
             </div>
 
-            {/* Description */}
+            {/* Description - FIXED IMAGE WRAPPING */}
             <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-gray-200 overflow-hidden">
               <h3 className="font-bold text-gray-900 text-base sm:text-lg mb-4">Product Details</h3>
               <div
-                className="prose prose-sm max-w-none text-gray-700 break-words overflow-wrap-anywhere"
+                className="product-description prose prose-sm max-w-none text-gray-700"
                 dangerouslySetInnerHTML={{ __html: product.description }}
               />
             </div>
@@ -456,7 +467,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
         >
           <button
             onClick={() => setIsZoomed(false)}
-            className="absolute top-4 right-4 bg-white/10 hover:bg-white/20 p-3 rounded-full transition-all"
+            className="absolute top-4 right-4 bg-white/10 hover:bg-white/20 p-3 rounded-full transition-all z-10"
           >
             <X size={24} className="text-white" />
           </button>
@@ -472,7 +483,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
           </div>
 
           {/* Navigation in zoom mode */}
-          {product.images?.length > 1 && (
+          {allImages.length > 1 && (
             <>
               <button
                 onClick={(e) => {
@@ -494,7 +505,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
               </button>
 
               <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/70 text-white text-sm px-4 py-2 rounded-full">
-                {selectedImage + 1} / {product.images.length}
+                {selectedImage + 1} / {allImages.length}
               </div>
             </>
           )}
@@ -510,31 +521,54 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
           scrollbar-width: none;
         }
         
-        .prose {
+        /* Product Description Styles - Fixed Image Handling */
+        .product-description {
           word-wrap: break-word;
           overflow-wrap: break-word;
           word-break: break-word;
         }
         
-        .prose * {
+        .product-description * {
           max-width: 100%;
-          overflow-wrap: break-word;
         }
         
-        .prose pre {
+        .product-description img {
+          display: block !important;
+          max-width: 100% !important;
+          height: auto !important;
+          margin: 1rem 0 !important;
+          border-radius: 0.5rem;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        .product-description p {
+          margin-bottom: 1rem;
+          line-height: 1.6;
+        }
+        
+        .product-description table {
+          display: block;
+          overflow-x: auto;
+          margin: 1rem 0;
+          border-collapse: collapse;
+          width: 100%;
+        }
+        
+        .product-description table td,
+        .product-description table th {
+          padding: 0.5rem;
+          border: 1px solid #e5e7eb;
+        }
+        
+        .product-description pre {
           white-space: pre-wrap;
           word-break: break-all;
-        }
-        
-        .prose table {
-          display: block;
-          overflow-x-auto;
-        }
-        
-        .overflow-wrap-anywhere {
-          overflow-wrap: anywhere;
+          background: #f3f4f6;
+          padding: 1rem;
+          border-radius: 0.5rem;
+          overflow-x: auto;
         }
       `}</style>
     </div>
   )
-  }
+            }
