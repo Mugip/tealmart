@@ -16,6 +16,8 @@ if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma
 const INGESTION_API_KEY = process.env.INGESTION_API_KEY!
 const CJ_API_URL = "https://developers.cjdropshipping.com/api2.0/v1"
 
+const BATCH_SIZE = 20
+
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms))
 }
@@ -24,9 +26,7 @@ async function cjFetch(url: string) {
   const token = await getCJToken()
 
   const res = await fetch(url, {
-    headers: {
-      "CJ-Access-Token": token,
-    },
+    headers: { "CJ-Access-Token": token },
   })
 
   const data = await res.json()
@@ -50,129 +50,132 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json().catch(() => ({}))
 
-    const limit = body.limit || 20
-    const offset = body.offset || 0
+    const maxProducts = body.count || 500
     const dryRun = body.dryRun === true
 
-    console.log("🔄 Starting CJ category remap...")
+    console.log(`🔄 Starting CJ category remap (max ${maxProducts})`)
 
-    const products = await prisma.product.findMany({
-      select: {
-        id: true,
-        externalId: true,
-        title: true,
-        description: true,
-        category: true,
-      },
-      where: {
-        externalId: {
-          not: null,
-        },
-        source: "cj-dropshipping",
-      },
-      skip: offset,
-      take: limit,
-    })
-
-    if (products.length === 0) {
-      return NextResponse.json({
-        success: true,
-        message: "No products found",
-      })
-    }
-
+    let offset = 0
+    let processed = 0
     let updated = 0
     let unchanged = 0
     let errors = 0
 
     const changes: any[] = []
 
-    for (const product of products) {
-      try {
-        if (!product.externalId) {
-          unchanged++
-          continue
-        }
+    while (processed < maxProducts) {
+      console.log(`📦 Fetching batch offset ${offset}`)
 
-        console.log(`🔎 Fetching CJ data for ${product.externalId}`)
+      const products = await prisma.product.findMany({
+        select: {
+          id: true,
+          externalId: true,
+          title: true,
+          description: true,
+          category: true,
+        },
+        where: {
+          externalId: { not: null },
+          source: "cj-dropshipping",
+        },
+        skip: offset,
+        take: BATCH_SIZE,
+      })
 
-        const cjData = await cjFetch(
-          `${CJ_API_URL}/product/query?pid=${product.externalId}`
-        )
+      if (products.length === 0) break
 
-        const detail = cjData.data
-
-        if (!detail) {
-          unchanged++
-          continue
-        }
-
-        const cjCategory =
-          detail.categoryName ||
-          detail.threeCategoryName ||
-          ""
-
-        if (!cjCategory) {
-          unchanged++
-          continue
-        }
-
-        const newCategory = classifyProduct(
-          product.title,
-          product.description,
-          cjCategory
-        )
-
-        if (newCategory !== product.category) {
-          if (!dryRun) {
-            await prisma.product.update({
-              where: { id: product.id },
-              data: { category: newCategory },
-            })
+      for (const product of products) {
+        try {
+          if (!product.externalId) {
+            unchanged++
+            continue
           }
 
-          updated++
+          console.log(`🔎 Checking ${product.externalId}`)
 
-          changes.push({
-            productId: product.id,
-            title: product.title.substring(0, 60),
-            oldCategory: product.category,
-            newCategory,
-            cjCategory,
-          })
-
-          console.log(
-            `✏️ ${product.category} → ${newCategory} | ${product.title}`
+          const cjData = await cjFetch(
+            `${CJ_API_URL}/product/query?pid=${product.externalId}`
           )
-        } else {
-          unchanged++
-        }
 
-        await sleep(1100)
-      } catch (err) {
-        console.error(`❌ Error processing ${product.id}`, err)
-        errors++
+          const detail = cjData.data
+
+          const cjCategory =
+            detail?.categoryName ||
+            detail?.threeCategoryName ||
+            ""
+
+          if (!cjCategory) {
+            unchanged++
+            continue
+          }
+
+          const newCategory = classifyProduct(
+            product.title,
+            product.description,
+            cjCategory
+          )
+
+          if (newCategory !== product.category) {
+            if (!dryRun) {
+              await prisma.product.update({
+                where: { id: product.id },
+                data: { category: newCategory },
+              })
+            }
+
+            updated++
+
+            if (changes.length < 50) {
+              changes.push({
+                productId: product.id,
+                title: product.title.substring(0, 60),
+                oldCategory: product.category,
+                newCategory,
+                cjCategory,
+              })
+            }
+
+            console.log(
+              `✏️ ${product.category} → ${newCategory}`
+            )
+          } else {
+            unchanged++
+          }
+
+          processed++
+
+          await sleep(1100)
+
+          if (processed >= maxProducts) break
+
+        } catch (err) {
+          console.error(`❌ Error processing ${product.id}`, err)
+          errors++
+        }
       }
+
+      offset += BATCH_SIZE
     }
 
     const duration = Date.now() - startTime
 
-    console.log(`✅ Remap finished in ${duration}ms`)
-    console.log(`Updated: ${updated} | Unchanged: ${unchanged}`)
+    console.log(`✅ Remap complete`)
+    console.log(`Processed: ${processed}`)
+    console.log(`Updated: ${updated}`)
+    console.log(`Unchanged: ${unchanged}`)
 
     return NextResponse.json({
       success: true,
       stats: {
-        processed: products.length,
+        processed,
         updated,
         unchanged,
         errors,
       },
-      preview: changes.slice(0, 50),
-      nextOffset: offset + limit,
-      hasMore: products.length === limit,
-      processingTimeMs: duration,
+      preview: changes,
+      time: `${duration}ms`,
     })
+
   } catch (error: any) {
     console.error("❌ remap-categories error:", error)
 
@@ -183,4 +186,4 @@ export async function POST(req: NextRequest) {
   } finally {
     await prisma.$disconnect()
   }
-  }
+            }
