@@ -1,0 +1,16 @@
+# https://www.robotstxt.org/robotstxt.html
+User-agent: *
+Allow: /
+
+# Disallow admin and API routes
+Disallow: /admin
+Disallow: /api/
+Disallow: /checkout
+Disallow: /cart
+
+# Allow crawling of product pages
+Allow: /products/
+Allow: /categories/
+
+# Sitemap location
+Sitemap: https://tealmart.vercel.app/sitemap.xml
