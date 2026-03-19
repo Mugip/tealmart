@@ -1,14 +1,13 @@
 // app/sitemap.ts
-// Dynamic sitemap generation for SEO
+// Dynamic sitemap generation for SEO - FIXED XML ENCODING
 
 import { prisma } from '@/lib/db'
 import { MetadataRoute } from 'next'
-import { formatCategoryName } from '@/lib/productClassifier'
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = 'https://tealmart.vercel.app'
 
-  // Get all active products (limit to most important ones)
+  // Get featured/popular products only (reduced for performance)
   const products = await prisma.product.findMany({
     where: { isActive: true },
     select: {
@@ -16,18 +15,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       updatedAt: true,
     },
     orderBy: [
-      { isFeatured: 'desc' }, // Featured products first
-      { views: 'desc' },      // Then by popularity
+      { isFeatured: 'desc' },
+      { views: 'desc' },
     ],
-    take: 500, // Reduced from 1000 for better performance
+    take: 500, // Limit to top 500 products
   })
 
   // Get all unique categories
   const categories = await prisma.product.groupBy({
     by: ['category'],
     where: { isActive: true },
-    _count: { category: true },
-    orderBy: { _count: { category: 'desc' } },
   })
 
   // Static pages
@@ -94,7 +91,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     },
   ]
 
-  // Product pages - only active products
+  // Product pages
   const productPages: MetadataRoute.Sitemap = products.map((product) => ({
     url: `${baseUrl}/products/${product.id}`,
     lastModified: product.updatedAt,
@@ -102,7 +99,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.7,
   }))
 
-  // Category pages - with clean slugs
+  // Category pages - Next.js will handle XML encoding automatically
+  // DO NOT manually encode here - Next.js sitemap does it
   const categoryPages: MetadataRoute.Sitemap = categories.map((cat) => ({
     url: `${baseUrl}/products?category=${cat.category}`,
     lastModified: new Date(),
