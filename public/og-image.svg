@@ -1,85 +1,115 @@
-<svg width="1200" height="630" xmlns="http://www.w3.org/2000/svg">
-  <!-- Gradient Background -->
+<svg width="1200" height="630" viewBox="0 0 1200 630"
+     xmlns="http://www.w3.org/2000/svg"
+     xmlns:xlink="http://www.w3.org/1999/xlink">
+
   <defs>
-    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#0D9488;stop-opacity:1" />
-      <stop offset="50%" style="stop-color:#14B8A6;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#2DD4BF;stop-opacity:1" />
-    </linearGradient>
-    
-    <linearGradient id="accentGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" style="stop-color:#A855F7;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#EC4899;stop-opacity:1" />
-    </linearGradient>
-    
-    <!-- Glow effect -->
-    <filter id="glow">
-      <feGaussianBlur stdDeviation="8" result="coloredBlur"/>
+
+    <!-- ═══════════════════════════════════════════
+         BACKGROUND: Linen Texture Pattern
+         Creates a beige fabric-like background
+         using fractal noise filter
+    ════════════════════════════════════════════ -->
+    <pattern id="linenTexture" patternUnits="userSpaceOnUse" width="100" height="100">
+
+      <!-- Base beige color -->
+      <rect width="100" height="100" fill="#F0E8D0"/>
+
+      <!-- High-fidelity linen grain filter using fractal noise
+           and small vector details for realistic texture -->
+      <filter id="linenFilter">
+        <feTurbulence type="fractalNoise" baseFrequency="0.9"
+                      numOctaves="3" stitchTiles="stitch"/>
+        <feColorMatrix type="matrix"
+                       values="1 0 0 0 0
+                               0 1 0 0 0
+                               0 1 0 0 0
+                               0 0 0 0.1 0"/>
+      </filter>
+
+      <!-- Apply linen filter at reduced opacity over base -->
+      <rect width="100" height="100" filter="url(#linenFilter)" opacity="0.3"/>
+
+    </pattern>
+
+    <!-- ═══════════════════════════════════════════
+         FILTER: Shopping Bag Drop Shadow
+         Soft gaussian blur shadow beneath the bag
+    ════════════════════════════════════════════ -->
+    <filter id="bagShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="1.5"/>
+      <feOffset dx="1" dy="1"/>
       <feMerge>
-        <feMergeNode in="coloredBlur"/>
+        <feMergeNode/>
         <feMergeNode in="SourceGraphic"/>
       </feMerge>
     </filter>
-    
-    <!-- Shadow -->
-    <filter id="shadow">
-      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-opacity="0.3"/>
-    </filter>
+
   </defs>
-  
-  <!-- Background -->
-  <rect width="1200" height="630" fill="url(#bgGradient)"/>
-  
-  <!-- Decorative circles -->
-  <circle cx="100" cy="100" r="200" fill="#14B8A6" opacity="0.1"/>
-  <circle cx="1100" cy="530" r="250" fill="#2DD4BF" opacity="0.1"/>
-  <circle cx="950" cy="150" r="150" fill="#A855F7" opacity="0.08"/>
-  
-  <!-- Main content container -->
-  <rect x="80" y="150" width="1040" height="330" rx="24" fill="white" opacity="0.95" filter="url(#shadow)"/>
-  
-  <!-- Logo Icon - Shopping bag with T -->
-  <g transform="translate(150, 220)">
-    <!-- Shopping bag -->
-    <path d="M10 60 L90 60 L85 140 L15 140 Z" fill="url(#accentGradient)" opacity="0.9"/>
-    <rect x="20" y="45" width="60" height="10" rx="5" fill="url(#accentGradient)"/>
-    <path d="M35 45 Q50 15, 65 45" fill="none" stroke="url(#accentGradient)" stroke-width="4" stroke-linecap="round"/>
-    
-    <!-- Letter T -->
-    <text x="50" y="115" font-family="Arial, sans-serif" font-size="70" font-weight="bold" fill="white" text-anchor="middle">T</text>
+
+  <!-- ═══════════════════════════════════════════
+       LAYER 1: Background Fill with Linen Texture
+  ════════════════════════════════════════════ -->
+  <rect width="1200" height="630" fill="url(#linenTexture)"/>
+
+  <!-- ═══════════════════════════════════════════
+       LAYER 2: Shopping Bag Icon
+       Positioned at (160, 200) with drop shadow
+  ════════════════════════════════════════════ -->
+  <g id="shoppingBag" transform="translate(160, 200)" filter="url(#bagShadow)">
+
+    <!-- Bag body shape with rounded corners -->
+    <path
+      d="M10,0 L70,0 A10,10 0 0,1 80,10 L80,110 A10,10 0 0,1 70,120
+         L10,120 A10,10 0 0,1 0,110 L0,10 A10,10 0 0,1 10,0 Z"
+      fill="white"
+      stroke="#D0D0D0"
+      stroke-width="1"/>
+
+    <!-- Bag handle arc (curved rope/ribbon handle) -->
+    <path
+      d="M25,-15 Q40,-35 55,-15"
+      fill="none"
+      stroke="#6000C0"
+      stroke-width="4"
+      stroke-linecap="round"/>
+
+    <!-- Left handle attachment dot -->
+    <circle cx="25" cy="-15" r="3" fill="#6000C0"/>
+
+    <!-- Right handle attachment dot -->
+    <circle cx="55" cy="-15" r="3" fill="#6000C0"/>
+
+    <!-- Central "T" lettermark on bag face -->
+    <text
+      x="40" y="75"
+      font-family="Verdana, sans-serif"
+      font-size="60"
+      fill="#008888"
+      text-anchor="middle">T</text>
+
   </g>
-  
-  <!-- Brand name -->
-  <text x="320" y="320" font-family="Arial, sans-serif" font-size="120" font-weight="900" fill="#0F172A">
-    TealMart
-  </text>
-  
-  <!-- Tagline -->
-  <text x="320" y="385" font-family="Arial, sans-serif" font-size="36" font-weight="400" fill="#475569">
-    Shop Quality Products at Amazing Prices
-  </text>
-  
-  <!-- Feature badges -->
-  <g transform="translate(320, 420)">
-    <!-- Free Shipping -->
-    <rect x="0" y="0" width="180" height="45" rx="22.5" fill="url(#accentGradient)" opacity="0.9"/>
-    <text x="90" y="30" font-family="Arial, sans-serif" font-size="18" font-weight="700" fill="white" text-anchor="middle">
-      Free Shipping
-    </text>
-    
-    <!-- 30-Day Returns -->
-    <rect x="200" y="0" width="200" height="45" rx="22.5" fill="#14B8A6" opacity="0.9"/>
-    <text x="300" y="30" font-family="Arial, sans-serif" font-size="18" font-weight="700" fill="white" text-anchor="middle">
-      30-Day Returns
-    </text>
-    
-    <!-- Secure Checkout -->
-    <rect x="420" y="0" width="210" height="45" rx="22.5" fill="#0D9488" opacity="0.9"/>
-    <text x="525" y="30" font-family="Arial, sans-serif" font-size="18" font-weight="700" fill="white" text-anchor="middle">
-      Secure Checkout
-    </text>
+
+  <!-- ═══════════════════════════════════════════
+       LAYER 3: TealMart Wordmark + Tagline
+       Positioned at (320, 260)
+  ════════════════════════════════════════════ -->
+  <g id="textGroup" transform="translate(320, 260)">
+
+    <!-- Brand wordmark -->
+    <text
+      x="0" y="0"
+      font-family="Helvetica Neue, Arial, sans-serif"
+      font-weight="bold"
+      font-size="80"
+      fill="#008888">TealMart</text>
+
+    <!-- Tagline — offset below wordmark -->
+    <text
+      x="0" y="55"
+      font-family="Arial, sans-serif"
+      font-size="28"
+      fill="#008888">Shop Smart, Live Better</text>
+
   </g>
-  
-  <!-- Bottom accent line -->
-  <rect x="80" y="565" width="1040" height="6" rx="3" fill="url(#accentGradient)" opacity="0.7"/>
+
 </svg>
