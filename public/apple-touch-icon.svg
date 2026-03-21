@@ -1,0 +1,28 @@
+<svg width="180" height="180" viewBox="0 0 180 180" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="appleGradient" x1="0" y1="0" x2="180" y2="180" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#14B8A6"/>
+      <stop offset="100%" stop-color="#3B82F6"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="180" height="180" rx="40" fill="url(#appleGradient)"/>
+
+  <g transform="translate(52, 68)">
+    
+    <path d="M22,0 C22,-28 54,-28 54,0" 
+          stroke="#8B5CF6" 
+          stroke-width="10" 
+          stroke-linecap="round" 
+          fill="none"/>
+
+    <path d="M8,0 H68 L80,90 H-4 L8,0 Z" fill="white" />
+    
+    <text x="38" y="62" 
+          font-family="Arial, sans-serif" 
+          font-weight="bold" 
+          font-size="48" 
+          fill="#14B8A6" 
+          text-anchor="middle">T</text>
+  </g>
+</svg>
