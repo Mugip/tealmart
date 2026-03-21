@@ -1,0 +1,15 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="tealGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#14B8A6" />
+      <stop offset="100%" stop-color="#3B82F6" />
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="120" fill="url(#tealGradient)"/>
+  
+  <path d="M200 180C200 140 220 120 256 120C292 120 312 140 312 180" stroke="#8B5CF6" stroke-width="16" stroke-linecap="round"/>
+  
+  <path d="M170 180H342L360 380H152L170 180Z" fill="white" />
+  
+  <text x="256" y="310" text-anchor="middle" font-family="sans-serif" font-weight="bold" font-size="90" fill="#14B8A6">T</text>
+</svg>
