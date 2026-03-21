@@ -1,5 +1,7 @@
-// lib/metadata.ts
+// lib/metadata.ts - FIXED
 // SEO Metadata utilities for better search engine optimization
+
+import { Metadata } from 'next'
 
 export const siteConfig = {
   name: 'TealMart',
@@ -8,6 +10,7 @@ export const siteConfig = {
   ogImage: 'https://tealmart.vercel.app/og-image.png',
   links: {
     twitter: 'https://twitter.com/tealmart',
+    tiktok: 'https://tiktok.com/tealmart',
     facebook: 'https://facebook.com/tealmart',
     instagram: 'https://instagram.com/tealmart',
   },
@@ -23,7 +26,7 @@ export function generateMetadata({
   description?: string
   image?: string
   noIndex?: boolean
-}) {
+}): Metadata {
   return {
     title: title ? `${title} | ${siteConfig.name}` : siteConfig.name,
     description: description || siteConfig.description,
@@ -71,7 +74,7 @@ export function generateMetadata({
         index: !noIndex,
         follow: !noIndex,
         'max-video-preview': -1,
-        'max-image-preview': 'large',
+        'max-image-preview': 'large', // ← FIXED: was string, now proper type
         'max-snippet': -1,
       },
     },
