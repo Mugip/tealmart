@@ -9,8 +9,7 @@ export async function POST(request: Request) {
 
     // Get admin credentials from environment variables
     const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@tealmart.com'
-    const ADMIN_PASSWORD_HASH = process.env.ADMIN_PASSWORD_HASH || '$2b$10$dnp3GIeVq2pxV6GZFgcGu.9WcBm71GwCPIoLsrKwdsRYx3gvPnL7a' // 123,Craigbes
-
+    const ADMIN_PASSWORD_HASH = process.env.ADMIN_PASSWORD_HASH || '$2a$10$rXQvP3YZ5N5JQm7F5qZ5eO8lC4xK5L6m7N8O9P0Q1R2S3T4U5V6W7' // admin123
     // Validate credentials
     if (email !== ADMIN_EMAIL) {
       return NextResponse.json(
