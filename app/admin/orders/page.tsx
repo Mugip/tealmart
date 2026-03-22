@@ -1,7 +1,7 @@
-// app/admin/orders/page.tsx
+// app/admin/orders/page.tsx - FIXED
 import { prisma } from '@/lib/db'
 import Link from 'next/link'
-import { Package, Search, Filter, Download } from 'lucide-react'
+import { Package, Search } from 'lucide-react'
 
 export default async function AdminOrdersPage({
   searchParams,
@@ -18,8 +18,9 @@ export default async function AdminOrdersPage({
   if (search) {
     where.OR = [
       { id: { contains: search, mode: 'insensitive' } },
-      { customerEmail: { contains: search, mode: 'insensitive' } },
-      { customerName: { contains: search, mode: 'insensitive' } },
+      { orderNumber: { contains: search, mode: 'insensitive' } },
+      { email: { contains: search, mode: 'insensitive' } },
+      { shippingName: { contains: search, mode: 'insensitive' } },
     ]
   }
 
@@ -47,6 +48,7 @@ export default async function AdminOrdersPage({
     SHIPPED: 'bg-purple-100 text-purple-800',
     DELIVERED: 'bg-green-100 text-green-800',
     CANCELLED: 'bg-red-100 text-red-800',
+    REFUNDED: 'bg-gray-100 text-gray-800',
   }
 
   return (
@@ -69,7 +71,7 @@ export default async function AdminOrdersPage({
           >
             All Orders ({orders.length})
           </Link>
-          {['PENDING', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'CANCELLED'].map((s) => {
+          {['PENDING', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'CANCELLED', 'REFUNDED'].map((s) => {
             const count = statusCounts.find((sc) => sc.status === s)?._count || 0
             return (
               <Link
@@ -97,7 +99,7 @@ export default async function AdminOrdersPage({
               type="text"
               name="search"
               defaultValue={search}
-              placeholder="Search by order ID, email, or customer name..."
+              placeholder="Search by order number, email, or customer name..."
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-tiffany-500 focus:border-transparent"
             />
           </div>
@@ -117,7 +119,7 @@ export default async function AdminOrdersPage({
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Order ID
+                  Order #
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Customer
@@ -154,11 +156,11 @@ export default async function AdminOrdersPage({
                 orders.map((order) => (
                   <tr key={order.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      {order.id.slice(0, 8)}...
+                      #{order.orderNumber}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">{order.customerName}</div>
-                      <div className="text-sm text-gray-500">{order.customerEmail}</div>
+                      <div className="text-sm font-medium text-gray-900">{order.shippingName}</div>
+                      <div className="text-sm text-gray-500">{order.email}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {order.items.length} item{order.items.length !== 1 ? 's' : ''}
