@@ -1,18 +1,19 @@
-// app/auth/error/page.tsx
 'use client'
 
+import { Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { AlertCircle } from 'lucide-react'
 
-export default function AuthError() {
+function AuthErrorContent() {
   const params = useSearchParams()
   const error = params.get('error')
 
   const messages: Record<string, string> = {
     OAuthSignin: 'Could not start Google sign-in.',
     OAuthCallback: 'Google sign-in was cancelled or failed.',
-    OAuthAccountNotLinked: 'This email is already registered. Please sign in with email/password.',
+    OAuthAccountNotLinked:
+      'This email is already registered. Please sign in with email/password.',
     CredentialsSignin: 'Invalid email or password.',
     EmailSignin: 'Email sign-in failed.',
     Callback: 'Authentication callback failed.',
@@ -50,5 +51,13 @@ export default function AuthError() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function AuthError() {
+  return (
+    <Suspense fallback={<div className="p-6 text-center">Loading...</div>}>
+      <AuthErrorContent />
+    </Suspense>
   )
 }
