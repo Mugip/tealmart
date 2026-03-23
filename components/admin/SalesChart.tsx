@@ -1,4 +1,4 @@
-// components/admin/SalesChart.tsx
+// components/admin/SalesChart.tsx - FIXED
 'use client'
 
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
@@ -16,6 +16,19 @@ interface Props {
 
 export default function SalesChart({ data }: Props) {
   const [chartType, setChartType] = useState<'line' | 'bar'>('line')
+
+  // Fixed formatter function with proper typing
+  const formatTooltip = (value: number, name: string) => {
+    if (name === 'revenue') {
+      return [`$${value.toFixed(2)}`, 'Revenue']
+    }
+    return [value, 'Orders']
+  }
+
+  // Fixed legend formatter
+  const formatLegend = (value: string) => {
+    return value.charAt(0).toUpperCase() + value.slice(1)
+  }
 
   return (
     <div>
@@ -69,14 +82,11 @@ export default function SalesChart({ data }: Props) {
                   border: '1px solid #e5e7eb',
                   borderRadius: '8px',
                 }}
-                formatter={(value: any, name: string) => [
-                  name === 'revenue' ? `$${value.toFixed(2)}` : value,
-                  name === 'revenue' ? 'Revenue' : 'Orders',
-                ]}
+                formatter={formatTooltip}
               />
               <Legend
                 wrapperStyle={{ paddingTop: '20px' }}
-                formatter={(value) => value.charAt(0).toUpperCase() + value.slice(1)}
+                formatter={formatLegend}
               />
               <Line
                 type="monotone"
@@ -116,14 +126,11 @@ export default function SalesChart({ data }: Props) {
                   border: '1px solid #e5e7eb',
                   borderRadius: '8px',
                 }}
-                formatter={(value: any, name: string) => [
-                  name === 'revenue' ? `$${value.toFixed(2)}` : value,
-                  name === 'revenue' ? 'Revenue' : 'Orders',
-                ]}
+                formatter={formatTooltip}
               />
               <Legend
                 wrapperStyle={{ paddingTop: '20px' }}
-                formatter={(value) => value.charAt(0).toUpperCase() + value.slice(1)}
+                formatter={formatLegend}
               />
               <Bar dataKey="revenue" fill="#14B8A6" radius={[8, 8, 0, 0]} />
               <Bar dataKey="orders" fill="#8B5CF6" radius={[8, 8, 0, 0]} />
