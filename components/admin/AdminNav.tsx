@@ -1,4 +1,4 @@
-// components/admin/AdminNav.tsx
+// components/admin/AdminNav.tsx - FULLY MOBILE RESPONSIVE
 'use client'
 
 import { useState } from 'react'
@@ -53,28 +53,99 @@ export default function AdminNav() {
 
   return (
     <>
-      {/* Mobile Menu Button */}
-      <button
-        onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-        className="lg:hidden fixed top-4 left-4 z-50 p-2 bg-white rounded-lg shadow-lg"
-      >
-        {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
-      </button>
+      {/* Mobile Header - Fixed at top */}
+      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 shadow-sm">
+        <div className="flex items-center justify-between p-4">
+          {/* Logo */}
+          <Link href="/admin" className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-gradient-to-br from-tiffany-500 to-tiffany-600 rounded-lg flex items-center justify-center">
+              <ShoppingBag className="w-5 h-5 text-white" />
+            </div>
+            <span className="text-lg font-bold text-gray-900">TealMart Admin</span>
+          </Link>
 
-      {/* Overlay */}
+          {/* Menu Button */}
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+          >
+            {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+          </button>
+        </div>
+      </div>
+
+      {/* Mobile Menu Overlay */}
       {mobileMenuOpen && (
         <div
-          className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-40"
+          className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-40 pt-16"
           onClick={() => setMobileMenuOpen(false)}
         />
       )}
 
-      {/* Sidebar */}
+      {/* Mobile Sidebar */}
       <aside
-        className={`fixed top-0 left-0 h-full w-64 bg-white border-r border-gray-200 shadow-lg transform transition-transform duration-200 ease-in-out z-40 ${
-          mobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+        className={`lg:hidden fixed top-16 left-0 bottom-0 w-64 bg-white border-r border-gray-200 shadow-lg transform transition-transform duration-200 ease-in-out z-40 ${
+          mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
+        <div className="h-full flex flex-col overflow-y-auto">
+          {/* Navigation Links */}
+          <nav className="flex-1 p-4 space-y-1">
+            {navItems.map((item) => {
+              const Icon = item.icon
+              const active = isActive(item.href, item.exact)
+
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+                    active
+                      ? 'bg-tiffany-50 text-tiffany-700 font-semibold'
+                      : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  <Icon className="w-5 h-5" />
+                  <span>{item.label}</span>
+                </Link>
+              )
+            })}
+          </nav>
+
+          {/* User Info & Logout */}
+          <div className="p-4 border-t border-gray-200">
+            <div className="flex items-center gap-3 px-4 py-2 mb-2">
+              <div className="w-8 h-8 bg-tiffany-100 rounded-full flex items-center justify-center">
+                <span className="text-tiffany-700 font-semibold text-sm">A</span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-gray-900 truncate">Admin</p>
+                <p className="text-xs text-gray-500 truncate">admin@tealmart.com</p>
+              </div>
+            </div>
+
+            <button
+              onClick={handleLogout}
+              disabled={loggingOut}
+              className="w-full flex items-center gap-3 px-4 py-3 text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+            >
+              <LogOut className="w-5 h-5" />
+              <span>{loggingOut ? 'Logging out...' : 'Logout'}</span>
+            </button>
+
+            <Link
+              href="/"
+              className="block text-center text-sm text-tiffany-600 hover:text-tiffany-700 mt-4"
+            >
+              ← Back to Store
+            </Link>
+          </div>
+        </div>
+      </aside>
+
+      {/* Desktop Sidebar - Always visible on large screens */}
+      <aside className="hidden lg:block fixed top-0 left-0 h-full w-64 bg-white border-r border-gray-200 shadow-lg z-40">
         <div className="h-full flex flex-col">
           {/* Logo */}
           <div className="p-6 border-b border-gray-200">
@@ -99,7 +170,6 @@ export default function AdminNav() {
                 <Link
                   key={item.href}
                   href={item.href}
-                  onClick={() => setMobileMenuOpen(false)}
                   className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
                     active
                       ? 'bg-tiffany-50 text-tiffany-700 font-semibold'
@@ -136,13 +206,10 @@ export default function AdminNav() {
               <LogOut className="w-5 h-5" />
               <span>{loggingOut ? 'Logging out...' : 'Logout'}</span>
             </button>
-          </div>
 
-          {/* Back to Store */}
-          <div className="p-4 border-t border-gray-200">
             <Link
               href="/"
-              className="block text-center text-sm text-tiffany-600 hover:text-tiffany-700"
+              className="block text-center text-sm text-tiffany-600 hover:text-tiffany-700 mt-4"
             >
               ← Back to Store
             </Link>
@@ -151,4 +218,4 @@ export default function AdminNav() {
       </aside>
     </>
   )
-}
+            }
