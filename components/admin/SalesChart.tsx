@@ -1,4 +1,4 @@
-// components/admin/SalesChart.tsx - FIXED
+// components/admin/SalesChart.tsx - FULLY FIXED
 'use client'
 
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
@@ -16,19 +16,6 @@ interface Props {
 
 export default function SalesChart({ data }: Props) {
   const [chartType, setChartType] = useState<'line' | 'bar'>('line')
-
-  // Fixed formatter function with proper typing
-  const formatTooltip = (value: number, name: string) => {
-    if (name === 'revenue') {
-      return [`$${value.toFixed(2)}`, 'Revenue']
-    }
-    return [value, 'Orders']
-  }
-
-  // Fixed legend formatter
-  const formatLegend = (value: string) => {
-    return value.charAt(0).toUpperCase() + value.slice(1)
-  }
 
   return (
     <div>
@@ -82,13 +69,12 @@ export default function SalesChart({ data }: Props) {
                   border: '1px solid #e5e7eb',
                   borderRadius: '8px',
                 }}
-                formatter={formatTooltip}
               />
               <Legend
                 wrapperStyle={{ paddingTop: '20px' }}
-                formatter={formatLegend}
               />
               <Line
+                name="Revenue"
                 type="monotone"
                 dataKey="revenue"
                 stroke="#14B8A6"
@@ -97,6 +83,7 @@ export default function SalesChart({ data }: Props) {
                 activeDot={{ r: 6 }}
               />
               <Line
+                name="Orders"
                 type="monotone"
                 dataKey="orders"
                 stroke="#8B5CF6"
@@ -126,14 +113,12 @@ export default function SalesChart({ data }: Props) {
                   border: '1px solid #e5e7eb',
                   borderRadius: '8px',
                 }}
-                formatter={formatTooltip}
               />
               <Legend
                 wrapperStyle={{ paddingTop: '20px' }}
-                formatter={formatLegend}
               />
-              <Bar dataKey="revenue" fill="#14B8A6" radius={[8, 8, 0, 0]} />
-              <Bar dataKey="orders" fill="#8B5CF6" radius={[8, 8, 0, 0]} />
+              <Bar name="Revenue" dataKey="revenue" fill="#14B8A6" radius={[8, 8, 0, 0]} />
+              <Bar name="Orders" dataKey="orders" fill="#8B5CF6" radius={[8, 8, 0, 0]} />
             </BarChart>
           )}
         </ResponsiveContainer>
