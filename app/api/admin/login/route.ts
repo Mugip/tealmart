@@ -1,33 +1,20 @@
-// app/api/admin/login/route.ts - PRODUCTION READY
+// app/api/admin/login/route.ts - SECURE WITH JWT
 import { NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 import { cookies } from 'next/headers'
+import { createAdminToken } from '@/lib/adminAuth'
 
 export async function POST(request: Request) {
   try {
     const { email, password } = await request.json()
 
-    console.log('🔐 Login attempt:', { email, passwordLength: password?.length })
-
     // Get admin credentials from environment variables
-    const ADMIN_EMAIL = process.env.ADMIN_EMAIL
+    const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@tealmart.com'
     const ADMIN_PASSWORD_HASH = process.env.ADMIN_PASSWORD_HASH
-    
-    console.log('📧 Expected email:', ADMIN_EMAIL)
-    console.log('🔑 Hash exists:', !!ADMIN_PASSWORD_HASH)
-    console.log('🔑 Hash length:', ADMIN_PASSWORD_HASH?.length)
-    console.log('🔑 Hash preview:', ADMIN_PASSWORD_HASH?.substring(0, 20) + '...')
 
-    // Check if environment variables are set
-    if (!ADMIN_EMAIL || !ADMIN_PASSWORD_HASH) {
-      console.error('❌ Missing ADMIN_EMAIL or ADMIN_PASSWORD_HASH environment variables')
-      return NextResponse.json(
-        { error: 'Server configuration error. Contact administrator.' },
-        { status: 500 }
-      )
-    }
+    console.log('🔐 Login attempt:', { email })
 
-    // Validate email
+    // Validate credentials
     if (email !== ADMIN_EMAIL) {
       console.log('❌ Email mismatch')
       return NextResponse.json(
@@ -36,22 +23,16 @@ export async function POST(request: Request) {
       )
     }
 
-    console.log('✅ Email matches, checking password...')
-
-    // Check password with bcrypt
-    let passwordMatch = false
-    try {
-      passwordMatch = await bcrypt.compare(password, ADMIN_PASSWORD_HASH)
-      console.log('🔐 Password match result:', passwordMatch)
-    } catch (bcryptError: any) {
-      console.error('❌ Bcrypt error:', bcryptError.message)
-      // If bcrypt fails, the hash might be malformed
+    if (!ADMIN_PASSWORD_HASH) {
+      console.error('❌ ADMIN_PASSWORD_HASH not set!')
       return NextResponse.json(
-        { error: 'Password verification failed. Check ADMIN_PASSWORD_HASH format.' },
+        { error: 'Server configuration error' },
         { status: 500 }
       )
     }
-    
+
+    const passwordMatch = await bcrypt.compare(password, ADMIN_PASSWORD_HASH)
+
     if (!passwordMatch) {
       console.log('❌ Password mismatch')
       return NextResponse.json(
@@ -60,11 +41,14 @@ export async function POST(request: Request) {
       )
     }
 
-    console.log('✅ Login successful!')
+    console.log('✅ Login successful')
 
-    // Create session cookie
+    // Create signed JWT token
+    const token = await createAdminToken(email)
+
+    // Set secure cookie with JWT
     const cookieStore = cookies()
-    cookieStore.set('admin-auth', 'authenticated', {
+    cookieStore.set('admin-auth', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
@@ -73,8 +57,8 @@ export async function POST(request: Request) {
     })
 
     return NextResponse.json({ success: true })
-  } catch (error: any) {
-    console.error('💥 Login error:', error.message)
+  } catch (error) {
+    console.error('💥 Login error:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
