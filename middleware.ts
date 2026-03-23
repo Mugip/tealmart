@@ -1,22 +1,25 @@
-// middleware.ts - Protect admin routes
+// middleware.ts - SECURE WITH JWT VERIFICATION
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { verifyAdminToken } from '@/lib/adminAuth'
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // Protect admin routes
   if (pathname.startsWith('/admin')) {
-    const adminAuth = request.cookies.get('admin-auth')
+    const token = request.cookies.get('admin-auth')?.value
 
-    // If no admin auth cookie, redirect to login
-    if (!adminAuth && pathname !== '/admin/login') {
-      return NextResponse.redirect(new URL('/admin/login', request.url))
-    }
-
-    // If has auth but trying to access login, redirect to dashboard
-    if (adminAuth && pathname === '/admin/login') {
-      return NextResponse.redirect(new URL('/admin', request.url))
+    // If no token or invalid token, redirect to login
+    if (!token || !(await verifyAdminToken(token))) {
+      if (pathname !== '/admin/login') {
+        return NextResponse.redirect(new URL('/admin/login', request.url))
+      }
+    } else {
+      // Valid token but trying to access login page
+      if (pathname === '/admin/login') {
+        return NextResponse.redirect(new URL('/admin', request.url))
+      }
     }
   }
 
