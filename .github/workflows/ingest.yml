@@ -68,6 +68,7 @@ jobs:
             1)
               echo "📂 Category: Women's Clothing"
               ingest "women blouse"
+              ingest "ladies dresses"
               ingest "women shirt long sleeve"
               ingest "women shirt short sleeve"
               ingest "women hoodie sweatshirt"
