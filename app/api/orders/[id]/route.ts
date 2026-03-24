@@ -1,76 +1,100 @@
-// app/api/orders/[id]/route.ts - FIXED
+// app/api/orders/[id]/route.ts
+// AUTH ON ALL METHODS
+
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { cookies } from 'next/headers'
+import { verifyAdminToken } from '@/lib/adminAuth'
 import { sendOrderUpdate } from '@/lib/email/sendOrderUpdate'
 
-// GET - Get order details
+async function requireAdmin() {
+  const token = cookies().get('admin-auth')?.value
+  return !!token && (await verifyAdminToken(token))
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  if (!(await requireAdmin())) {
+    return NextResponse.json(
+      { error: 'Unauthorized' },
+      { status: 401 }
+    )
+  }
+
   try {
     const order = await prisma.order.findUnique({
       where: { id: params.id },
       include: {
         items: {
-          include: {
-            product: true,
-          },
+          include: { product: true },
         },
       },
     })
 
     if (!order) {
-      return NextResponse.json({ error: 'Order not found' }, { status: 404 })
+      return NextResponse.json(
+        { error: 'Order not found' },
+        { status: 404 }
+      )
     }
 
     return NextResponse.json(order)
   } catch (error) {
-    console.error('Get order error:', error)
-    return NextResponse.json({ error: 'Failed to fetch order' }, { status: 500 })
+    return NextResponse.json(
+      { error: 'Failed to fetch order' },
+      { status: 500 }
+    )
   }
 }
 
-// PUT - Update order status
 export async function PUT(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  if (!(await requireAdmin())) {
+    return NextResponse.json(
+      { error: 'Unauthorized' },
+      { status: 401 }
+    )
+  }
+
   try {
-    // Check admin authentication
-    const cookieStore = cookies()
-    const adminAuth = cookieStore.get('admin-auth')
-
-    if (!adminAuth) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
     const { status, trackingNumber } = await request.json()
 
-    // Validate status
-    const validStatuses = ['PENDING', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'CANCELLED', 'REFUNDED']
+    const validStatuses = [
+      'PENDING',
+      'PROCESSING',
+      'SHIPPED',
+      'DELIVERED',
+      'CANCELLED',
+      'REFUNDED',
+    ]
+
     if (!validStatuses.includes(status)) {
-      return NextResponse.json({ error: 'Invalid status' }, { status: 400 })
+      return NextResponse.json(
+        { error: 'Invalid status' },
+        { status: 400 }
+      )
     }
 
-    // Get current order
     const currentOrder = await prisma.order.findUnique({
       where: { id: params.id },
       include: {
         items: {
-          include: {
-            product: true,
-          },
+          include: { product: true },
         },
       },
     })
 
     if (!currentOrder) {
-      return NextResponse.json({ error: 'Order not found' }, { status: 404 })
+      return NextResponse.json(
+        { error: 'Order not found' },
+        { status: 404 }
+      )
     }
 
-    // Update order
     const updatedOrder = await prisma.order.update({
       where: { id: params.id },
       data: {
@@ -79,16 +103,11 @@ export async function PUT(
       },
       include: {
         items: {
-          include: {
-            product: true,
-          },
+          include: { product: true },
         },
       },
     })
 
-    console.log(`✅ Order ${updatedOrder.orderNumber} status updated to ${status}`)
-
-    // Send email notification if status changed
     if (currentOrder.status !== status) {
       try {
         await sendOrderUpdate({
@@ -99,7 +118,7 @@ export async function PUT(
           status,
           trackingNumber: trackingNumber || undefined,
           total: updatedOrder.total,
-          items: updatedOrder.items.map(item => ({
+          items: updatedOrder.items.map((item) => ({
             product: {
               title: item.product.title,
               price: item.product.price,
@@ -108,40 +127,39 @@ export async function PUT(
             price: item.price,
           })),
         })
-        console.log(`📧 Status update email sent to ${updatedOrder.email}`)
       } catch (emailError) {
-        console.error('Failed to send status update email:', emailError)
-        // Don't fail the update if email fails
+        console.error(
+          'Failed to send status update email:',
+          emailError
+        )
       }
     }
 
     return NextResponse.json({
       success: true,
       order: updatedOrder,
-      message: 'Order updated successfully'
+      message: 'Order updated successfully',
     })
   } catch (error: any) {
-    console.error('Update order error:', error)
-    return NextResponse.json({
-      error: error.message || 'Failed to update order'
-    }, { status: 500 })
+    return NextResponse.json(
+      { error: error.message || 'Failed to update order' },
+      { status: 500 }
+    )
   }
 }
 
-// DELETE - Cancel order
 export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  if (!(await requireAdmin())) {
+    return NextResponse.json(
+      { error: 'Unauthorized' },
+      { status: 401 }
+    )
+  }
+
   try {
-    // Check admin authentication
-    const cookieStore = cookies()
-    const adminAuth = cookieStore.get('admin-auth')
-
-    if (!adminAuth) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
     const order = await prisma.order.update({
       where: { id: params.id },
       data: {
@@ -150,13 +168,14 @@ export async function DELETE(
       },
     })
 
-    console.log(`✅ Order ${order.orderNumber} cancelled`)
-
-    return NextResponse.json({ success: true, order })
-  } catch (error: any) {
-    console.error('Cancel order error:', error)
     return NextResponse.json({
-      error: error.message || 'Failed to cancel order'
-    }, { status: 500 })
+      success: true,
+      order,
+    })
+  } catch (error: any) {
+    return NextResponse.json(
+      { error: error.message || 'Failed to cancel order' },
+      { status: 500 }
+    )
   }
-}
+        }
