@@ -2,37 +2,21 @@
 // Three responsibilities:
 //   1. Inject x-pathname header so ConditionalShell suppresses store Header/Footer on /admin
 //   2. Protect /admin routes with JWT verification
-//   3. Enforce maintenance mode — redirects all store visitors to /maintenance
+//   3. Enforce maintenance mode by reading a cookie — NOT a self-fetch
+//      (self-fetch is unreliable on Vercel Edge: cold starts, no loopback)
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { verifyAdminToken } from '@/lib/adminAuth'
 
-// Module-level cache so we don't hit the DB on every request
-let maintenanceCacheValue = false
-let maintenanceCacheExpiry = 0
-
-async function isMaintenanceMode(origin: string): Promise<boolean> {
-  const now = Date.now()
-  if (now < maintenanceCacheExpiry) return maintenanceCacheValue
-
-  try {
-    const res = await fetch(`${origin}/api/settings/public`, { cache: 'no-store' })
-    maintenanceCacheValue = res.ok ? (await res.json()).maintenanceMode === true : false
-  } catch {
-    maintenanceCacheValue = false
-  }
-  maintenanceCacheExpiry = now + 30_000
-  return maintenanceCacheValue
-}
-
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  // Inject pathname so server components (ConditionalShell) can read it
+  // Always inject pathname so ConditionalShell (server component) can
+  // suppress the store Header/Footer on /admin routes without client JS.
   const requestHeaders = new Headers(request.headers)
   requestHeaders.set('x-pathname', pathname)
 
-  // ── Admin protection ──────────────────────────────────────────────────────
+  // ── Admin route protection ────────────────────────────────────────────────
   if (pathname.startsWith('/admin')) {
     const token = request.cookies.get('admin-auth')?.value
     const isValid = token ? await verifyAdminToken(token) : false
@@ -46,15 +30,18 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next({ request: { headers: requestHeaders } })
   }
 
-  // ── Maintenance mode (skip for API, maintenance page, and static assets) ──
+  // ── Maintenance mode ──────────────────────────────────────────────────────
+  // Read the cookie written by PUT /api/admin/settings when the admin saves.
+  // This works reliably on Vercel Edge because cookies are in the request —
+  // no network call needed, no loopback fetch, no cold-start race condition.
   const isExempt =
     pathname.startsWith('/api/') ||
     pathname.startsWith('/maintenance') ||
     pathname.startsWith('/_next/')
 
   if (!isExempt) {
-    const maintenance = await isMaintenanceMode(request.nextUrl.origin)
-    if (maintenance) {
+    const maintenanceCookie = request.cookies.get('tealmart-maintenance')?.value
+    if (maintenanceCookie === '1') {
       return NextResponse.redirect(new URL('/maintenance', request.url))
     }
   }
