@@ -307,6 +307,27 @@ model IngestionLog {
 }
 
 // ============================================
+// ADMIN SETTINGS
+// ============================================
+
+model AdminSettings {
+  id                       String   @id @default(cuid())
+  storeName                String   @default("TealMart")
+  storeEmail               String   @default("support@tealmart.com")
+  storePhone               String?
+  currency                 String   @default("USD")
+  orderNotifications       Boolean  @default(true)
+  lowStockAlerts           Boolean  @default(true)
+  dailyReports             Boolean  @default(false)
+  customerMessages         Boolean  @default(true)
+  maintenanceMode          Boolean  @default(false)
+  allowGuestCheckout       Boolean  @default(true)
+  requireEmailVerification Boolean  @default(false)
+  autoApproveReviews       Boolean  @default(false)
+  updatedAt                DateTime @updatedAt
+}
+
+// ============================================
 // CJ DROPSHIPPING TOKEN CACHE
 // ============================================
 
