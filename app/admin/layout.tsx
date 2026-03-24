@@ -4,20 +4,27 @@ import MaintenanceBanner from '@/components/admin/MaintenanceBanner'
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
-    // Use a flex column so MaintenanceBanner naturally pushes everything down.
-    // The banner must be OUTSIDE the lg:ml-64 main area so it spans full width
-    // above both the mobile fixed header and the desktop sidebar.
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Full-width maintenance banner — renders above the mobile fixed header */}
+    <div className="min-h-screen bg-gray-50">
+      {/*
+        MaintenanceBanner is fixed z-[60] and sets --banner-h on <html>.
+        AdminNav reads --banner-h to offset its own fixed positions so it
+        sits below the banner rather than overlapping it.
+      */}
       <MaintenanceBanner />
-
-      {/* Sidebar nav (fixed on desktop, slide-in on mobile) */}
       <AdminNav />
 
-      {/* Main content */}
-      <main className="lg:ml-64 flex-1">
-        {/* pt-16 offsets the mobile fixed top bar; lg:pt-0 removes it on desktop */}
-        <div className="pt-16 lg:pt-0">
+      {/*
+        Main content:
+        - Mobile: needs top padding for the fixed mobile nav bar (64px) + banner
+          We use pt-16 as the base for the nav bar; the banner adds itself via
+          inline style on a wrapper div in the page.
+        - Desktop: lg:ml-64 for the sidebar, no top padding needed.
+      */}
+      <main className="lg:ml-64 min-h-screen">
+        <div
+          className="lg:pt-0"
+          style={{ paddingTop: 'calc(var(--banner-h, 0px) + 64px)' } as React.CSSProperties}
+        >
           {children}
         </div>
       </main>
