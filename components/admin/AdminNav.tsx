@@ -1,4 +1,4 @@
-// components/admin/AdminNav.tsx - DYNAMIC ADMIN EMAIL
+// components/admin/AdminNav.tsx - AUTH-GATED: renders nothing until verified
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -14,14 +14,35 @@ export default function AdminNav() {
   const router = useRouter()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
-  const [adminEmail, setAdminEmail] = useState(process.env.NEXT_PUBLIC_ADMIN_EMAIL ?? 'Admin')
+  const [adminEmail, setAdminEmail] = useState('')
+  // null = checking, false = unauthenticated, true = authenticated
+  const [authed, setAuthed] = useState<boolean | null>(null)
 
   useEffect(() => {
     fetch('/api/admin/me')
-      .then(r => r.ok ? r.json() : null)
-      .then(data => { if (data?.email) setAdminEmail(data.email) })
-      .catch(() => {})
-  }, [])
+      .then(r => {
+        if (!r.ok) {
+          setAuthed(false)
+          router.replace('/admin/login')
+          return null
+        }
+        return r.json()
+      })
+      .then(data => {
+        if (data?.email) {
+          setAdminEmail(data.email)
+          setAuthed(true)
+        }
+      })
+      .catch(() => {
+        setAuthed(false)
+        router.replace('/admin/login')
+      })
+  }, [router])
+
+  // Render NOTHING while the auth check is in flight or if unauthenticated.
+  // This is the key guard — prevents any admin UI from painting to visitors.
+  if (authed !== true) return null
 
   const navItems = [
     { href: '/admin', icon: LayoutDashboard, label: 'Dashboard', exact: true },
@@ -154,4 +175,4 @@ export default function AdminNav() {
       </aside>
     </>
   )
-      }
+    }
