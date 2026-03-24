@@ -1,66 +1,70 @@
 // middleware.ts
-// Responsibilities:
-//   1. Inject x-pathname header for ConditionalShell (Header/Footer suppression on /admin)
-//   2. Protect /admin routes with JWT verification
-//   3. Enforce maintenance mode via Supabase REST API — the ONLY approach that
-//      works reliably on Vercel Edge across ALL visitors.
-//
-// WHY NOT A COOKIE: The tealmart-maintenance cookie is set in the ADMIN's browser
-// when they save settings. Visitor browsers never have that cookie, so middleware
-// can never read it from request.cookies for a visitor. Cookies are per-browser.
-//
-// WHY SUPABASE REST: Supabase exposes a PostgREST endpoint at
-// https://<project>.supabase.co/rest/v1/ that is reachable from Vercel Edge.
-// We query the AdminSettings table directly, cache the result for 10 seconds
-// in a module-level variable (per Edge worker instance), so we hit Supabase
-// at most once every 10s per warm worker — not on every request.
-
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { verifyAdminToken } from '@/lib/adminAuth'
 
-// ── Maintenance mode cache ─────────────────────────────────────────────────
+// ── Maintenance mode cache (per Edge worker instance, 10s TTL) ─────────────
 let _maintenanceCache: boolean = false
 let _maintenanceCacheExpiry: number = 0
+
+function getSupabaseUrl(): string {
+  // Try explicit env var first
+  if (process.env.SUPABASE_URL) return process.env.SUPABASE_URL
+  if (process.env.NEXT_PUBLIC_SUPABASE_URL) return process.env.NEXT_PUBLIC_SUPABASE_URL
+
+  // Auto-extract from DATABASE_URL
+  // Format: postgresql://postgres.PROJECTREF:PASSWORD@HOST/postgres
+  const dbUrl = process.env.DATABASE_URL ?? process.env.POSTGRES_URL ?? ''
+  const match = dbUrl.match(/postgres\.([a-zA-Z0-9]+)[:@]/)
+  if (match?.[1]) return `https://${match[1]}.supabase.co`
+
+  // Auto-extract from DIRECT_URL as fallback
+  const directUrl = process.env.DIRECT_URL ?? ''
+  const match2 = directUrl.match(/postgres\.([a-zA-Z0-9]+)[:@]/)
+  if (match2?.[1]) return `https://${match2[1]}.supabase.co`
+
+  return ''
+}
 
 async function getMaintenanceMode(): Promise<boolean> {
   const now = Date.now()
   if (now < _maintenanceCacheExpiry) return _maintenanceCache
 
   try {
-    const supabaseUrl =
-      process.env.NEXT_PUBLIC_SUPABASE_URL ||
-      process.env.SUPABASE_URL ||
-      extractSupabaseUrl(process.env.DATABASE_URL ?? '')
-
-    const supabaseKey =
-      process.env.SUPABASE_SERVICE_ROLE_KEY ||
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    const supabaseUrl = getSupabaseUrl()
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+      ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
     if (!supabaseUrl || !supabaseKey) {
+      console.warn('[maintenance] Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY')
       _maintenanceCache = false
       _maintenanceCacheExpiry = now + 10_000
       return false
     }
 
-    const res = await fetch(
-      `${supabaseUrl}/rest/v1/AdminSettings?select=maintenanceMode&limit=1`,
-      {
-        headers: {
-          apikey: supabaseKey,
-          Authorization: `Bearer ${supabaseKey}`,
-          Accept: 'application/json',
-        },
-      }
-    )
+    // Prisma stores camelCase model names with quoted identifiers in Postgres.
+    // The table is "AdminSettings" and the column is "maintenanceMode" —
+    // both must be URL-encoded double-quoted for PostgREST.
+    const url = `${supabaseUrl}/rest/v1/%22AdminSettings%22?select=%22maintenanceMode%22&limit=1`
+
+    const res = await fetch(url, {
+      headers: {
+        apikey: supabaseKey,
+        Authorization: `Bearer ${supabaseKey}`,
+        Accept: 'application/json',
+      },
+    })
 
     if (res.ok) {
       const rows: Array<{ maintenanceMode: boolean }> = await res.json()
       _maintenanceCache = rows[0]?.maintenanceMode === true
     } else {
+      const text = await res.text()
+      console.error('[maintenance] Supabase query failed:', res.status, text)
       _maintenanceCache = false
     }
-  } catch {
+  } catch (err) {
+    console.error('[maintenance] fetch error:', err)
     _maintenanceCache = false
   }
 
@@ -68,21 +72,10 @@ async function getMaintenanceMode(): Promise<boolean> {
   return _maintenanceCache
 }
 
-// Extract the Supabase project URL from the DATABASE_URL connection string
-function extractSupabaseUrl(dbUrl: string): string {
-  try {
-    const match = dbUrl.match(/postgres\.([\w]+)@/)
-    if (match) return `https://${match[1]}.supabase.co`
-  } catch {}
-
-  return ''
-}
-
 // ── Middleware ──────────────────────────────────────────────────────────────
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  // Inject pathname so ConditionalShell can suppress Header/Footer on /admin
   const requestHeaders = new Headers(request.headers)
   requestHeaders.set('x-pathname', pathname)
 
@@ -94,11 +87,9 @@ export async function middleware(request: NextRequest) {
     if (!isValid && pathname !== '/admin/login') {
       return NextResponse.redirect(new URL('/admin/login', request.url))
     }
-
     if (isValid && pathname === '/admin/login') {
       return NextResponse.redirect(new URL('/admin', request.url))
     }
-
     return NextResponse.next({ request: { headers: requestHeaders } })
   }
 
@@ -110,7 +101,6 @@ export async function middleware(request: NextRequest) {
 
   if (!isExempt) {
     const maintenance = await getMaintenanceMode()
-
     if (maintenance) {
       return NextResponse.redirect(new URL('/maintenance', request.url))
     }
@@ -120,7 +110,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: [
-    '/((?!_next/static|_next/image|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js)$).*)',
-  ],
-        }
+  matcher: ['/((?!_next/static|_next/image|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js)$).*)'],
+}
