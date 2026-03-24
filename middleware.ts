@@ -32,8 +32,8 @@ async function getMaintenanceMode(): Promise<boolean> {
 
   try {
     const supabaseUrl = getSupabaseUrl()
-    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-      ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    const supabaseKey =
+      process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
     if (!supabaseUrl || !supabaseKey) {
       console.warn('[maintenance] Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY')
@@ -42,10 +42,9 @@ async function getMaintenanceMode(): Promise<boolean> {
       return false
     }
 
-    // Prisma stores camelCase model names with quoted identifiers in Postgres.
-    // The table is "AdminSettings" and the column is "maintenanceMode" —
-    // both must be URL-encoded double-quoted for PostgREST.
-    const url = `${supabaseUrl}/rest/v1/%22AdminSettings%22?select=%22maintenanceMode%22&limit=1`
+    // PostgREST handles SQL quoting of PascalCase identifiers internally —
+    // pass the table and column names as plain path/query params (no %22).
+    const url = `${supabaseUrl}/rest/v1/AdminSettings?select=maintenanceMode&limit=1`
 
     const res = await fetch(url, {
       headers: {
@@ -111,4 +110,4 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: ['/((?!_next/static|_next/image|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js)$).*)'],
-}
+    }
