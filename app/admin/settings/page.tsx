@@ -1,4 +1,4 @@
-// app/admin/settings/page.tsx - FIXED
+// app/admin/settings/page.tsx - REAL SAVE/LOAD
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -10,7 +10,7 @@ export default function AdminSettingsPage() {
   const [loading, setLoading] = useState(true)
   const [message, setMessage] = useState('')
   const [showNewPassword, setShowNewPassword] = useState(false)
-  
+
   const [settings, setSettings] = useState({
     storeName: 'TealMart',
     storeEmail: 'support@tealmart.com',
@@ -242,13 +242,47 @@ export default function AdminSettingsPage() {
           {activeTab === 'store' && (
             <div className="space-y-4">
               <h3 className="text-sm font-semibold text-gray-900 mb-4">Store Behaviour</h3>
+
+              {/* Maintenance mode — gets its own prominent card */}
+              <div className={`rounded-xl border-2 p-4 transition-colors ${
+                settings.maintenanceMode
+                  ? 'border-red-300 bg-red-50'
+                  : 'border-gray-200 hover:border-gray-300'
+              }`}>
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={settings.maintenanceMode}
+                    onChange={e => setSettings(s => ({ ...s, maintenanceMode: e.target.checked }))}
+                    className="w-4 h-4 mt-0.5 text-red-600 rounded border-gray-300 focus:ring-red-500"
+                  />
+                  <div className="flex-1">
+                    <p className={`text-sm font-semibold ${settings.maintenanceMode ? 'text-red-700' : 'text-gray-900'}`}>
+                      Maintenance mode
+                    </p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Redirects all store visitors to a maintenance page. You can still access the admin panel.
+                    </p>
+                  </div>
+                </label>
+
+                {settings.maintenanceMode && (
+                  <div className="mt-3 ml-7 flex items-start gap-2 bg-red-100 border border-red-200 rounded-lg px-3 py-2">
+                    <span className="text-red-500 text-base leading-none mt-0.5">⚠</span>
+                    <p className="text-xs text-red-700 leading-relaxed">
+                      <strong>Your store is currently hidden from visitors.</strong> Save settings to apply. Disable this toggle and save again to reopen your store.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Other settings */}
               {[
-                { key: 'maintenanceMode', label: 'Maintenance mode', desc: 'Temporarily hide the store from visitors', danger: true },
                 { key: 'allowGuestCheckout', label: 'Guest checkout', desc: 'Allow purchases without an account' },
                 { key: 'requireEmailVerification', label: 'Require email verification', desc: 'Users must verify email before ordering' },
                 { key: 'autoApproveReviews', label: 'Auto-approve reviews', desc: 'Publish reviews without manual approval' },
               ].map(item => (
-                <label key={item.key} className={`flex items-start gap-3 cursor-pointer group p-3 rounded-lg ${item.danger && (settings as any)[item.key] ? 'bg-red-50 border border-red-200' : 'hover:bg-gray-50'}`}>
+                <label key={item.key} className="flex items-start gap-3 cursor-pointer group p-3 rounded-lg hover:bg-gray-50">
                   <input
                     type="checkbox"
                     checked={(settings as any)[item.key]}
@@ -256,7 +290,7 @@ export default function AdminSettingsPage() {
                     className="w-4 h-4 mt-0.5 text-tiffany-600 rounded border-gray-300 focus:ring-tiffany-500"
                   />
                   <div>
-                    <p className={`text-sm font-medium ${item.danger && (settings as any)[item.key] ? 'text-red-700' : 'text-gray-900'}`}>{item.label}</p>
+                    <p className="text-sm font-medium text-gray-900">{item.label}</p>
                     <p className="text-xs text-gray-500">{item.desc}</p>
                   </div>
                 </label>
@@ -291,4 +325,4 @@ export default function AdminSettingsPage() {
       </button>
     </div>
   )
-}
+                  }
