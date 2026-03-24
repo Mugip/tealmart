@@ -1,0 +1,458 @@
+name: Daily Product Ingestion
+
+on:
+  schedule:
+    - cron: "40 2 * * *"   # 02:40 UTC every day
+  workflow_dispatch:
+    inputs:
+      force_day:
+        description: "Force a specific day (1–13). Leave blank to use auto-rotation."
+        required: false
+        default: ""
+
+jobs:
+  ingest-products:
+    runs-on: ubuntu-latest
+
+    steps:
+      # ─────────────────────────────────────────────────────────────
+      # Determine which day of the 13-day cycle we are on.
+      # We use the Unix epoch day number modulo 13 so the cycle
+      # restarts automatically and is consistent across runners.
+      # ─────────────────────────────────────────────────────────────
+      - name: Determine cycle day
+        id: cycle
+        run: |
+          if [ -n "${{ github.event.inputs.force_day }}" ]; then
+            DAY="${{ github.event.inputs.force_day }}"
+            echo "Manual override: day $DAY"
+          else
+            EPOCH_DAYS=$(( $(date +%s) / 86400 ))
+            DAY=$(( (EPOCH_DAYS % 13) + 1 ))
+            echo "Epoch days: $EPOCH_DAYS → cycle day $DAY"
+          fi
+          echo "day=$DAY" >> $GITHUB_OUTPUT
+
+      # ─────────────────────────────────────────────────────────────
+      # Run ingestion for today's category
+      # Each keyword posts count=20 (one page = 20 products)
+      # 50 keywords × 20 products = 1000 products max per day
+      # ─────────────────────────────────────────────────────────────
+      - name: Ingest today's category
+        env:
+          API: "https://tealmart.vercel.app/api/ingest"
+          KEY: ${{ secrets.INGESTION_API_KEY }}
+          DAY: ${{ steps.cycle.outputs.day }}
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "  TealMart Ingestion — Cycle Day $DAY / 13"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+          ingest() {
+            local keyword="$1"
+            echo ""
+            echo "▶ Ingesting: $keyword"
+            RESPONSE=$(curl -s -X POST "$API" \
+              -H "Content-Type: application/json" \
+              -H "x-api-key: $KEY" \
+              -d "{\"count\":20,\"keyword\":\"$keyword\"}")
+            echo "$RESPONSE" | grep -o '"created":[0-9]*\|"updated":[0-9]*\|"skipped":[0-9]*\|"error":"[^"]*"' || echo "$RESPONSE"
+            sleep 4
+          }
+
+          case "$DAY" in
+
+            # ──────────────────────────────────────────
+            # DAY 1 — Women's Clothing (43 keywords)
+            # ──────────────────────────────────────────
+            1)
+              echo "📂 Category: Women's Clothing"
+              ingest "women blouse"
+              ingest "women shirt long sleeve"
+              ingest "women shirt short sleeve"
+              ingest "women hoodie sweatshirt"
+              ingest "women sweater"
+              ingest "women cardigan"
+              ingest "women tank top cami"
+              ingest "women jumpsuit"
+              ingest "women romper"
+              ingest "women dress casual"
+              ingest "women dress evening"
+              ingest "women wedding dress"
+              ingest "women bridesmaid dress"
+              ingest "women prom dress"
+              ingest "women leggings"
+              ingest "women jeans"
+              ingest "women shorts"
+              ingest "women pants"
+              ingest "women wide leg pants"
+              ingest "women skirt"
+              ingest "women blazer"
+              ingest "women jacket"
+              ingest "women trench coat"
+              ingest "women padded jacket"
+              ingest "women leather jacket"
+              ingest "women fur coat"
+              ingest "women wool coat"
+              ingest "women lingerie"
+              ingest "women sleepwear pajamas"
+              ingest "women swimwear bikini"
+              ingest "women sportswear"
+              ingest "women scarf wrap"
+              ingest "women belt"
+              ingest "women gloves"
+              ingest "women hat cap"
+              ingest "women socks"
+              ingest "women sunglasses eyewear"
+              ingest "women face mask fashion"
+              ingest "couple matching outfits"
+              ingest "women cocktail dress"
+              ingest "women bodysuit"
+              ingest "women crop top"
+              ingest "women maxi dress"
+              ;;
+
+            # ──────────────────────────────────────────
+            # DAY 2 — Men's Clothing (24 keywords)
+            # ──────────────────────────────────────────
+            2)
+              echo "📂 Category: Men's Clothing"
+              ingest "men t-shirt"
+              ingest "men polo shirt"
+              ingest "men dress shirt"
+              ingest "men hoodie"
+              ingest "men sweatshirt"
+              ingest "men sweater"
+              ingest "men jacket"
+              ingest "men blazer"
+              ingest "men suit"
+              ingest "men jeans"
+              ingest "men trousers"
+              ingest "men shorts"
+              ingest "men jogger pants"
+              ingest "men tracksuit"
+              ingest "men coat"
+              ingest "men puffer jacket"
+              ingest "men underwear"
+              ingest "men sleepwear"
+              ingest "men swimwear"
+              ingest "men socks"
+              ingest "men belt"
+              ingest "men cap hat"
+              ingest "men scarf"
+              ingest "men tank top"
+              ;;
+
+            # ──────────────────────────────────────────
+            # DAY 3 — Bags & Shoes (24 keywords)
+            # ──────────────────────────────────────────
+            3)
+              echo "📂 Category: Bags & Shoes"
+              ingest "women handbag"
+              ingest "women shoulder bag"
+              ingest "women crossbody bag"
+              ingest "women tote bag"
+              ingest "women clutch bag"
+              ingest "women backpack"
+              ingest "women wallet purse"
+              ingest "men bag messenger"
+              ingest "men backpack"
+              ingest "travel bag luggage"
+              ingest "women heels"
+              ingest "women sandals"
+              ingest "women sneakers"
+              ingest "women boots"
+              ingest "women flats"
+              ingest "women slippers"
+              ingest "men sneakers"
+              ingest "men formal shoes"
+              ingest "men boots"
+              ingest "men loafers"
+              ingest "men sandals"
+              ingest "kids shoes sneakers"
+              ingest "women ankle boots"
+              ingest "men sports shoes"
+              ;;
+
+            # ──────────────────────────────────────────
+            # DAY 4 — Home & Garden (47 keywords)
+            # ──────────────────────────────────────────
+            4)
+              echo "📂 Category: Home & Garden"
+              ingest "bedding set duvet cover"
+              ingest "bed sheets pillowcase"
+              ingest "comforter blanket"
+              ingest "curtains window drapes"
+              ingest "cushion cover throw pillow"
+              ingest "towels bath set"
+              ingest "kitchen knife set"
+              ingest "cooking utensils tools"
+              ingest "bakeware cake mold"
+              ingest "drinkware mug cup"
+              ingest "dinnerware plate bowl"
+              ingest "barware cocktail"
+              ingest "food storage container"
+              ingest "kitchen organizer rack"
+              ingest "bathroom storage organizer"
+              ingest "wardrobe clothes organizer"
+              ingest "home office desk organizer"
+              ingest "wall art canvas painting"
+              ingest "decorative flowers artificial"
+              ingest "christmas decoration"
+              ingest "party supplies balloon"
+              ingest "LED fairy lights"
+              ingest "scented candles"
+              ingest "picture frame"
+              ingest "vase home decor"
+              ingest "door mat rug"
+              ingest "shower curtain"
+              ingest "laundry basket hamper"
+              ingest "indoor plant pot"
+              ingest "garden tools"
+              ingest "outdoor furniture cushion"
+              ingest "diamond painting kit"
+              ingest "cross stitch embroidery kit"
+              ingest "sewing fabric lace ribbon"
+              ingest "musical instrument guitar"
+              ingest "violin ukulele"
+              ingest "home decor figurine"
+              ingest "throw blanket sofa"
+              ingest "diffuser aroma"
+              ingest "storage bags boxes"
+              ingest "furniture shelf"
+              ingest "cake decorating supplies"
+              ingest "event party decoration"
+              ingest "kitchen gadget"
+              ingest "bed runner"
+              ingest "tablecloth placemat"
+              ingest "wall clock"
+              ;;
+
+            # ──────────────────────────────────────────
+            # DAY 5 — Health & Beauty (40 keywords)
+            # ──────────────────────────────────────────
+            5)
+              echo "📂 Category: Health & Beauty"
+              ingest "face serum moisturizer"
+              ingest "face mask sheet"
+              ingest "sunscreen SPF"
+              ingest "facial cleanser wash"
+              ingest "eye cream"
+              ingest "body lotion"
+              ingest "essential oil"
+              ingest "electric face cleanser brush"
+              ingest "facial steamer"
+              ingest "jade roller gua sha"
+              ingest "lipstick lip gloss"
+              ingest "eyeshadow palette"
+              ingest "foundation concealer"
+              ingest "mascara"
+              ingest "eyeliner"
+              ingest "false eyelashes"
+              ingest "makeup brushes set"
+              ingest "eyebrow pencil"
+              ingest "blush highlighter"
+              ingest "makeup remover"
+              ingest "nail gel polish"
+              ingest "nail art kit"
+              ingest "nail decorations glitter"
+              ingest "nail dryer UV lamp"
+              ingest "hair straightener flat iron"
+              ingest "hair curling iron wand"
+              ingest "hair dryer"
+              ingest "hair growth serum"
+              ingest "headband hair clip pin"
+              ingest "human hair extensions"
+              ingest "hair weave bundle"
+              ingest "lace front wig"
+              ingest "synthetic wig"
+              ingest "cosplay wig"
+              ingest "razor electric shaver"
+              ingest "health care massager"
+              ingest "resistance band fitness"
+              ingest "teeth whitening kit"
+              ingest "makeup set"
+              ingest "face skin care tools"
+              ;;
+
+            # ──────────────────────────────────────────
+            # DAY 6 — Jewelry & Watches (18 keywords)
+            # ──────────────────────────────────────────
+            6)
+              echo "📂 Category: Jewelry & Watches"
+              ingest "women necklace pendant"
+              ingest "women bracelet bangle"
+              ingest "women earrings stud"
+              ingest "women ring fashion"
+              ingest "women anklet"
+              ingest "men necklace chain"
+              ingest "men bracelet"
+              ingest "men ring"
+              ingest "brooch pin"
+              ingest "keychain charm"
+              ingest "engagement ring"
+              ingest "wedding ring band"
+              ingest "bridal jewelry set"
+              ingest "wedding hair jewelry"
+              ingest "watch women fashion"
+              ingest "watch men casual"
+              ingest "smartwatch fitness band"
+              ingest "jewelry gift set"
+              ;;
+
+            # ──────────────────────────────────────────
+            # DAY 7 — Consumer Electronics (15 keywords)
+            # ──────────────────────────────────────────
+            7)
+              echo "📂 Category: Consumer Electronics"
+              ingest "wireless earbuds bluetooth"
+              ingest "bluetooth speaker portable"
+              ingest "phone case cover"
+              ingest "phone holder stand"
+              ingest "USB charging cable"
+              ingest "wireless charger pad"
+              ingest "power bank portable"
+              ingest "screen protector tempered glass"
+              ingest "laptop sleeve bag"
+              ingest "mouse keyboard wireless"
+              ingest "LED desk lamp"
+              ingest "smart home gadget"
+              ingest "action camera accessories"
+              ingest "ring light selfie"
+              ingest "cable organizer"
+              ;;
+
+            # ──────────────────────────────────────────
+            # DAY 8 — Sports & Outdoors (15 keywords)
+            # ──────────────────────────────────────────
+            8)
+              echo "📂 Category: Sports & Outdoors"
+              ingest "yoga mat"
+              ingest "resistance band set"
+              ingest "gym gloves"
+              ingest "jump rope"
+              ingest "dumbbell weight"
+              ingest "water bottle sports"
+              ingest "running belt waist bag"
+              ingest "cycling gloves"
+              ingest "outdoor hiking bag"
+              ingest "camping tent"
+              ingest "sleeping bag"
+              ingest "fishing accessories"
+              ingest "knee brace support"
+              ingest "compression socks"
+              ingest "sport sunglasses"
+              ;;
+
+            # ──────────────────────────────────────────
+            # DAY 9 — Toys, Kids & Baby (20 keywords)
+            # ──────────────────────────────────────────
+            9)
+              echo "📂 Category: Toys, Kids & Baby"
+              ingest "baby onesie romper"
+              ingest "baby shoes socks"
+              ingest "kids t-shirt set"
+              ingest "kids dress girl"
+              ingest "kids jeans pants boy"
+              ingest "baby blanket swaddle"
+              ingest "baby feeding bottle"
+              ingest "baby pacifier teether"
+              ingest "kids backpack school bag"
+              ingest "educational toy kids"
+              ingest "building blocks"
+              ingest "remote control car toy"
+              ingest "stuffed animal plush toy"
+              ingest "kids puzzle game"
+              ingest "baby monitor"
+              ingest "stroller accessories"
+              ingest "kids hair accessories"
+              ingest "baby bath toy"
+              ingest "kids art craft kit"
+              ingest "baby carrier"
+              ;;
+
+            # ──────────────────────────────────────────
+            # DAY 10 — Pet Supplies (18 keywords)
+            # ──────────────────────────────────────────
+            10)
+              echo "📂 Category: Pet Supplies"
+              ingest "dog collar leash"
+              ingest "dog harness"
+              ingest "dog clothes hoodie"
+              ingest "dog dress costume"
+              ingest "dog shoes boots"
+              ingest "cat collar"
+              ingest "cat toy interactive"
+              ingest "pet bowl feeder"
+              ingest "automatic pet water dispenser"
+              ingest "pet bed cushion mat"
+              ingest "pet carrier bag"
+              ingest "cat tree scratching post"
+              ingest "pet grooming brush comb"
+              ingest "dog training pad"
+              ingest "pet snacks treats"
+              ingest "fish tank aquarium decor"
+              ingest "bird cage feeder"
+              ingest "pet blanket"
+              ;;
+
+            # ──────────────────────────────────────────
+            # DAY 11 — Automotive (10 keywords)
+            # ──────────────────────────────────────────
+            11)
+              echo "📂 Category: Automotive"
+              ingest "car seat cover"
+              ingest "car phone holder mount"
+              ingest "car air freshener"
+              ingest "car organizer storage"
+              ingest "car floor mat"
+              ingest "dash cam"
+              ingest "car led interior light"
+              ingest "tire pressure gauge"
+              ingest "car cleaning kit"
+              ingest "steering wheel cover"
+              ;;
+
+            # ──────────────────────────────────────────
+            # DAY 12 — Tools & Hardware (10 keywords)
+            # ──────────────────────────────────────────
+            12)
+              echo "📂 Category: Tools & Hardware"
+              ingest "screwdriver set"
+              ingest "measuring tape"
+              ingest "power drill accessories"
+              ingest "cable management clips"
+              ingest "wall hooks adhesive"
+              ingest "tool bag organizer"
+              ingest "hand tools kit"
+              ingest "electric screwdriver"
+              ingest "soldering iron kit"
+              ingest "laser level"
+              ;;
+
+            # ──────────────────────────────────────────
+            # DAY 13 — Office & Stationery (10 keywords)
+            # ──────────────────────────────────────────
+            13)
+              echo "📂 Category: Office & Stationery"
+              ingest "notebook journal planner"
+              ingest "pen set gel ink"
+              ingest "sticky notes memo pad"
+              ingest "desk organizer tray"
+              ingest "file folder binder"
+              ingest "washi tape stickers"
+              ingest "art sketchbook"
+              ingest "coloring pencils set"
+              ingest "laptop stand ergonomic"
+              ingest "mouse pad desk mat"
+              ;;
+
+            *)
+              echo "⚠️ Unknown day: $DAY — nothing to ingest"
+              ;;
+          esac
+
+          echo ""
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "  ✅ Day $DAY ingestion complete"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
