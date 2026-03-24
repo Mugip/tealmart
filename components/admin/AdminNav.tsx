@@ -121,8 +121,11 @@ export default function AdminNav() {
 
   return (
     <>
-      {/* Mobile Header */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 shadow-sm">
+      {/* Mobile Header — sits directly below the maintenance banner via top: var(--banner-h) */}
+      <div
+        className="lg:hidden fixed left-0 right-0 z-50 bg-white border-b border-gray-200 shadow-sm"
+        style={{ top: 'var(--banner-h, 0px)' }}
+      >
         <div className="flex items-center justify-between p-4">
           <Link href="/admin" className="flex items-center gap-2">
             <div className="w-8 h-8 bg-gradient-to-br from-tiffany-500 to-tiffany-600 rounded-lg flex items-center justify-center">
@@ -142,23 +145,28 @@ export default function AdminNav() {
       {/* Mobile Overlay */}
       {mobileMenuOpen && (
         <div
-          className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-40 pt-16"
+          className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-40"
+          style={{ top: 'calc(var(--banner-h, 0px) + 64px)' }}
           onClick={() => setMobileMenuOpen(false)}
         />
       )}
 
-      {/* Mobile Sidebar */}
+      {/* Mobile Sidebar — opens below the mobile header bar */}
       <aside
-        className={`lg:hidden fixed top-16 left-0 bottom-0 w-64 bg-white border-r border-gray-200 shadow-lg transform transition-transform duration-200 z-40 flex flex-col ${
+        className={`lg:hidden fixed left-0 bottom-0 w-64 bg-white border-r border-gray-200 shadow-lg transform transition-transform duration-200 z-40 flex flex-col ${
           mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
+        style={{ top: 'calc(var(--banner-h, 0px) + 64px)' }}
       >
         <NavLinks onClick={() => setMobileMenuOpen(false)} />
         <UserFooter />
       </aside>
 
-      {/* Desktop Sidebar */}
-      <aside className="hidden lg:flex fixed top-0 left-0 h-full w-64 bg-white border-r border-gray-200 shadow-lg z-40 flex-col">
+      {/* Desktop Sidebar — offset top by banner height on desktop too */}
+      <aside
+        className="hidden lg:flex fixed left-0 h-full w-64 bg-white border-r border-gray-200 shadow-lg z-40 flex-col"
+        style={{ top: 'var(--banner-h, 0px)' }}
+      >
         <div className="p-6 border-b border-gray-200">
           <Link href="/admin" className="flex items-center gap-3">
             <div className="w-10 h-10 bg-gradient-to-br from-tiffany-500 to-tiffany-600 rounded-lg flex items-center justify-center">
@@ -175,4 +183,4 @@ export default function AdminNav() {
       </aside>
     </>
   )
-    }
+          }
