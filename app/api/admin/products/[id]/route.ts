@@ -1,16 +1,25 @@
-// app/api/admin/products/[id]/route.ts - FIXED
+// app/api/admin/products/[id]/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { cookies } from 'next/headers'
+import { verifyAdminToken } from '@/lib/adminAuth'
 
-// GET - Get product details
+async function requireAdmin(): Promise<boolean> {
+  const token = cookies().get('admin-auth')?.value
+  return !!token && (await verifyAdminToken(token))
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  if (!(await requireAdmin())) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
   try {
     const product = await prisma.product.findUnique({
-      where: { id: params.id },
+      where: { id: params.id }
     })
 
     if (!product) {
@@ -19,36 +28,28 @@ export async function GET(
 
     return NextResponse.json(product)
   } catch (error) {
-    console.error('Get product error:', error)
     return NextResponse.json({ error: 'Failed to fetch product' }, { status: 500 })
   }
 }
 
-// PUT - Update product
 export async function PUT(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  if (!(await requireAdmin())) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
   try {
-    // Check admin authentication
-    const cookieStore = cookies()
-    const adminAuth = cookieStore.get('admin-auth')
-
-    if (!adminAuth) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
     const data = await request.json()
 
-    // Validate required fields
-    if (!data.title || !data.price) {
+    if (!data.title || data.price === undefined) {
       return NextResponse.json(
         { error: 'Title and price are required' },
         { status: 400 }
       )
     }
 
-    // Update product
     const product = await prisma.product.update({
       where: { id: params.id },
       data: {
@@ -65,15 +66,12 @@ export async function PUT(
       },
     })
 
-    console.log(`✅ Product ${product.id} updated successfully`)
-
     return NextResponse.json({
       success: true,
       product,
-      message: 'Product updated successfully',
+      message: 'Product updated successfully'
     })
   } catch (error: any) {
-    console.error('Update product error:', error)
     return NextResponse.json(
       { error: error.message || 'Failed to update product' },
       { status: 500 }
@@ -81,42 +79,30 @@ export async function PUT(
   }
 }
 
-// DELETE - Delete product
 export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  if (!(await requireAdmin())) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
   try {
-    // Check admin authentication
-    const cookieStore = cookies()
-    const adminAuth = cookieStore.get('admin-auth')
-
-    if (!adminAuth) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // Check if product exists
     const product = await prisma.product.findUnique({
-      where: { id: params.id },
+      where: { id: params.id }
     })
 
     if (!product) {
       return NextResponse.json({ error: 'Product not found' }, { status: 404 })
     }
 
-    // Delete product
-    await prisma.product.delete({
-      where: { id: params.id },
-    })
-
-    console.log(`✅ Product ${params.id} deleted successfully`)
+    await prisma.product.delete({ where: { id: params.id } })
 
     return NextResponse.json({
       success: true,
-      message: 'Product deleted successfully',
+      message: 'Product deleted successfully'
     })
   } catch (error: any) {
-    console.error('Delete product error:', error)
     return NextResponse.json(
       { error: error.message || 'Failed to delete product' },
       { status: 500 }
