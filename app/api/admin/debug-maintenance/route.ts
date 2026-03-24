@@ -25,7 +25,8 @@ export async function GET() {
   }
 
   const supabaseUrl = getSupabaseUrl()
-  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? ''
+  const supabaseKey =
+    process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? ''
   const dbUrl = process.env.DATABASE_URL ?? ''
 
   const diagnostics: Record<string, any> = {
@@ -44,49 +45,68 @@ export async function GET() {
     })
   }
 
-  // Test 1: quoted table name (what middleware uses)
-  const url1 = `${supabaseUrl}/rest/v1/%22AdminSettings%22?select=%22maintenanceMode%22&limit=1`
+  const headers = {
+    apikey: supabaseKey,
+    Authorization: `Bearer ${supabaseKey}`,
+    Accept: 'application/json',
+  }
+
+  // Test 1: plain table name — what middleware now uses (no %22 encoding)
+  const url1 = `${supabaseUrl}/rest/v1/AdminSettings?select=maintenanceMode&limit=1`
   let result1: any = null
   let error1: string | null = null
   try {
-    const r = await fetch(url1, {
-      headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}`, Accept: 'application/json' },
-    })
+    const r = await fetch(url1, { headers })
     result1 = { status: r.status, body: await r.text() }
     if (!r.ok) error1 = `HTTP ${r.status}: ${result1.body}`
   } catch (e: any) {
     error1 = e.message
   }
 
-  // Test 2: lowercase table name (alternative Prisma naming)
-  const url2 = `${supabaseUrl}/rest/v1/admin_settings?select=maintenance_mode&limit=1`
+  // Test 2: old broken URL with %22 encoding — kept for comparison
+  const url2 = `${supabaseUrl}/rest/v1/%22AdminSettings%22?select=%22maintenanceMode%22&limit=1`
   let result2: any = null
   try {
-    const r = await fetch(url2, {
-      headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}`, Accept: 'application/json' },
-    })
+    const r = await fetch(url2, { headers })
     result2 = { status: r.status, body: await r.text() }
   } catch (e: any) {
     result2 = { error: e.message }
   }
 
-  // Test 3: list all tables to find the correct name
+  // Test 3: list all tables visible to PostgREST to confirm schema cache
   const url3 = `${supabaseUrl}/rest/v1/?apikey=${supabaseKey}`
   let tableList: string | null = null
   try {
-    const r = await fetch(url3, {
-      headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` },
-    })
+    const r = await fetch(url3, { headers })
     tableList = await r.text()
+  } catch {}
+
+  // Parse table names from swagger paths for easier reading
+  let visibleTables: string[] = []
+  try {
+    const swagger = JSON.parse(tableList ?? '{}')
+    visibleTables = Object.keys(swagger.paths ?? {})
+      .filter((p) => p !== '/')
+      .map((p) => p.replace(/^\//, ''))
   } catch {}
 
   return NextResponse.json({
     ...diagnostics,
-    test1_quotedName: { url: url1, result: result1, error: error1 },
-    test2_snakeCase: { url: url2, result: result2 },
-    test3_tableList: tableList?.substring(0, 500),
-    instructions: error1
-      ? 'Test 1 failed — check test2 and test3 to find the correct table name'
-      : 'Test 1 passed — middleware should work',
+    test1_correctUrl: {
+      url: url1,
+      result: result1,
+      error: error1,
+      verdict: !error1 ? '✅ PASS — middleware URL is correct' : '❌ FAIL — see error',
+    },
+    test2_oldBrokenUrl: {
+      url: url2,
+      result: result2,
+      verdict: result2?.status === 404 ? '404 as expected (this URL was the bug)' : 'unexpected',
+    },
+    test3_visibleTables: visibleTables.length > 0 ? visibleTables : tableList?.substring(0, 500),
+    conclusion: !error1
+      ? '✅ Middleware fix confirmed. Delete this debug route.'
+      : '❌ Still failing — check RLS policies on AdminSettings in Supabase dashboard',
   })
-}
+                                       }
+    
