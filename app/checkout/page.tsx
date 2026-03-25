@@ -1,4 +1,3 @@
-// app/checkout/page.tsx
 'use client'
 
 import { useState, useMemo, useEffect } from 'react'
@@ -54,17 +53,18 @@ export default function CheckoutPage() {
   const [selectedCountry, setSelectedCountry] = useState<ICountry | null>(null)
   const [states, setStates] = useState<IState[]>([])
 
-  // Saved addresses
   const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([])
   const [showSavedAddresses, setShowSavedAddresses] = useState(false)
   const [saveAddress, setSaveAddress] = useState(false)
 
-  // Discount code
   const [discountCode, setDiscountCode] = useState('')
   const [discountLoading, setDiscountLoading] = useState(false)
   const [discount, setDiscount] = useState<DiscountResult | null>(null)
 
-  const countries = useMemo(() => Country.getAllCountries().sort((a, b) => a.name.localeCompare(b.name)), [])
+  const countries = useMemo(
+    () => Country.getAllCountries().sort((a, b) => a.name.localeCompare(b.name)),
+    []
+  )
 
   // Pre-fill email from session
   useEffect(() => {
@@ -81,7 +81,6 @@ export default function CheckoutPage() {
       .then(data => {
         if (Array.isArray(data) && data.length > 0) {
           setSavedAddresses(data)
-          // Auto-fill default address
           const def = data.find((a: SavedAddress) => a.isDefault) || data[0]
           if (def) applyAddress(def)
         }
@@ -107,7 +106,10 @@ export default function CheckoutPage() {
   // Init default country
   useEffect(() => {
     const def = Country.getCountryByCode('US')
-    if (def) { setSelectedCountry(def); setStates(State.getStatesOfCountry('US')) }
+    if (def) {
+      setSelectedCountry(def)
+      setStates(State.getStatesOfCountry('US'))
+    }
   }, [])
 
   function applyAddress(addr: SavedAddress) {
@@ -161,24 +163,27 @@ export default function CheckoutPage() {
     setError(null)
     setLoading(true)
 
-    if (!formData.email || !formData.name || !formData.address || !formData.city ||
-        !formData.zip || !formData.phone || !formData.country) {
+    if (
+      !formData.email || !formData.name || !formData.address ||
+      !formData.city || !formData.zip || !formData.phone || !formData.country
+    ) {
       setError('Please fill in all required fields')
       setLoading(false)
       return
     }
+
     if (states.length > 0 && !formData.state) {
       setError('Please select a state/province')
       setLoading(false)
       return
     }
+
     if (items.length === 0) {
       setError('Your cart is empty')
       setLoading(false)
       return
     }
 
-    // Optionally save address
     if (saveAddress && session?.user?.id) {
       fetch('/api/addresses', {
         method: 'POST',
@@ -189,7 +194,9 @@ export default function CheckoutPage() {
 
     try {
       const country = Country.getCountryByCode(formData.country)
-      const state = formData.state ? State.getStateByCodeAndCountry(formData.state, formData.country) : null
+      const state = formData.state
+        ? State.getStateByCodeAndCountry(formData.state, formData.country)
+        : null
 
       const response = await fetch('/api/checkout', {
         method: 'POST',
@@ -221,6 +228,7 @@ export default function CheckoutPage() {
 
       const data = await response.json()
       if (!response.ok) throw new Error(data.error || 'Checkout failed')
+
       if (data.url) {
         window.location.href = data.url
       } else {
@@ -233,9 +241,18 @@ export default function CheckoutPage() {
   }
 
   const getFieldLabels = () => ({
-    state: formData.country === 'US' ? 'State' : formData.country === 'CA' ? 'Province' : formData.country === 'GB' ? 'County' : 'State / Region',
-    zip: formData.country === 'US' ? 'ZIP Code' : formData.country === 'GB' ? 'Postcode' : formData.country === 'CA' ? 'Postal Code' : 'ZIP / Postal Code',
+    state:
+      formData.country === 'US' ? 'State' :
+      formData.country === 'CA' ? 'Province' :
+      formData.country === 'GB' ? 'County' :
+      'State / Region',
+    zip:
+      formData.country === 'US' ? 'ZIP Code' :
+      formData.country === 'GB' ? 'Postcode' :
+      formData.country === 'CA' ? 'Postal Code' :
+      'ZIP / Postal Code',
   })
+
   const labels = getFieldLabels()
 
   if (items.length === 0) {
@@ -245,7 +262,9 @@ export default function CheckoutPage() {
           <div className="text-6xl mb-4">🛒</div>
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Your cart is empty</h1>
           <p className="text-gray-600 mb-6">Add some products before checking out</p>
-          <button onClick={() => router.push('/products')} className="btn-primary px-8 py-3">Browse Products</button>
+          <button onClick={() => router.push('/products')} className="btn-primary px-8 py-3">
+            Browse Products
+          </button>
         </div>
       </div>
     )
@@ -258,7 +277,8 @@ export default function CheckoutPage() {
   const discountAmount = discount?.discountAmount || 0
   const finalTotal = subtotal + shipping + tax - discountAmount
 
-  const inputCls = 'w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-tiffany-500 focus:border-tiffany-500 outline-none transition-all text-sm'
+  const inputCls =
+    'w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-tiffany-500 focus:border-tiffany-500 outline-none transition-all text-sm'
   const labelCls = 'block text-sm font-semibold text-gray-700 mb-1.5'
 
   return (
@@ -267,7 +287,8 @@ export default function CheckoutPage() {
         <h1 className="text-3xl font-bold text-gray-900 mb-8">Checkout</h1>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left — Form */}
+
+          {/* ── Left: Form ── */}
           <div className="lg:col-span-2 space-y-5">
             <form onSubmit={handleSubmit} className="space-y-5">
 
@@ -290,8 +311,12 @@ export default function CheckoutPage() {
                       <MapPin size={18} className="text-tiffany-600" />
                       Saved Addresses ({savedAddresses.length})
                     </span>
-                    <ChevronDown size={16} className={`text-gray-400 transition-transform ${showSavedAddresses ? 'rotate-180' : ''}`} />
+                    <ChevronDown
+                      size={16}
+                      className={`text-gray-400 transition-transform ${showSavedAddresses ? 'rotate-180' : ''}`}
+                    />
                   </button>
+
                   {showSavedAddresses && (
                     <div className="mt-4 space-y-3">
                       {savedAddresses.map(addr => (
@@ -301,8 +326,17 @@ export default function CheckoutPage() {
                           onClick={() => applyAddress(addr)}
                           className="w-full text-left p-3 border border-gray-200 rounded-xl hover:border-tiffany-400 hover:bg-tiffany-50 transition-all text-sm"
                         >
-                          <div className="font-semibold text-gray-900">{addr.name} {addr.isDefault && <span className="text-xs bg-tiffany-100 text-tiffany-700 px-1.5 py-0.5 rounded ml-1">Default</span>}</div>
-                          <div className="text-gray-500">{addr.address}, {addr.city}, {addr.state} {addr.zip}, {addr.country}</div>
+                          <div className="font-semibold text-gray-900">
+                            {addr.name}
+                            {addr.isDefault && (
+                              <span className="text-xs bg-tiffany-100 text-tiffany-700 px-1.5 py-0.5 rounded ml-2">
+                                Default
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-gray-500">
+                            {addr.address}, {addr.city}, {addr.state} {addr.zip}, {addr.country}
+                          </div>
                         </button>
                       ))}
                     </div>
@@ -313,58 +347,166 @@ export default function CheckoutPage() {
               {/* Shipping form */}
               <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 space-y-4">
                 <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                  <Truck size={20} className="text-tiffany-600" /> Shipping Information
+                  <Truck size={20} className="text-tiffany-600" />
+                  Shipping Information
                 </h2>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="sm:col-span-2">
-                    <label className={labelCls}>Email <span className="text-red-500">*</span></label>
-                    <input type="email" name="email" value={formData.email} onChange={handleChange} required className={inputCls} placeholder="you@example.com" />
+                    <label className={labelCls}>
+                      Email <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="email"
+                      name="email"
+                      value={formData.email}
+                      onChange={handleChange}
+                      required
+                      className={inputCls}
+                      placeholder="you@example.com"
+                    />
                   </div>
+
                   <div>
-                    <label className={labelCls}>Full Name <span className="text-red-500">*</span></label>
-                    <input type="text" name="name" value={formData.name} onChange={handleChange} required className={inputCls} placeholder="John Doe" />
+                    <label className={labelCls}>
+                      Full Name <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="name"
+                      value={formData.name}
+                      onChange={handleChange}
+                      required
+                      className={inputCls}
+                      placeholder="John Doe"
+                    />
                   </div>
+
                   <div>
-                    <label className={labelCls}>Phone <span className="text-red-500">*</span></label>
-                    <input type="tel" name="phone" value={formData.phone} onChange={handleChange} required className={inputCls} placeholder="+1 555 123 4567" />
+                    <label className={labelCls}>
+                      Phone <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="tel"
+                      name="phone"
+                      value={formData.phone}
+                      onChange={handleChange}
+                      required
+                      className={inputCls}
+                      placeholder="+1 555 123 4567"
+                    />
                   </div>
+
                   <div className="sm:col-span-2">
-                    <label className={labelCls}>Country <span className="text-red-500">*</span></label>
-                    <select name="country" value={formData.country} onChange={handleCountryChange} required className={inputCls}>
+                    <label className={labelCls}>
+                      Country <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      name="country"
+                      value={formData.country}
+                      onChange={handleCountryChange}
+                      required
+                      className={inputCls}
+                    >
                       <option value="">Select a country</option>
-                      {countries.map(c => <option key={c.isoCode} value={c.isoCode}>{c.flag} {c.name}</option>)}
+                      {countries.map(c => (
+                        <option key={c.isoCode} value={c.isoCode}>
+                          {c.flag} {c.name}
+                        </option>
+                      ))}
                     </select>
                   </div>
+
                   <div className="sm:col-span-2">
-                    <label className={labelCls}>Street Address <span className="text-red-500">*</span></label>
-                    <input type="text" name="address" value={formData.address} onChange={handleChange} required className={inputCls} placeholder="123 Main Street, Apt 4B" />
+                    <label className={labelCls}>
+                      Street Address <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="address"
+                      value={formData.address}
+                      onChange={handleChange}
+                      required
+                      className={inputCls}
+                      placeholder="123 Main Street, Apt 4B"
+                    />
                   </div>
+
                   <div>
-                    <label className={labelCls}>City <span className="text-red-500">*</span></label>
-                    <input type="text" name="city" value={formData.city} onChange={handleChange} required className={inputCls} placeholder="New York" />
+                    <label className={labelCls}>
+                      City <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="city"
+                      value={formData.city}
+                      onChange={handleChange}
+                      required
+                      className={inputCls}
+                      placeholder="New York"
+                    />
                   </div>
+
                   <div>
-                    <label className={labelCls}>{labels.state} {states.length > 0 && <span className="text-red-500">*</span>}</label>
+                    <label className={labelCls}>
+                      {labels.state}
+                      {states.length > 0 && <span className="text-red-500"> *</span>}
+                    </label>
                     {states.length > 0 ? (
-                      <select name="state" value={formData.state} onChange={handleChange} required className={inputCls}>
+                      <select
+                        name="state"
+                        value={formData.state}
+                        onChange={handleChange}
+                        required
+                        className={inputCls}
+                      >
                         <option value="">Select {labels.state.toLowerCase()}</option>
-                        {states.map(s => <option key={s.isoCode} value={s.isoCode}>{s.name}</option>)}
+                        {states.map(s => (
+                          <option key={s.isoCode} value={s.isoCode}>
+                            {s.name}
+                          </option>
+                        ))}
                       </select>
                     ) : (
-                      <input type="text" name="state" value={formData.state} onChange={handleChange} className={inputCls} placeholder={labels.state} />
+                      <input
+                        type="text"
+                        name="state"
+                        value={formData.state}
+                        onChange={handleChange}
+                        className={inputCls}
+                        placeholder={labels.state}
+                      />
                     )}
                   </div>
+
                   <div>
-                    <label className={labelCls}>{labels.zip} <span className="text-red-500">*</span></label>
-                    <input type="text" name="zip" value={formData.zip} onChange={handleChange} required className={inputCls} placeholder={formData.country === 'US' ? '10001' : formData.country === 'GB' ? 'SW1A 1AA' : '12345'} />
+                    <label className={labelCls}>
+                      {labels.zip} <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="zip"
+                      value={formData.zip}
+                      onChange={handleChange}
+                      required
+                      className={inputCls}
+                      placeholder={
+                        formData.country === 'US' ? '10001' :
+                        formData.country === 'GB' ? 'SW1A 1AA' :
+                        '12345'
+                      }
+                    />
                   </div>
                 </div>
 
-                {/* Save address checkbox (only for logged-in users) */}
                 {session?.user?.id && (
-                  <label className="flex items-center gap-2 cursor-pointer mt-1">
-                    <input type="checkbox" checked={saveAddress} onChange={e => setSaveAddress(e.target.checked)} className="rounded text-tiffany-500 w-4 h-4" />
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={saveAddress}
+                      onChange={e => setSaveAddress(e.target.checked)}
+                      className="rounded text-tiffany-500 w-4 h-4"
+                    />
                     <span className="text-sm text-gray-700">Save this address for future orders</span>
                   </label>
                 )}
@@ -373,8 +515,10 @@ export default function CheckoutPage() {
               {/* Discount code */}
               <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5">
                 <h3 className="font-bold text-gray-900 flex items-center gap-2 mb-3">
-                  <Tag size={18} className="text-tiffany-600" /> Discount Code
+                  <Tag size={18} className="text-tiffany-600" />
+                  Discount Code
                 </h3>
+
                 {discount ? (
                   <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-xl p-3">
                     <div className="flex items-center gap-2">
@@ -384,7 +528,13 @@ export default function CheckoutPage() {
                         <p className="text-xs text-green-600">{discount.message}</p>
                       </div>
                     </div>
-                    <button type="button" onClick={() => { setDiscount(null); setDiscountCode('') }} className="text-xs text-red-500 hover:underline">Remove</button>
+                    <button
+                      type="button"
+                      onClick={() => { setDiscount(null); setDiscountCode('') }}
+                      className="text-xs text-red-500 hover:underline"
+                    >
+                      Remove
+                    </button>
                   </div>
                 ) : (
                   <div className="flex gap-2">
@@ -392,7 +542,12 @@ export default function CheckoutPage() {
                       type="text"
                       value={discountCode}
                       onChange={e => setDiscountCode(e.target.value.toUpperCase())}
-                      onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), handleApplyDiscount())}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault()
+                          handleApplyDiscount()
+                        }
+                      }}
                       placeholder="Enter code"
                       className="flex-1 px-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-tiffany-500 focus:border-tiffany-500 outline-none uppercase"
                     />
@@ -402,7 +557,7 @@ export default function CheckoutPage() {
                       disabled={!discountCode.trim() || discountLoading}
                       className="px-4 py-2.5 bg-tiffany-500 hover:bg-tiffany-600 disabled:opacity-50 text-white font-semibold rounded-xl text-sm transition-colors flex items-center gap-1.5"
                     >
-                      {discountLoading ? <Loader2 size={14} className="animate-spin" /> : null}
+                      {discountLoading && <Loader2 size={14} className="animate-spin" />}
                       Apply
                     </button>
                   </div>
@@ -415,14 +570,16 @@ export default function CheckoutPage() {
                 className="w-full bg-gradient-to-r from-tiffany-500 to-tiffany-600 hover:from-tiffany-600 hover:to-tiffany-700 text-white py-4 rounded-xl font-bold flex items-center justify-center gap-3 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed text-base"
               >
                 {loading ? <Loader2 size={22} className="animate-spin" /> : <CreditCard size={22} />}
-                {loading ? 'Processing...' : `Pay ${finalTotal > 0 ? `$${finalTotal.toFixed(2)}` : ''} Securely`}
+                {loading ? 'Processing…' : `Pay ${finalTotal > 0 ? `$${finalTotal.toFixed(2)}` : ''} Securely`}
               </button>
 
-              <p className="text-xs text-center text-gray-400">🔒 Secured by Stripe. We never store your card details.</p>
+              <p className="text-xs text-center text-gray-400">
+                🔒 Secured by Stripe. We never store your card details.
+              </p>
             </form>
           </div>
 
-          {/* Right — Summary */}
+          {/* ── Right: Order summary ── */}
           <div className="lg:col-span-1">
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 sticky top-4">
               <h2 className="text-lg font-bold text-gray-900 mb-4">Order Summary</h2>
@@ -431,7 +588,13 @@ export default function CheckoutPage() {
                 {items.map(item => (
                   <div key={item.id} className="flex gap-3">
                     <div className="relative w-14 h-14 flex-shrink-0 rounded-lg overflow-hidden bg-gray-100">
-                      <Image src={item.image} alt={item.title} fill className="object-cover" sizes="56px" />
+                      <Image
+                        src={item.image}
+                        alt={item.title}
+                        fill
+                        className="object-cover"
+                        sizes="56px"
+                      />
                       {item.quantity > 1 && (
                         <div className="absolute -top-1 -right-1 bg-tiffany-500 text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center">
                           {item.quantity}
@@ -448,7 +611,8 @@ export default function CheckoutPage() {
 
               <div className="border-t border-gray-100 pt-4 space-y-2 text-sm">
                 <div className="flex justify-between text-gray-600">
-                  <span>Subtotal</span><span>${subtotal.toFixed(2)}</span>
+                  <span>Subtotal</span>
+                  <span>${subtotal.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-gray-600">
                   <span>Shipping</span>
@@ -457,14 +621,19 @@ export default function CheckoutPage() {
                   </span>
                 </div>
                 <div className="flex justify-between text-gray-600">
-                  <span>Tax (10%)</span><span>${tax.toFixed(2)}</span>
+                  <span>Tax (10%)</span>
+                  <span>${tax.toFixed(2)}</span>
                 </div>
                 {discountAmount > 0 && (
-                  <div className="flex justify-between text-green-600 font-medium">                                             <span>Discount ({discount?.code})</span>                                                                    <span>-${discountAmount.toFixed(2)}</span>                                                                </div>
+                  <div className="flex justify-between text-green-600 font-medium">
+                    <span>Discount ({discount?.code})</span>
+                    <span>-${discountAmount.toFixed(2)}</span>
+                  </div>
                 )}
                 <div className="border-t border-gray-200 pt-2 flex justify-between font-bold text-gray-900 text-base">
                   <span>Total</span>
-                  <span className="text-tiffany-600">${finalTotal.toFixed(2)}</span>                                        </div>
+                  <span className="text-tiffany-600">${finalTotal.toFixed(2)}</span>
+                </div>
               </div>
 
               {subtotal < 50 && !freeShipping && (
@@ -476,7 +645,9 @@ export default function CheckoutPage() {
               )}
             </div>
           </div>
+
         </div>
       </div>
-    </div>                                              )
-}
+    </div>
+  )
+              }
