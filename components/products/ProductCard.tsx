@@ -1,9 +1,12 @@
+// components/products/ProductCard.tsx
+
 'use client'
 
 import Image from 'next/image'
 import Link from 'next/link'
-import { ShoppingCart, Star } from 'lucide-react'
+import { ShoppingCart, Star, Heart } from 'lucide-react'
 import { useCart } from '@/lib/contexts/CartContext'
+import { useWishlist } from '@/lib/contexts/WishlistContext'
 
 type Product = {
   id: string
@@ -17,7 +20,9 @@ type Product = {
 
 export default function ProductCard({ product }: { product: Product }) {
   const { addItem } = useCart()
-  
+  const { toggle, isWishlisted } = useWishlist()
+  const wishlisted = isWishlisted(product.id)
+
   const discount = product.compareAtPrice
     ? Math.round(((product.compareAtPrice - product.price) / product.compareAtPrice) * 100)
     : 0
@@ -32,56 +37,87 @@ export default function ProductCard({ product }: { product: Product }) {
     })
   }
 
+  const handleWishlist = (e: React.MouseEvent) => {
+    e.preventDefault()
+    toggle(product.id, product.title)
+  }
+
   return (
-    <Link href={`/products/${product.id}`} className="card group">
+    <Link href={`/products/${product.id}`} className="card group relative overflow-hidden">
       <div className="relative aspect-square overflow-hidden bg-gray-100">
         <Image
           src={product.images[0] || '/placeholder.png'}
           alt={product.title}
           fill
           className="object-cover group-hover:scale-105 transition-transform duration-300"
-          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+          sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
         />
+
+        {/* Discount badge */}
         {discount > 0 && (
-          <div className="absolute top-2 right-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded">
+          <div className="absolute top-2 left-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
             -{discount}%
           </div>
         )}
+
+        {/* Wishlist button */}
+        <button
+          onClick={handleWishlist}
+          className={`absolute top-2 right-2 p-1.5 rounded-full shadow-md transition-all ${
+            wishlisted
+              ? 'bg-red-500 text-white scale-110'
+              : 'bg-white/90 text-gray-500 hover:bg-red-50 hover:text-red-500 opacity-0 group-hover:opacity-100'
+          }`}
+          aria-label={wishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
+        >
+          <Heart size={15} className={wishlisted ? 'fill-white' : ''} />
+        </button>
+
+        {/* Quick add to cart overlay */}
+        <div className="absolute bottom-0 left-0 right-0 translate-y-full group-hover:translate-y-0 transition-transform duration-200">
+          <button
+            onClick={handleAddToCart}
+            className="w-full bg-tiffany-600/95 hover:bg-tiffany-700 text-white py-2 text-xs font-semibold flex items-center justify-center gap-1.5 backdrop-blur-sm"
+          >
+            <ShoppingCart size={14} />
+            Quick Add
+          </button>
+        </div>
       </div>
-      
-      <div className="p-4">
-        <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2 group-hover:text-tiffany-600 transition-colors">
+
+      <div className="p-3">
+        <h3 className="font-semibold text-gray-900 mb-1.5 line-clamp-2 group-hover:text-tiffany-600 transition-colors text-sm leading-snug">
           {product.title}
         </h3>
-        
+
         {product.rating && (
-          <div className="flex items-center mb-2">
-            <Star size={14} className="fill-yellow-400 text-yellow-400" />
-            <span className="text-sm text-gray-600 ml-1">
-              {product.rating.toFixed(1)} ({product.reviewCount})
+          <div className="flex items-center mb-1.5 gap-1">
+            <div className="flex">
+              {[...Array(5)].map((_, i) => (
+                <Star
+                  key={i}
+                  size={11}
+                  className={i < Math.round(product.rating!) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-200 fill-gray-200'}
+                />
+              ))}
+            </div>
+            <span className="text-xs text-gray-500">
+              ({product.reviewCount})
             </span>
           </div>
         )}
-        
+
         <div className="flex items-center justify-between">
           <div>
-            <div className="text-xl font-bold text-gray-900">
+            <div className="text-base font-bold text-gray-900">
               ${product.price.toFixed(2)}
             </div>
-            {product.compareAtPrice && (
-              <div className="text-sm text-gray-500 line-through">
+            {product.compareAtPrice && product.compareAtPrice > product.price && (
+              <div className="text-xs text-gray-400 line-through">
                 ${product.compareAtPrice.toFixed(2)}
               </div>
             )}
           </div>
-          
-          <button
-            onClick={handleAddToCart}
-            className="bg-tiffany-500 hover:bg-tiffany-600 text-white p-2 rounded-lg transition-colors"
-            aria-label="Add to cart"
-          >
-            <ShoppingCart size={18} />
-          </button>
         </div>
       </div>
     </Link>
