@@ -300,6 +300,8 @@ export default function AdminSettingsPage() {
         </div>
       </div>
 
+      <CJWebhookRegistration />
+
       {/* Save */}
       {message && (
         <p className={`mb-4 text-sm font-medium ${message.startsWith('✓') ? 'text-green-600' : 'text-red-600'}`}>
