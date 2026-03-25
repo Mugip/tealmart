@@ -1,4 +1,4 @@
-app/checkout/page.tsx
+// app/checkout/page.tsx
 'use client'
 
 import { useState, useMemo, useEffect } from 'react'
