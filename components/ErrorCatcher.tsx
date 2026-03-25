@@ -1,41 +1,99 @@
 'use client'
 
-import { useEffect } from "react"
+import { useEffect } from 'react'
+
+// Lightweight Sentry integration — no SDK install needed for basic error capture.
+// To use the full Sentry SDK: npm install @sentry/nextjs then follow their wizard.
+// This file sends errors to both your existing /api/debug/client-error endpoint
+// AND to Sentry's ingestion API if NEXT_PUBLIC_SENTRY_DSN is set.
+
+async function sendToSentry(error: string, stack?: string, context?: string) {
+  const dsn = process.env.NEXT_PUBLIC_SENTRY_DSN
+  if (!dsn) return
+
+  try {
+    // Parse DSN: https://KEY@oXXXXXX.ingest.sentry.io/PROJECT_ID
+    const url = new URL(dsn)
+    const projectId = url.pathname.replace('/', '')
+    const sentryEndpoint = `${url.protocol}//${url.host}/api/${projectId}/store/`
+    const publicKey = url.username
+
+    await fetch(sentryEndpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Sentry-Auth': `Sentry sentry_version=7, sentry_key=${publicKey}`,
+      },
+      body: JSON.stringify({
+        platform: 'javascript',
+        level: 'error',
+        logger: context || 'window',
+        message: error,
+        exception: stack
+          ? {
+              values: [
+                {
+                  type: 'Error',
+                  value: error,
+                  stacktrace: {
+                    frames: stack.split('\n').map(line => ({
+                      filename: line,
+                    })),
+                  },
+                },
+              ],
+            }
+          : undefined,
+        tags: {
+          environment: process.env.NODE_ENV,
+          url: typeof window !== 'undefined' ? window.location.href : '',
+        },
+      }),
+    })
+  } catch {
+    // Sentry itself errored — don't break the app
+  }
+}
 
 export default function ErrorCatcher() {
-
   useEffect(() => {
-
     const sendError = async (payload: {
       error: any
       stack?: string
       context?: string
     }) => {
+      const errorMessage =
+        typeof payload.error === 'string'
+          ? payload.error
+          : payload.error?.message || 'Unknown client error'
+
+      // Send to your internal log endpoint
       try {
-        await fetch("/api/debug/client-error", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
+        await fetch('/api/debug/client-error', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            error: typeof payload.error === "string"
-              ? payload.error
-              : payload.error?.message || "Unknown client error",
+            error: errorMessage,
             stack: payload.stack || payload.error?.stack || null,
-            context: payload.context || "global",
+            context: payload.context || 'global',
             url: window.location.href,
           }),
         })
-      } catch {
-        // never break the UI if logging fails
-      }
+      } catch {}
+
+      // Also send to Sentry if DSN is configured
+      await sendToSentry(
+        errorMessage,
+        payload.stack || payload.error?.stack,
+        payload.context
+      )
     }
 
     const handleError = (event: ErrorEvent) => {
       sendError({
         error: event.error || event.message,
         stack: event.error?.stack,
-        context: "window-error",
+        context: 'window-error',
       })
     }
 
@@ -43,18 +101,17 @@ export default function ErrorCatcher() {
       sendError({
         error: event.reason,
         stack: event.reason?.stack,
-        context: "unhandled-promise-rejection",
+        context: 'unhandled-promise-rejection',
       })
     }
 
-    window.addEventListener("error", handleError)
-    window.addEventListener("unhandledrejection", handlePromiseError)
+    window.addEventListener('error', handleError)
+    window.addEventListener('unhandledrejection', handlePromiseError)
 
     return () => {
-      window.removeEventListener("error", handleError)
-      window.removeEventListener("unhandledrejection", handlePromiseError)
+      window.removeEventListener('error', handleError)
+      window.removeEventListener('unhandledrejection', handlePromiseError)
     }
-
   }, [])
 
   return null
