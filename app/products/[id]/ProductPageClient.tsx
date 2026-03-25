@@ -12,6 +12,7 @@ import { useRouter } from 'next/navigation'
 import RelatedProducts from '@/components/products/RelatedProducts'
 import RecentlyViewed, { recordRecentlyViewed } from '@/components/products/RecentlyViewed'
 import ReviewSection from '@/components/products/ReviewSection'
+import SocialProof from '@/components/products/SocialProof'
 import toast from 'react-hot-toast'
 
 interface Variant {
@@ -275,6 +276,7 @@ export default function ProductPageClient({ params }: { params: { id: string } }
           </div>
 
           {/* ── Product Info ── */}
+          <SocialProof productId={product.id} stock={activeStock} />
           <div className="space-y-6 min-w-0">
 
             {/* Title + action buttons */}
