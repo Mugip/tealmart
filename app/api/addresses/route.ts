@@ -1,5 +1,3 @@
-// app/api/addresses/route.ts
-
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -18,16 +16,17 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
-  if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })              
+  if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
   const body = await req.json()
-  const { name, address, city, state, zip, country, phone, isDefault, saveForLater } = body
+  const { name, address, city, state, zip, country, phone, isDefault } = body
 
   if (!name || !address || !city || !zip || !country) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
   }
 
-  // If this is the default, un-default all others
-  if (isDefault) {                                        await prisma.savedAddress.updateMany({
+  if (isDefault) {
+    await prisma.savedAddress.updateMany({
       where: { userId: session.user.id },
       data: { isDefault: false },
     })
@@ -36,7 +35,12 @@ export async function POST(req: NextRequest) {
   const saved = await prisma.savedAddress.create({
     data: {
       userId: session.user.id,
-      name, address, city, state: state || '', zip, country,
+      name,
+      address,
+      city,
+      state: state || '',
+      zip,
+      country,
       phone: phone || null,
       isDefault: !!isDefault,
     },
@@ -54,5 +58,7 @@ export async function DELETE(req: NextRequest) {
 
   await prisma.savedAddress.deleteMany({
     where: { id, userId: session.user.id },
-  })                                                    return NextResponse.json({ ok: true })
+  })
+
+  return NextResponse.json({ ok: true })
 }
