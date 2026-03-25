@@ -1,4 +1,4 @@
-// lib/auth.ts - USE SHARED PRISMA INSTANCE
+// lib/auth.ts
 import { NextAuthOptions } from 'next-auth'
 import { PrismaAdapter } from '@auth/prisma-adapter'
 import CredentialsProvider from 'next-auth/providers/credentials'
@@ -25,7 +25,7 @@ export const authOptions: NextAuthOptions = {
         }
 
         const user = await prisma.user.findUnique({
-          where: { email: credentials.email },
+          where: { email: credentials.email.toLowerCase().trim() },
         })
 
         if (!user || !user.password) {
@@ -33,7 +33,6 @@ export const authOptions: NextAuthOptions = {
         }
 
         const isCorrectPassword = await bcrypt.compare(credentials.password, user.password)
-
         if (!isCorrectPassword) {
           throw new Error('Invalid credentials')
         }
@@ -54,12 +53,14 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id
+        token.isAdmin = (user as any).isAdmin ?? false
       }
       return token
     },
     async session({ session, token }) {
       if (session.user) {
         session.user.id = token.id as string
+        ;(session.user as any).isAdmin = token.isAdmin as boolean
       }
       return session
     },
