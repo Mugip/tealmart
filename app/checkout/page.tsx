@@ -1,16 +1,40 @@
-// app/checkout/page.tsx
+app/checkout/page.tsx
 'use client'
 
 import { useState, useMemo, useEffect } from 'react'
 import { useCart } from '@/lib/contexts/CartContext'
+import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
-import { Truck, CreditCard, AlertCircle, MapPin } from 'lucide-react'
-import { Country, State, City } from 'country-state-city'
+import { Truck, CreditCard, AlertCircle, MapPin, Tag, CheckCircle, ChevronDown, Loader2 } from 'lucide-react'
+import { Country, State } from 'country-state-city'
 import type { ICountry, IState } from 'country-state-city'
+import toast from 'react-hot-toast'
+
+interface SavedAddress {
+  id: string
+  name: string
+  address: string
+  city: string
+  state: string
+  zip: string
+  country: string
+  phone?: string
+  isDefault: boolean
+}
+
+interface DiscountResult {
+  valid: boolean
+  code: string
+  type: string
+  value: number
+  discountAmount: number
+  message: string
+}
 
 export default function CheckoutPage() {
   const { items, total } = useCart()
+  const { data: session } = useSession()
   const router = useRouter()
 
   const [loading, setLoading] = useState(false)
@@ -23,31 +47,56 @@ export default function CheckoutPage() {
     city: '',
     state: '',
     zip: '',
-    country: 'US', // Store country code instead of name
+    country: 'US',
     phone: '',
   })
 
   const [selectedCountry, setSelectedCountry] = useState<ICountry | null>(null)
   const [states, setStates] = useState<IState[]>([])
 
-  // Get all countries sorted alphabetically
-  const countries = useMemo(() => {
-    return Country.getAllCountries().sort((a, b) => 
-      a.name.localeCompare(b.name)
-    )
-  }, [])
+  // Saved addresses
+  const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([])
+  const [showSavedAddresses, setShowSavedAddresses] = useState(false)
+  const [saveAddress, setSaveAddress] = useState(false)
+
+  // Discount code
+  const [discountCode, setDiscountCode] = useState('')
+  const [discountLoading, setDiscountLoading] = useState(false)
+  const [discount, setDiscount] = useState<DiscountResult | null>(null)
+
+  const countries = useMemo(() => Country.getAllCountries().sort((a, b) => a.name.localeCompare(b.name)), [])
+
+  // Pre-fill email from session
+  useEffect(() => {
+    if (session?.user?.email) {
+      setFormData(prev => ({ ...prev, email: prev.email || session.user!.email! }))
+    }
+  }, [session])
+
+  // Load saved addresses
+  useEffect(() => {
+    if (!session?.user?.id) return
+    fetch('/api/addresses')
+      .then(r => r.json())
+      .then(data => {
+        if (Array.isArray(data) && data.length > 0) {
+          setSavedAddresses(data)
+          // Auto-fill default address
+          const def = data.find((a: SavedAddress) => a.isDefault) || data[0]
+          if (def) applyAddress(def)
+        }
+      })
+      .catch(() => {})
+  }, [session?.user?.id])
 
   // Update states when country changes
   useEffect(() => {
     if (formData.country) {
       const country = Country.getCountryByCode(formData.country)
       setSelectedCountry(country || null)
-      
       if (country) {
         const countryStates = State.getStatesOfCountry(country.isoCode)
         setStates(countryStates)
-        
-        // Reset state if it doesn't exist in new country
         if (formData.state && !countryStates.find(s => s.isoCode === formData.state)) {
           setFormData(prev => ({ ...prev, state: '' }))
         }
@@ -55,31 +104,56 @@ export default function CheckoutPage() {
     }
   }, [formData.country])
 
-  // Set default country on mount
+  // Init default country
   useEffect(() => {
-    const defaultCountry = Country.getCountryByCode('US')
-    if (defaultCountry) {
-      setSelectedCountry(defaultCountry)
-      setStates(State.getStatesOfCountry('US'))
-    }
+    const def = Country.getCountryByCode('US')
+    if (def) { setSelectedCountry(def); setStates(State.getStatesOfCountry('US')) }
   }, [])
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target
-    
+  function applyAddress(addr: SavedAddress) {
     setFormData(prev => ({
       ...prev,
-      [name]: value,
+      name: addr.name,
+      address: addr.address,
+      city: addr.city,
+      state: addr.state,
+      zip: addr.zip,
+      country: addr.country,
+      phone: addr.phone || prev.phone,
     }))
+    setShowSavedAddresses(false)
+  }
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }))
   }
 
   const handleCountryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const countryCode = e.target.value
-    setFormData(prev => ({
-      ...prev,
-      country: countryCode,
-      state: '', // Reset state when country changes
-    }))
+    setFormData(prev => ({ ...prev, country: e.target.value, state: '' }))
+  }
+
+  const handleApplyDiscount = async () => {
+    if (!discountCode.trim()) return
+    setDiscountLoading(true)
+    try {
+      const res = await fetch('/api/checkout/validate-discount', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: discountCode.trim(), subtotal: total }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        toast.error(data.error || 'Invalid code')
+        setDiscount(null)
+      } else {
+        setDiscount(data)
+        toast.success(data.message)
+      }
+    } catch {
+      toast.error('Failed to apply discount')
+    } finally {
+      setDiscountLoading(false)
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -87,93 +161,81 @@ export default function CheckoutPage() {
     setError(null)
     setLoading(true)
 
-    // Validation
-    if (!formData.email || !formData.name || !formData.address || !formData.city || 
+    if (!formData.email || !formData.name || !formData.address || !formData.city ||
         !formData.zip || !formData.phone || !formData.country) {
       setError('Please fill in all required fields')
       setLoading(false)
       return
     }
-
-    // Validate state for countries that have states
     if (states.length > 0 && !formData.state) {
       setError('Please select a state/province')
       setLoading(false)
       return
     }
-
     if (items.length === 0) {
       setError('Your cart is empty')
       setLoading(false)
       return
     }
 
+    // Optionally save address
+    if (saveAddress && session?.user?.id) {
+      fetch('/api/addresses', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...formData, isDefault: savedAddresses.length === 0 }),
+      }).catch(() => {})
+    }
+
     try {
-      // Get country and state names
       const country = Country.getCountryByCode(formData.country)
       const state = formData.state ? State.getStateByCodeAndCountry(formData.state, formData.country) : null
 
       const response = await fetch('/api/checkout', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           items: items.map(item => ({
             id: item.id,
             title: item.title,
             price: item.price,
-            quantity: 1,
+            quantity: item.quantity,
           })),
           email: formData.email,
           shippingAddress: {
             name: formData.name,
             address1: formData.address,
             city: formData.city,
-            state: state?.name || formData.state || '', // Use state name if available
+            state: state?.name || formData.state || '',
             zip: formData.zip,
             postalCode: formData.zip,
-            country: country?.name || formData.country, // Use country name
-            countryCode: formData.country, // Also send code
+            country: country?.name || formData.country,
+            countryCode: formData.country,
             phone: formData.phone,
           },
+          discountCode: discount?.code || null,
+          discountAmount: discount?.discountAmount || 0,
+          freeShipping: discount?.type === 'FREE_SHIPPING',
         }),
       })
 
       const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Checkout failed')
-      }
-
+      if (!response.ok) throw new Error(data.error || 'Checkout failed')
       if (data.url) {
         window.location.href = data.url
       } else {
         throw new Error('No checkout URL received')
       }
     } catch (err: any) {
-      console.error('Checkout error:', err)
       setError(err.message || 'Something went wrong. Please try again.')
       setLoading(false)
     }
   }
 
-  // Get field labels based on country
-  const getFieldLabels = () => {
-    const countryCode = formData.country
-    
-    return {
-      state: countryCode === 'US' ? 'State' : 
-             countryCode === 'CA' ? 'Province' : 
-             countryCode === 'GB' ? 'County' : 
-             'State / Province / Region',
-      zip: countryCode === 'US' ? 'ZIP Code' :
-           countryCode === 'GB' ? 'Postcode' :
-           countryCode === 'CA' ? 'Postal Code' :
-           'ZIP / Postal Code',
-    }
-  }
-
+  const getFieldLabels = () => ({
+    state: formData.country === 'US' ? 'State' : formData.country === 'CA' ? 'Province' : formData.country === 'GB' ? 'County' : 'State / Region',
+    zip: formData.country === 'US' ? 'ZIP Code' : formData.country === 'GB' ? 'Postcode' : formData.country === 'CA' ? 'Postal Code' : 'ZIP / Postal Code',
+  })
   const labels = getFieldLabels()
 
   if (items.length === 0) {
@@ -183,21 +245,21 @@ export default function CheckoutPage() {
           <div className="text-6xl mb-4">🛒</div>
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Your cart is empty</h1>
           <p className="text-gray-600 mb-6">Add some products before checking out</p>
-          <button
-            onClick={() => router.push('/products')}
-            className="btn-primary px-8 py-3"
-          >
-            Browse Products
-          </button>
+          <button onClick={() => router.push('/products')} className="btn-primary px-8 py-3">Browse Products</button>
         </div>
       </div>
     )
   }
 
   const subtotal = total
-  const shipping = subtotal >= 50 ? 0 : 9.99
+  const freeShipping = discount?.type === 'FREE_SHIPPING'
+  const shipping = freeShipping || subtotal >= 50 ? 0 : 9.99
   const tax = subtotal * 0.1
-  const finalTotal = subtotal + shipping + tax
+  const discountAmount = discount?.discountAmount || 0
+  const finalTotal = subtotal + shipping + tax - discountAmount
+
+  const inputCls = 'w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-tiffany-500 focus:border-tiffany-500 outline-none transition-all text-sm'
+  const labelCls = 'block text-sm font-semibold text-gray-700 mb-1.5'
 
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4">
@@ -205,259 +267,210 @@ export default function CheckoutPage() {
         <h1 className="text-3xl font-bold text-gray-900 mb-8">Checkout</h1>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Shipping Form */}
-          <div className="lg:col-span-2">
-            <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-sm p-6 space-y-6">
+          {/* Left — Form */}
+          <div className="lg:col-span-2 space-y-5">
+            <form onSubmit={handleSubmit} className="space-y-5">
+
               {error && (
                 <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3">
                   <AlertCircle className="text-red-500 flex-shrink-0 mt-0.5" size={20} />
-                  <div className="text-red-800 text-sm">{error}</div>
+                  <p className="text-red-800 text-sm">{error}</p>
                 </div>
               )}
 
-              <div>
-                <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-                  <Truck size={24} className="text-tiffany-600" />
-                  Shipping Information
-                </h2>
-              </div>
-
-              {/* Contact Information */}
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Email <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="email"
-                    name="email"
-                    value={formData.email}
-                    onChange={handleChange}
-                    required
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-tiffany-500 focus:border-tiffany-500"
-                    placeholder="you@example.com"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Full Name <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="name"
-                    value={formData.name}
-                    onChange={handleChange}
-                    required
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-tiffany-500 focus:border-tiffany-500"
-                    placeholder="John Doe"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Phone Number <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="tel"
-                    name="phone"
-                    value={formData.phone}
-                    onChange={handleChange}
-                    required
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-tiffany-500 focus:border-tiffany-500"
-                    placeholder="+1 (555) 123-4567"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Include country code for international shipping
-                  </p>
-                </div>
-              </div>
-
-              {/* Address Section */}
-              <div className="pt-4 border-t border-gray-200">
-                <div className="flex items-center gap-2 mb-4">
-                  <MapPin size={20} className="text-tiffany-600" />
-                  <h3 className="text-lg font-semibold text-gray-900">Delivery Address</h3>
-                </div>
-
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Country <span className="text-red-500">*</span>
-                    </label>
-                    <select
-                      name="country"
-                      value={formData.country}
-                      onChange={handleCountryChange}
-                      required
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-tiffany-500 focus:border-tiffany-500"
-                    >
-                      <option value="">Select a country</option>
-                      {countries.map((country) => (
-                        <option key={country.isoCode} value={country.isoCode}>
-                          {country.flag} {country.name}
-                        </option>
+              {/* Saved addresses */}
+              {savedAddresses.length > 0 && (
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5">
+                  <button
+                    type="button"
+                    onClick={() => setShowSavedAddresses(!showSavedAddresses)}
+                    className="flex items-center justify-between w-full"
+                  >
+                    <span className="font-bold text-gray-900 flex items-center gap-2">
+                      <MapPin size={18} className="text-tiffany-600" />
+                      Saved Addresses ({savedAddresses.length})
+                    </span>
+                    <ChevronDown size={16} className={`text-gray-400 transition-transform ${showSavedAddresses ? 'rotate-180' : ''}`} />
+                  </button>
+                  {showSavedAddresses && (
+                    <div className="mt-4 space-y-3">
+                      {savedAddresses.map(addr => (
+                        <button
+                          key={addr.id}
+                          type="button"
+                          onClick={() => applyAddress(addr)}
+                          className="w-full text-left p-3 border border-gray-200 rounded-xl hover:border-tiffany-400 hover:bg-tiffany-50 transition-all text-sm"
+                        >
+                          <div className="font-semibold text-gray-900">{addr.name} {addr.isDefault && <span className="text-xs bg-tiffany-100 text-tiffany-700 px-1.5 py-0.5 rounded ml-1">Default</span>}</div>
+                          <div className="text-gray-500">{addr.address}, {addr.city}, {addr.state} {addr.zip}, {addr.country}</div>
+                        </button>
                       ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Shipping form */}
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 space-y-4">
+                <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                  <Truck size={20} className="text-tiffany-600" /> Shipping Information
+                </h2>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="sm:col-span-2">
+                    <label className={labelCls}>Email <span className="text-red-500">*</span></label>
+                    <input type="email" name="email" value={formData.email} onChange={handleChange} required className={inputCls} placeholder="you@example.com" />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Full Name <span className="text-red-500">*</span></label>
+                    <input type="text" name="name" value={formData.name} onChange={handleChange} required className={inputCls} placeholder="John Doe" />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Phone <span className="text-red-500">*</span></label>
+                    <input type="tel" name="phone" value={formData.phone} onChange={handleChange} required className={inputCls} placeholder="+1 555 123 4567" />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className={labelCls}>Country <span className="text-red-500">*</span></label>
+                    <select name="country" value={formData.country} onChange={handleCountryChange} required className={inputCls}>
+                      <option value="">Select a country</option>
+                      {countries.map(c => <option key={c.isoCode} value={c.isoCode}>{c.flag} {c.name}</option>)}
                     </select>
                   </div>
-
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Street Address <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      name="address"
-                      value={formData.address}
-                      onChange={handleChange}
-                      required
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-tiffany-500 focus:border-tiffany-500"
-                      placeholder="123 Main Street, Apt 4B"
-                    />
+                  <div className="sm:col-span-2">
+                    <label className={labelCls}>Street Address <span className="text-red-500">*</span></label>
+                    <input type="text" name="address" value={formData.address} onChange={handleChange} required className={inputCls} placeholder="123 Main Street, Apt 4B" />
                   </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        City <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        name="city"
-                        value={formData.city}
-                        onChange={handleChange}
-                        required
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-tiffany-500 focus:border-tiffany-500"
-                        placeholder="New York"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        {labels.state} {states.length > 0 && <span className="text-red-500">*</span>}
-                      </label>
-                      {states.length > 0 ? (
-                        <select
-                          name="state"
-                          value={formData.state}
-                          onChange={handleChange}
-                          required={states.length > 0}
-                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-tiffany-500 focus:border-tiffany-500"
-                        >
-                          <option value="">Select {labels.state.toLowerCase()}</option>
-                          {states.map((state) => (
-                            <option key={state.isoCode} value={state.isoCode}>
-                              {state.name}
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        <input
-                          type="text"
-                          name="state"
-                          value={formData.state}
-                          onChange={handleChange}
-                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-tiffany-500 focus:border-tiffany-500"
-                          placeholder={labels.state}
-                        />
-                      )}
-                    </div>
-                  </div>
-
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      {labels.zip} <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      name="zip"
-                      value={formData.zip}
-                      onChange={handleChange}
-                      required
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-tiffany-500 focus:border-tiffany-500"
-                      placeholder={
-                        formData.country === 'US' ? '10001' :
-                        formData.country === 'GB' ? 'SW1A 1AA' :
-                        formData.country === 'CA' ? 'K1A 0B1' :
-                        '12345'
-                      }
-                    />
+                    <label className={labelCls}>City <span className="text-red-500">*</span></label>
+                    <input type="text" name="city" value={formData.city} onChange={handleChange} required className={inputCls} placeholder="New York" />
+                  </div>
+                  <div>
+                    <label className={labelCls}>{labels.state} {states.length > 0 && <span className="text-red-500">*</span>}</label>
+                    {states.length > 0 ? (
+                      <select name="state" value={formData.state} onChange={handleChange} required className={inputCls}>
+                        <option value="">Select {labels.state.toLowerCase()}</option>
+                        {states.map(s => <option key={s.isoCode} value={s.isoCode}>{s.name}</option>)}
+                      </select>
+                    ) : (
+                      <input type="text" name="state" value={formData.state} onChange={handleChange} className={inputCls} placeholder={labels.state} />
+                    )}
+                  </div>
+                  <div>
+                    <label className={labelCls}>{labels.zip} <span className="text-red-500">*</span></label>
+                    <input type="text" name="zip" value={formData.zip} onChange={handleChange} required className={inputCls} placeholder={formData.country === 'US' ? '10001' : formData.country === 'GB' ? 'SW1A 1AA' : '12345'} />
                   </div>
                 </div>
+
+                {/* Save address checkbox (only for logged-in users) */}
+                {session?.user?.id && (
+                  <label className="flex items-center gap-2 cursor-pointer mt-1">
+                    <input type="checkbox" checked={saveAddress} onChange={e => setSaveAddress(e.target.checked)} className="rounded text-tiffany-500 w-4 h-4" />
+                    <span className="text-sm text-gray-700">Save this address for future orders</span>
+                  </label>
+                )}
               </div>
 
-              {/* Selected Address Preview */}
-              {selectedCountry && (
-                <div className="bg-tiffany-50 border border-tiffany-200 rounded-xl p-4">
-                  <p className="text-sm font-semibold text-gray-700 mb-2">📍 Shipping to:</p>
-                  <p className="text-sm text-gray-600">
-                    {selectedCountry.flag} {selectedCountry.name}
-                    {formData.state && states.find(s => s.isoCode === formData.state) && 
-                      `, ${states.find(s => s.isoCode === formData.state)?.name}`}
-                  </p>
-                </div>
-              )}
+              {/* Discount code */}
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5">
+                <h3 className="font-bold text-gray-900 flex items-center gap-2 mb-3">
+                  <Tag size={18} className="text-tiffany-600" /> Discount Code
+                </h3>
+                {discount ? (
+                  <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-xl p-3">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle size={18} className="text-green-600" />
+                      <div>
+                        <p className="font-semibold text-green-800 text-sm">{discount.code}</p>
+                        <p className="text-xs text-green-600">{discount.message}</p>
+                      </div>
+                    </div>
+                    <button type="button" onClick={() => { setDiscount(null); setDiscountCode('') }} className="text-xs text-red-500 hover:underline">Remove</button>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={discountCode}
+                      onChange={e => setDiscountCode(e.target.value.toUpperCase())}
+                      onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), handleApplyDiscount())}
+                      placeholder="Enter code"
+                      className="flex-1 px-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-tiffany-500 focus:border-tiffany-500 outline-none uppercase"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleApplyDiscount}
+                      disabled={!discountCode.trim() || discountLoading}
+                      className="px-4 py-2.5 bg-tiffany-500 hover:bg-tiffany-600 disabled:opacity-50 text-white font-semibold rounded-xl text-sm transition-colors flex items-center gap-1.5"
+                    >
+                      {discountLoading ? <Loader2 size={14} className="animate-spin" /> : null}
+                      Apply
+                    </button>
+                  </div>
+                )}
+              </div>
 
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-gradient-to-r from-tiffany-500 to-tiffany-600 hover:from-tiffany-600 hover:to-tiffany-700 text-white py-4 rounded-xl font-bold flex items-center justify-center gap-3 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full bg-gradient-to-r from-tiffany-500 to-tiffany-600 hover:from-tiffany-600 hover:to-tiffany-700 text-white py-4 rounded-xl font-bold flex items-center justify-center gap-3 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed text-base"
               >
-                <CreditCard size={24} />
-                {loading ? 'Processing...' : 'Continue to Payment'}
+                {loading ? <Loader2 size={22} className="animate-spin" /> : <CreditCard size={22} />}
+                {loading ? 'Processing...' : `Pay ${finalTotal > 0 ? `$${finalTotal.toFixed(2)}` : ''} Securely`}
               </button>
+
+              <p className="text-xs text-center text-gray-400">🔒 Secured by Stripe. We never store your card details.</p>
             </form>
           </div>
 
-          {/* Order Summary */}
+          {/* Right — Summary */}
           <div className="lg:col-span-1">
-            <div className="bg-white rounded-2xl shadow-sm p-6 sticky top-4">
-              <h2 className="text-xl font-bold text-gray-900 mb-4">Order Summary</h2>
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 sticky top-4">
+              <h2 className="text-lg font-bold text-gray-900 mb-4">Order Summary</h2>
 
-              <div className="space-y-4 mb-6">
-                {items.map((item) => (
+              <div className="space-y-3 mb-5 max-h-64 overflow-y-auto pr-1">
+                {items.map(item => (
                   <div key={item.id} className="flex gap-3">
-                    <div className="relative w-16 h-16 flex-shrink-0 rounded-lg overflow-hidden">
-                      <Image
-                        src={item.image}
-                        alt={item.title}
-                        fill
-                        className="object-cover"
-                      />
+                    <div className="relative w-14 h-14 flex-shrink-0 rounded-lg overflow-hidden bg-gray-100">
+                      <Image src={item.image} alt={item.title} fill className="object-cover" sizes="56px" />
+                      {item.quantity > 1 && (
+                        <div className="absolute -top-1 -right-1 bg-tiffany-500 text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center">
+                          {item.quantity}
+                        </div>
+                      )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h3 className="text-sm font-medium text-gray-900 truncate">{item.title}</h3>
-                      <p className="text-sm text-gray-600">${item.price.toFixed(2)}</p>
+                      <p className="text-sm font-medium text-gray-900 line-clamp-2">{item.title}</p>
+                      <p className="text-sm text-gray-500">${(item.price * item.quantity).toFixed(2)}</p>
                     </div>
                   </div>
                 ))}
               </div>
 
-              <div className="border-t border-gray-200 pt-4 space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Subtotal</span>
-                  <span className="font-medium text-gray-900">${subtotal.toFixed(2)}</span>
+              <div className="border-t border-gray-100 pt-4 space-y-2 text-sm">
+                <div className="flex justify-between text-gray-600">
+                  <span>Subtotal</span><span>${subtotal.toFixed(2)}</span>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Shipping</span>
-                  <span className="font-medium text-gray-900">
+                <div className="flex justify-between text-gray-600">
+                  <span>Shipping</span>
+                  <span className={shipping === 0 ? 'text-green-600 font-medium' : ''}>
                     {shipping === 0 ? 'FREE' : `$${shipping.toFixed(2)}`}
                   </span>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Tax (10%)</span>
-                  <span className="font-medium text-gray-900">${tax.toFixed(2)}</span>
+                <div className="flex justify-between text-gray-600">
+                  <span>Tax (10%)</span><span>${tax.toFixed(2)}</span>
                 </div>
-                <div className="border-t border-gray-200 pt-2 flex justify-between">
-                  <span className="text-lg font-bold text-gray-900">Total</span>
-                  <span className="text-lg font-bold text-tiffany-600">${finalTotal.toFixed(2)}</span>
-                </div>
+                {discountAmount > 0 && (
+                  <div className="flex justify-between text-green-600 font-medium">                                             <span>Discount ({discount?.code})</span>                                                                    <span>-${discountAmount.toFixed(2)}</span>                                                                </div>
+                )}
+                <div className="border-t border-gray-200 pt-2 flex justify-between font-bold text-gray-900 text-base">
+                  <span>Total</span>
+                  <span className="text-tiffany-600">${finalTotal.toFixed(2)}</span>                                        </div>
               </div>
 
-              {subtotal < 50 && (
-                <div className="mt-4 bg-tiffany-50 border border-tiffany-200 rounded-lg p-3">
-                  <p className="text-sm text-tiffany-800">
-                    💡 Add ${(50 - subtotal).toFixed(2)} more for free shipping!
+              {subtotal < 50 && !freeShipping && (
+                <div className="mt-4 bg-tiffany-50 border border-tiffany-200 rounded-xl p-3">
+                  <p className="text-xs text-tiffany-800 font-medium">
+                    💡 Add <strong>${(50 - subtotal).toFixed(2)}</strong> more for free shipping!
                   </p>
                 </div>
               )}
@@ -465,6 +478,5 @@ export default function CheckoutPage() {
           </div>
         </div>
       </div>
-    </div>
-  )
+    </div>                                              )
 }
