@@ -1,5 +1,4 @@
 // prisma/schema.prisma
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -20,12 +19,11 @@ model User {
   email         String?   @unique
   emailVerified DateTime?
   image         String?
-  password      String?   // For email/password auth
+  password      String?
   isAdmin       Boolean   @default(false)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  // Relations
   accounts  Account[]
   sessions  Session[]
   orders    Order[]
@@ -62,8 +60,7 @@ model Product {
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
   variants       Json?
-  
-  // Relations
+
   orderItems    OrderItem[]
   reviews       Review[]
   wishlistItems WishlistItem[]
@@ -99,10 +96,16 @@ model Order {
   paymentMethod   String
   paymentId       String?
   paidAt          DateTime?
+  // CJ fulfilment fields
+  cjOrderId       String?     // CJ's internal order ID
+  trackingNumber  String?     // Carrier tracking number from CJ
+  trackingCarrier String?     // Carrier name (e.g. "USPS", "FedEx")
+  // Discount
+  discountCode    String?
+  discountAmount  Float       @default(0)
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
-  
-  // Relations
+
   user  User?       @relation(fields: [userId], references: [id])
   items OrderItem[]
 
@@ -119,8 +122,7 @@ model OrderItem {
   productId String
   quantity  Int
   price     Float
-  
-  // Relations
+
   order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product Product @relation(fields: [productId], references: [id])
 
@@ -157,7 +159,7 @@ model Session {
   sessionToken String   @unique
   userId       String
   expires      DateTime
-  
+
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
@@ -179,12 +181,12 @@ model Review {
   id        String   @id @default(cuid())
   productId String
   userId    String
-  rating    Int      // 1-5
+  rating    Int
   title     String?
   comment   String?
-  images    String[] // Array of image URLs
-  verified  Boolean  @default(false) // Verified purchase
-  helpful   Int      @default(0) // Helpful votes
+  images    String[]
+  verified  Boolean  @default(false)
+  helpful   Int      @default(0)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -244,9 +246,9 @@ model DiscountCode {
   id          String    @id @default(cuid())
   code        String    @unique
   type        String    // PERCENTAGE, FIXED, FREE_SHIPPING
-  value       Float     // Percentage or fixed amount
-  minPurchase Float?    // Minimum purchase amount
-  maxUses     Int?      // Max number of uses
+  value       Float
+  minPurchase Float?
+  maxUses     Int?
   usedCount   Int       @default(0)
   validFrom   DateTime  @default(now())
   validUntil  DateTime?
@@ -264,12 +266,29 @@ model DiscountCode {
 model Subscriber {
   id        String   @id @default(cuid())
   email     String   @unique
-  status    String   @default("ACTIVE") // ACTIVE, UNSUBSCRIBED
-  source    String?  // Where they subscribed from
+  status    String   @default("ACTIVE")
+  source    String?
   createdAt DateTime @default(now())
 
   @@index([email])
   @@index([status])
+}
+
+// ============================================
+// ABANDONED CART
+// ============================================
+
+model AbandonedCart {
+  id        String   @id @default(cuid())
+  email     String
+  cartData  Json     // serialized cart items
+  emailSent Boolean  @default(false)
+  sentAt    DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([email])
+  @@index([emailSent, createdAt])
 }
 
 // ============================================
