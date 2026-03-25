@@ -128,6 +128,15 @@ async function forwardOrderToCJ(order: any) {
 
     if (data.code === 200 || data.result === true) {
       console.log(`✅ CJ Order created successfully`)
+
+      // Save CJ order ID (NEW ADDITION)
+      await prisma.order.update({
+        where: { id: order.id },
+        data: {
+          cjOrderId: String(data.data?.orderId || data.data?.cjOrderId),
+        },
+      })
+      
       
       await prisma.order.update({
         where: { id: order.id },
