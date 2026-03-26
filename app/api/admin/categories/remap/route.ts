@@ -1,46 +1,105 @@
 // app/api/admin/categories/remap/route.ts
-
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
-import { cookies } from 'next/headers'
-import { verifyAdminToken } from '@/lib/adminAuth'
+import { classifyProductSync, classifyProduct } from '@/lib/productClassifier'
 
-export async function POST(request: NextRequest) {
-  const token = cookies().get('admin-auth')?.value
+const INGESTION_API_KEY = process.env.INGESTION_API_KEY!
 
-  if (!token || !(await verifyAdminToken(token))) {
-    return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401 }
-    )
+export async function POST(req: NextRequest) {
+  // Auth
+  const key = req.headers.get('x-api-key')
+  if (!INGESTION_API_KEY || key !== INGESTION_API_KEY) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  try {
-    const { fromCategory, toCategory } = await request.json()
+  const body = await req.json().catch(() => ({}))
+  const dryRun = body.dryRun !== false // default true (safe)
+  const useAI = body.useAI === true    // opt-in — uses Gemini for low-confidence products
 
-    if (!fromCategory || !toCategory) {
-      return NextResponse.json(
-        { error: 'fromCategory and toCategory are required' },
-        { status: 400 }
-      )
+  const startTime = Date.now()
+
+  const products = await prisma.product.findMany({
+    select: {
+      id: true,
+      title: true,
+      description: true,
+      category: true,
+    },
+  })
+
+  let updated = 0
+  let unchanged = 0
+  let errors = 0
+  const changes: Array<{ id: string; title: string; from: string; to: string }> = []
+  const changeSummary: Record<string, number> = {}
+
+  for (const product of products) {
+    try {
+      // Use sync classifier by default (avoids Gemini rate limits on bulk ops)
+      // Use async (with AI) only if explicitly requested
+      const newCategory = useAI
+        ? await classifyProduct(product.title, product.description, product.category)
+        : classifyProductSync(product.title, product.description, product.category)
+
+      if (newCategory !== product.category) {
+        if (!dryRun) {
+          await prisma.product.update({
+            where: { id: product.id },
+            data: { category: newCategory },
+          })
+        }
+
+        const changeKey = `${product.category} → ${newCategory}`
+        changeSummary[changeKey] = (changeSummary[changeKey] || 0) + 1
+
+        if (changes.length < 100) {
+          changes.push({
+            id: product.id,
+            title: product.title.substring(0, 80),
+            from: product.category,
+            to: newCategory,
+          })
+        }
+
+        updated++
+      } else {
+        unchanged++
+      }
+    } catch (err: any) {
+      errors++
     }
-
-    const result = await prisma.product.updateMany({
-      where: { category: fromCategory },
-      data: { category: toCategory },
-    })
-
-    return NextResponse.json({
-      success: true,
-      count: result.count,
-      message: `${result.count} products remapped from "${fromCategory}" to "${toCategory}"`,
-    })
-  } catch (error: any) {
-    console.error('Remap categories error:', error)
-
-    return NextResponse.json(
-      { error: error.message || 'Failed to remap categories' },
-      { status: 500 }
-    )
   }
+
+  // Category distribution after remapping
+  const categoryStats = await prisma.product.groupBy({
+    by: ['category'],
+    _count: { id: true },
+    orderBy: { _count: { id: 'desc' } },
+  })
+
+  const categoryDistribution = categoryStats.map(stat => ({
+    category: stat.category,
+    count: stat._count.id,
+    percentage: ((stat._count.id / products.length) * 100).toFixed(1),
+  }))
+
+  const duration = `${((Date.now() - startTime) / 1000).toFixed(2)}s`
+
+  return NextResponse.json({
+    message: dryRun
+      ? `Preview: ${updated} products would be updated`
+      : `Updated ${updated} products`,
+    dryRun,
+    useAI,
+    stats: {
+      total: products.length,
+      updated,
+      unchanged,
+      errors,
+      duration,
+    },
+    changeSummary,
+    changes,
+    categoryDistribution,
+  })
 }
