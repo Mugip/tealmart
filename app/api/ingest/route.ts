@@ -454,13 +454,15 @@ async function saveProduct(product: any, existingProducts: Set<string>, keyword?
 // ============================================
 
 export async function POST(req: NextRequest) {
-  const start = Date.now()
+  // 🔐 Auth (browser-friendly via query param)
+  const url = new URL(req.url)
+  const secret = url.searchParams.get('key')
 
-  try {
-    const key = req.headers.get("x-api-key")
-    if (!INGESTION_API_KEY || key !== INGESTION_API_KEY) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
+  if (INGESTION_API_KEY && secret !== INGESTION_API_KEY) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const start = Date.now()
 
     const body = await req.json()
     const keyword = body.keyword
