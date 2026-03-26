@@ -3,6 +3,7 @@
 
 import { useState, useEffect } from 'react'
 import { Save, Lock, Bell, Store, Shield, Database, Eye, EyeOff, Loader2 } from 'lucide-react'
+import CJWebhookRegistration from '@/components/admin/CJWebhookRegistration'
 
 export default function AdminSettingsPage() {
   const [activeTab, setActiveTab] = useState('general')
