@@ -5,16 +5,24 @@ import { classifyProductSync, classifyProduct } from '@/lib/productClassifier'
 
 const INGESTION_API_KEY = process.env.INGESTION_API_KEY!
 
-export async function POST(req: NextRequest) {
-  // Auth
-  const key = req.headers.get('x-api-key')
+// ============================================
+// HANDLER (shared logic)
+// ============================================
+
+async function handleRequest(req: NextRequest) {
+  // 🔐 Auth (browser + header support)
+  const url = new URL(req.url)
+  const queryKey = url.searchParams.get('key')
+  const headerKey = req.headers.get('x-api-key')
+  const key = queryKey || headerKey
+
   if (!INGESTION_API_KEY || key !== INGESTION_API_KEY) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   const body = await req.json().catch(() => ({}))
-  const dryRun = body.dryRun !== false // default true (safe)
-  const useAI = body.useAI === true    // opt-in — uses Gemini for low-confidence products
+  const dryRun = body.dryRun !== false // default true
+  const useAI = body.useAI === true
 
   const startTime = Date.now()
 
@@ -30,16 +38,29 @@ export async function POST(req: NextRequest) {
   let updated = 0
   let unchanged = 0
   let errors = 0
-  const changes: Array<{ id: string; title: string; from: string; to: string }> = []
+
+  const changes: Array<{
+    id: string
+    title: string
+    from: string
+    to: string
+  }> = []
+
   const changeSummary: Record<string, number> = {}
 
   for (const product of products) {
     try {
-      // Use sync classifier by default (avoids Gemini rate limits on bulk ops)
-      // Use async (with AI) only if explicitly requested
       const newCategory = useAI
-        ? await classifyProduct(product.title, product.description, product.category)
-        : classifyProductSync(product.title, product.description, product.category)
+        ? await classifyProduct(
+            product.title,
+            product.description,
+            product.category
+          )
+        : classifyProductSync(
+            product.title,
+            product.description,
+            product.category
+          )
 
       if (newCategory !== product.category) {
         if (!dryRun) {
@@ -65,12 +86,12 @@ export async function POST(req: NextRequest) {
       } else {
         unchanged++
       }
-    } catch (err: any) {
+    } catch {
       errors++
     }
   }
 
-  // Category distribution after remapping
+  // 📊 Category distribution
   const categoryStats = await prisma.product.groupBy({
     by: ['category'],
     _count: { id: true },
@@ -103,3 +124,17 @@ export async function POST(req: NextRequest) {
     categoryDistribution,
   })
 }
+
+// ============================================
+// ROUTES
+// ============================================
+
+// ✅ Browser-friendly
+export async function GET(req: NextRequest) {
+  return handleRequest(req)
+}
+
+// ✅ For scripts / API calls
+export async function POST(req: NextRequest) {
+  return handleRequest(req)
+    }
