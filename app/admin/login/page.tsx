@@ -89,7 +89,7 @@ export default function AdminLoginPage() {
                   required
                   autoComplete="email"
                   className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-400 focus:border-transparent transition-all bg-gray-50"
-                  placeholder="admin@example.com"
+                  placeholder="you@example.com"
                 />
               </div>
             </div>
