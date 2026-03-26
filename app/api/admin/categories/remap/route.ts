@@ -9,8 +9,23 @@ const INGESTION_API_KEY = process.env.INGESTION_API_KEY!
 // HANDLER (shared logic)
 // ============================================
 async function handleRequest(req: NextRequest) {
-  // 🔐 Auth (browser + header support)
   const url = new URL(req.url)
+
+  // 🔹 TEMPORARY DEBUG
+  if (url.pathname.endsWith('/debug')) {
+    const queryKey = url.searchParams.get('key')
+    const headerKey = req.headers.get('x-api-key')
+    const cookies = Object.fromEntries(req.cookies)
+    return NextResponse.json({
+      message: 'DEBUG INFO',
+      queryKey,
+      headerKey,
+      cookies,
+      ingestionEnvKeySet: !!INGESTION_API_KEY,
+    })
+  }
+
+  // 🔐 Auth (browser + header support)
   const queryKey = url.searchParams.get('key')
   const headerKey = req.headers.get('x-api-key')
   const key = queryKey || headerKey
@@ -19,7 +34,6 @@ async function handleRequest(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  // Body parsing
   const body = await req.json().catch(() => ({}))
   const dryRun = body.dryRun !== false // default true
   const useAI = body.useAI === true
@@ -89,31 +103,12 @@ async function handleRequest(req: NextRequest) {
 }
 
 // ============================================
-// TEMPORARY DEBUG ENDPOINT
-// ============================================
-export async function DEBUG(req: NextRequest) {
-  const url = new URL(req.url)
-  const queryKey = url.searchParams.get('key')
-  const headerKey = req.headers.get('x-api-key')
-  const cookies = Object.fromEntries(req.cookies)
-  return NextResponse.json({
-    message: 'DEBUG INFO',
-    queryKey,
-    headerKey,
-    cookies,
-    ingestionEnvKeySet: !!INGESTION_API_KEY,
-  })
-}
-
-// ============================================
 // ROUTES
 // ============================================
 export async function GET(req: NextRequest) {
-  // Access /debug?key= or normal remap
-  if (req.url.includes('/debug')) return DEBUG(req)
   return handleRequest(req)
 }
 
 export async function POST(req: NextRequest) {
   return handleRequest(req)
-    }
+}
