@@ -1,16 +1,23 @@
-// app/admin/remap-categories/page.tsx
+// app/admin/remap-categories.page.tsx
+
 'use client'
 
 import { useState } from 'react'
-import { RefreshCw, CheckCircle, XCircle, AlertCircle } from 'lucide-react'
+import { RefreshCw, CheckCircle, XCircle, AlertCircle, Sparkles } from 'lucide-react'
 
 export default function RemapCategoriesPage() {
   const [loading, setLoading] = useState(false)
   const [dryRun, setDryRun] = useState(true)
+  const [useAI, setUseAI] = useState(false)
   const [result, setResult] = useState<any>(null)
 
   const handleRemap = async () => {
-    if (!dryRun && !confirm('Are you sure you want to remap all product categories? This will update the database.')) {
+    if (
+      !dryRun &&
+      !confirm(
+        'Are you sure you want to remap all product categories? This will update the database.'
+      )
+    ) {
       return
     }
 
@@ -18,13 +25,13 @@ export default function RemapCategoriesPage() {
     setResult(null)
 
     try {
-      const response = await fetch('/api/remap-categories', {
+      const response = await fetch('/api/admin/categories/remap', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-api-key': process.env.NEXT_PUBLIC_INGESTION_API_KEY || 'Craigbes123',
+          'x-api-key': process.env.NEXT_PUBLIC_INGESTION_API_KEY || '',
         },
-        body: JSON.stringify({ dryRun }),
+        body: JSON.stringify({ dryRun, useAI }),
       })
 
       const data = await response.json()
@@ -49,51 +56,89 @@ export default function RemapCategoriesPage() {
             Remap Product Categories
           </h1>
           <p className="text-gray-600 mb-8">
-            Update all product categories using the improved classifier
+            Re-classify all products using the current classifier (keyword scoring + CJ map).
+            Optionally enable AI for ambiguous products.
           </p>
 
           {/* Controls */}
-          <div className="bg-blue-50 border border-blue-200 rounded-xl p-6 mb-6">
-            <div className="flex items-center gap-3 mb-4">
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-6 mb-6 space-y-4">
+
+            {/* Dry run toggle */}
+            <div className="flex items-start gap-3">
               <input
                 type="checkbox"
                 id="dryRun"
                 checked={dryRun}
-                onChange={(e) => setDryRun(e.target.checked)}
-                className="w-5 h-5 text-blue-600 rounded"
+                onChange={e => setDryRun(e.target.checked)}
+                className="w-5 h-5 text-blue-600 rounded mt-0.5"
               />
-              <label htmlFor="dryRun" className="font-medium text-gray-900">
-                Dry Run (Preview Only)
-              </label>
+              <div>
+                <label htmlFor="dryRun" className="font-semibold text-gray-900 cursor-pointer">
+                  Dry Run (Preview Only)
+                </label>
+                <p className="text-sm text-gray-600">
+                  {dryRun
+                    ? '✅ Safe mode — shows what would change without touching the database'
+                    : '⚠️ Live mode — will update all products in the database'}
+                </p>
+              </div>
             </div>
-            <p className="text-sm text-gray-600 mb-4">
-              {dryRun
-                ? '✅ Safe mode: Will preview changes without updating the database'
-                : '⚠️ LIVE mode: Will update all products in the database'}
-            </p>
+
+            {/* AI toggle */}
+            <div className="flex items-start gap-3 pt-2 border-t border-blue-200">
+              <input
+                type="checkbox"
+                id="useAI"
+                checked={useAI}
+                onChange={e => setUseAI(e.target.checked)}
+                className="w-5 h-5 text-purple-600 rounded mt-0.5"
+              />
+              <div>
+                <label htmlFor="useAI" className="font-semibold text-gray-900 cursor-pointer flex items-center gap-1.5">
+                  <Sparkles size={15} className="text-purple-500" />
+                  Use Gemini AI for ambiguous products
+                </label>
+                <p className="text-sm text-gray-600">
+                  Calls Gemini Flash for products where keyword confidence is low.
+                  Uses your free-tier quota (1,500 req/day). Only enable this on smaller batches
+                  or when re-ingesting products normally covers your full catalog.
+                </p>
+              </div>
+            </div>
 
             <button
               onClick={handleRemap}
               disabled={loading}
-              className={`
-                flex items-center gap-2 px-6 py-3 rounded-xl font-semibold
-                ${loading
-                  ? 'bg-gray-400 cursor-not-allowed'
+              className={`flex items-center gap-2 px-6 py-3 rounded-xl font-semibold transition-colors ${
+                loading
+                  ? 'bg-gray-400 cursor-not-allowed text-white'
                   : dryRun
                   ? 'bg-blue-600 hover:bg-blue-700 text-white'
                   : 'bg-red-600 hover:bg-red-700 text-white'
-                }
-                transition-colors
-              `}
+              }`}
             >
               <RefreshCw className={loading ? 'animate-spin' : ''} size={20} />
               {loading
-                ? 'Processing...'
+                ? 'Processing…'
                 : dryRun
                 ? 'Preview Changes'
                 : 'Remap All Categories'}
             </button>
           </div>
+
+          {/* Warning for live mode */}
+          {!dryRun && !result && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6 mb-6">
+              <div className="flex items-center gap-2 text-yellow-800 font-semibold mb-2">
+                <AlertCircle size={20} />
+                Warning
+              </div>
+              <p className="text-yellow-700">
+                You are about to update ALL products in the database. This action cannot be easily
+                undone. Make sure you have a database backup!
+              </p>
+            </div>
+          )}
 
           {/* Results */}
           {result && (
@@ -101,8 +146,7 @@ export default function RemapCategoriesPage() {
               {result.error ? (
                 <div className="bg-red-50 border border-red-200 rounded-xl p-6">
                   <div className="flex items-center gap-2 text-red-800 font-semibold mb-2">
-                    <XCircle size={20} />
-                    Error
+                    <XCircle size={20} /> Error
                   </div>
                   <p className="text-red-700">{result.error}</p>
                 </div>
@@ -110,116 +154,94 @@ export default function RemapCategoriesPage() {
                 <>
                   {/* Summary */}
                   <div className="bg-green-50 border border-green-200 rounded-xl p-6">
-                    <div className="flex items-center gap-2 text-green-800 font-semibold mb-2">
+                    <div className="flex items-center gap-2 text-green-800 font-semibold mb-4">
                       <CheckCircle size={20} />
                       {result.message}
+                      {result.dryRun && (
+                        <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">
+                          Preview
+                        </span>
+                      )}
+                      {result.useAI && (
+                        <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium flex items-center gap-1">
+                          <Sparkles size={11} /> AI
+                        </span>
+                      )}
                     </div>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
-                      <div>
-                        <div className="text-2xl font-bold text-gray-900">
-                          {result.stats.total}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      {[
+                        { label: 'Total Products', value: result.stats.total, color: 'text-gray-900' },
+                        { label: result.dryRun ? 'Would Update' : 'Updated', value: result.stats.updated, color: 'text-green-600' },
+                        { label: 'Unchanged', value: result.stats.unchanged, color: 'text-gray-500' },
+                        { label: 'Errors', value: result.stats.errors, color: 'text-red-600' },
+                      ].map(({ label, value, color }) => (
+                        <div key={label}>
+                          <div className={`text-2xl font-bold ${color}`}>{value}</div>
+                          <div className="text-sm text-gray-600">{label}</div>
                         </div>
-                        <div className="text-sm text-gray-600">Total Products</div>
-                      </div>
-                      <div>
-                        <div className="text-2xl font-bold text-green-600">
-                          {result.stats.updated}
-                        </div>
-                        <div className="text-sm text-gray-600">Updated</div>
-                      </div>
-                      <div>
-                        <div className="text-2xl font-bold text-gray-500">
-                          {result.stats.unchanged}
-                        </div>
-                        <div className="text-sm text-gray-600">Unchanged</div>
-                      </div>
-                      <div>
-                        <div className="text-2xl font-bold text-red-600">
-                          {result.stats.errors}
-                        </div>
-                        <div className="text-sm text-gray-600">Errors</div>
-                      </div>
+                      ))}
                     </div>
-                    <p className="text-sm text-gray-600 mt-4">
-                      Completed in {result.stats.duration}
-                    </p>
+                    <p className="text-sm text-gray-500 mt-4">Completed in {result.stats.duration}</p>
                   </div>
 
-                  {/* Change Summary */}
+                  {/* Change summary */}
                   {result.changeSummary && Object.keys(result.changeSummary).length > 0 && (
                     <div className="bg-white border border-gray-200 rounded-xl p-6">
-                      <h3 className="font-semibold text-gray-900 mb-4">
-                        Category Changes Summary
-                      </h3>
+                      <h3 className="font-semibold text-gray-900 mb-4">Category Changes Summary</h3>
                       <div className="space-y-2">
                         {Object.entries(result.changeSummary)
                           .sort((a: any, b: any) => b[1] - a[1])
                           .map(([change, count]: any) => (
-                            <div
-                              key={change}
-                              className="flex justify-between items-center py-2 border-b border-gray-100"
-                            >
+                            <div key={change} className="flex justify-between items-center py-2 border-b border-gray-100 text-sm">
                               <span className="text-gray-700">{change}</span>
-                              <span className="font-semibold text-gray-900">
-                                {count}x
-                              </span>
+                              <span className="font-semibold text-gray-900">{count}x</span>
                             </div>
                           ))}
                       </div>
                     </div>
                   )}
 
-                  {/* Category Distribution */}
+                  {/* Category distribution */}
                   {result.categoryDistribution && (
                     <div className="bg-white border border-gray-200 rounded-xl p-6">
                       <h3 className="font-semibold text-gray-900 mb-4">
-                        New Category Distribution
+                        {result.dryRun ? 'Current' : 'New'} Category Distribution
                       </h3>
                       <div className="space-y-2">
                         {result.categoryDistribution.map((cat: any) => (
-                          <div
-                            key={cat.category}
-                            className="flex justify-between items-center py-2"
-                          >
-                            <span className="text-gray-700 capitalize">
-                              {cat.category.replace('-', ' ')}
-                            </span>
-                            <div className="flex items-center gap-3">
-                              <div className="w-32 bg-gray-200 rounded-full h-2">
-                                <div
-                                  className="bg-tiffany-600 h-2 rounded-full"
-                                  style={{ width: `${cat.percentage}%` }}
-                                />
-                              </div>
-                              <span className="text-sm text-gray-600 w-16 text-right">
-                                {cat.count} ({cat.percentage}%)
-                              </span>
+                          <div key={cat.category} className="flex items-center gap-3 py-1.5">
+                            <span className="text-gray-700 text-sm w-44 flex-shrink-0">{cat.category}</span>
+                            <div className="flex-1 bg-gray-100 rounded-full h-2">
+                              <div
+                                className="bg-tiffany-500 h-2 rounded-full transition-all"
+                                style={{ width: `${Math.min(100, parseFloat(cat.percentage))}%` }}
+                              />
                             </div>
+                            <span className="text-xs text-gray-500 w-20 text-right flex-shrink-0">
+                              {cat.count} ({cat.percentage}%)
+                            </span>
                           </div>
                         ))}
                       </div>
                     </div>
                   )}
 
-                  {/* Sample Changes */}
+                  {/* Sample changes */}
                   {result.changes && result.changes.length > 0 && (
                     <div className="bg-white border border-gray-200 rounded-xl p-6">
                       <h3 className="font-semibold text-gray-900 mb-4">
-                        Sample Changes (First 100)
+                        Sample Changes (first {result.changes.length})
                       </h3>
                       <div className="space-y-2 max-h-96 overflow-y-auto">
-                        {result.changes.map((change: any, index: number) => (
-                          <div
-                            key={index}
-                            className="py-2 border-b border-gray-100 text-sm"
-                          >
-                            <div className="text-gray-900 mb-1">{change.title}</div>
-                            <div className="flex items-center gap-2 text-gray-600">
-                              <span className="bg-red-100 text-red-700 px-2 py-1 rounded">
+                        {result.changes.map((change: any, i: number) => (
+                          <div key={i} className="py-2 border-b border-gray-100 text-sm">
+                            <div className="text-gray-900 mb-1.5 font-medium">{change.title}</div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="bg-red-100 text-red-700 px-2 py-0.5 rounded text-xs">
                                 {change.from}
                               </span>
-                              <span>→</span>
-                              <span className="bg-green-100 text-green-700 px-2 py-1 rounded">
+                              <span className="text-gray-400">→</span>
+                              <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded text-xs">
                                 {change.to}
                               </span>
                             </div>
@@ -232,22 +254,9 @@ export default function RemapCategoriesPage() {
               )}
             </div>
           )}
-
-          {/* Warning */}
-          {!dryRun && !result && (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6 mt-6">
-              <div className="flex items-center gap-2 text-yellow-800 font-semibold mb-2">
-                <AlertCircle size={20} />
-                Warning
-              </div>
-              <p className="text-yellow-700">
-                You are about to update ALL products in the database. This action
-                cannot be easily undone. Make sure you have a database backup!
-              </p>
-            </div>
-          )}
         </div>
       </div>
     </div>
   )
-}
+      }
+                
