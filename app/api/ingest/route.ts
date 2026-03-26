@@ -463,6 +463,8 @@ export async function POST(req: NextRequest) {
   }
 
   const start = Date.now()
+  
+  try {
 
     const body = await req.json()
     const keyword = body.keyword
