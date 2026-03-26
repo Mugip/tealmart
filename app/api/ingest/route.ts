@@ -406,7 +406,7 @@ async function saveProduct(product: any, existingProducts: Set<string>, keyword?
   const productDescription = detail.description || product.description || ""
   const cjCategory = detail.categoryName || product.threeCategoryName || ""
   
-  const category = await classifyProduct(productTitle, productDescription, cjCategory)
+  const category = classifyProduct(productTitle, productDescription, cjCategory)
 
   const { variants, totalStock, skipped } = extractVariants(detail, String(pid))
 
@@ -419,7 +419,7 @@ async function saveProduct(product: any, existingProducts: Set<string>, keyword?
   }
 
   const tags = ["tealmart", "verified"]
-  if (category !== "General") tags.push(category)
+  if (category !== "general") tags.push(category)
   if (keyword) tags.push(keyword.toLowerCase())
 
   const data = {
@@ -454,17 +454,13 @@ async function saveProduct(product: any, existingProducts: Set<string>, keyword?
 // ============================================
 
 export async function POST(req: NextRequest) {
-  // 🔐 Auth (browser-friendly via query param)
-  const url = new URL(req.url)
-  const secret = url.searchParams.get('key')
-
-  if (INGESTION_API_KEY && secret !== INGESTION_API_KEY) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
   const start = Date.now()
-  
+
   try {
+    const key = req.headers.get("x-api-key")
+    if (!INGESTION_API_KEY || key !== INGESTION_API_KEY) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
 
     const body = await req.json()
     const keyword = body.keyword
@@ -559,4 +555,4 @@ export async function POST(req: NextRequest) {
   } finally {
     await prisma.$disconnect()
   }
-    }
+      }
