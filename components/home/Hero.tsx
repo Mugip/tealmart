@@ -1,6 +1,6 @@
 // components/home/Hero.tsx
 import Link from 'next/link'
-import { ArrowRight, Sparkles } from 'lucide-react'
+import { ArrowRight, ShieldCheck, Star } from 'lucide-react'
 
 interface HeroProps {
   stats: {
@@ -12,81 +12,60 @@ interface HeroProps {
 
 export default function Hero({ stats }: HeroProps) {
   return (
-    <div className="relative bg-gradient-to-br from-tiffany-600 via-tiffany-700 to-purple-700 overflow-hidden">
-      {/* Animated Background */}
-      <div className="absolute inset-0">
-        <div className="absolute top-0 left-1/4 w-72 h-72 bg-purple-500/30 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute bottom-0 right-1/4 w-72 h-72 bg-tiffany-400/30 rounded-full blur-3xl animate-pulse delay-1000"></div>
+    <div className="relative min-h-[75vh] flex items-center justify-center bg-gray-900 overflow-hidden">
+      {/* Background Image with Dark Overlay */}
+      <div className="absolute inset-0 z-0">
+        <img 
+          src="https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?q=80&w=2070&auto=format&fit=crop" 
+          alt="Shopping Background" 
+          className="w-full h-full object-cover opacity-40"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/60 to-transparent" />
       </div>
 
-      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 lg:py-16">
-        <div className="text-center max-w-4xl mx-auto">
-          
-          <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-sm px-3 py-1.5 rounded-full mb-4 border border-white/30">
-            <Sparkles size={16} className="text-yellow-300" />
-            <span className="font-semibold text-xs sm:text-sm text-white">New Products Added Daily</span>
+      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full py-16 text-center md:text-left flex flex-col md:flex-row items-center">
+        
+        <div className="md:w-3/4 lg:w-2/3 space-y-6 sm:space-y-8">
+          {/* Social Proof Badge */}
+          <div className="inline-flex items-center gap-2 bg-tiffany-500/20 backdrop-blur-md border border-tiffany-500/30 px-4 py-2 rounded-full text-tiffany-300 text-xs sm:text-sm font-bold tracking-wide uppercase">
+            <Star className="w-4 h-4 fill-tiffany-300" />
+            Rated {stats.avgRating.toFixed(1)}/5 by Happy Customers
           </div>
 
-          <h1 className="text-3xl sm:text-4xl lg:text-5xl xl:text-6xl font-bold mb-3 sm:mb-4 leading-tight text-white">
-            Discover Your
-            <span className="block text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-pink-300">
-              Perfect Style
+          <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold text-white leading-tight tracking-tight">
+            Discover Premium <br className="hidden md:block"/>
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-tiffany-400 to-tiffany-200">
+              Quality Products
             </span>
           </h1>
 
-          <p className="text-sm sm:text-base lg:text-lg text-tiffany-100 mb-6 leading-relaxed max-w-2xl mx-auto">
-            Shop the latest trends from top brands. Quality products at unbeatable prices, 
-            delivered right to your door.
+          <p className="text-base sm:text-lg md:text-xl text-gray-300 max-w-2xl leading-relaxed mx-auto md:mx-0">
+            Shop the latest trends across fashion, electronics, and home goods. Enjoy unbeatable prices with free shipping on orders over $50.
           </p>
 
-          <div className="flex flex-wrap gap-3 justify-center mb-6">
-            <Link 
-              href="/products" 
-              className="group px-6 py-2.5 sm:py-3 bg-white text-tiffany-700 font-bold rounded-xl hover:shadow-2xl transition-all flex items-center gap-2 hover:scale-105 text-sm"
-            >
-              Shop Now
-              <ArrowRight className="group-hover:translate-x-1 transition-transform" size={16} />
+          {/* Action Buttons */}
+          <div className="flex flex-col sm:flex-row gap-4 justify-center md:justify-start pt-4">
+            <Link href="/products" className="group flex items-center justify-center gap-2 px-8 py-4 bg-tiffany-500 hover:bg-tiffany-400 text-gray-900 font-bold rounded-xl transition-all shadow-[0_0_20px_rgba(20,184,166,0.3)] hover:shadow-[0_0_30px_rgba(20,184,166,0.5)] hover:-translate-y-1">
+              Shop Now <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </Link>
-            
-            <Link 
-              href="/products?featured=true" 
-              className="px-6 py-2.5 sm:py-3 bg-white/10 backdrop-blur-sm text-white font-bold rounded-xl border-2 border-white/30 hover:bg-white/20 transition-all text-sm"
-            >
-              Featured Products
+            <Link href="/products?featured=true" className="flex items-center justify-center gap-2 px-8 py-4 bg-white/10 hover:bg-white/20 text-white font-bold rounded-xl backdrop-blur-md border border-white/10 transition-all hover:-translate-y-1">
+              View Trending
             </Link>
           </div>
 
-          {/* Compact Stats */}
-          <div className="flex items-center justify-center gap-6 sm:gap-8 text-white/90">
-            <div className="text-center">
-              <div className="text-xl sm:text-2xl font-bold text-yellow-300">
-                {stats.totalProducts.toLocaleString()}+
-              </div>
-              <div className="text-xs text-tiffany-100">Products</div>
+          {/* Mini Trust Indicators */}
+          <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 sm:gap-6 pt-6 text-xs sm:text-sm text-gray-400 font-medium">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="w-5 h-5 text-tiffany-500" />
+              Secure Checkout
             </div>
-            <div className="h-8 w-px bg-white/30"></div>
-            <div className="text-center">
-              <div className="text-xl sm:text-2xl font-bold text-yellow-300">
-                {stats.totalCategories}+
-              </div>
-              <div className="text-xs text-tiffany-100">Categories</div>
-            </div>
-            <div className="h-8 w-px bg-white/30"></div>
-            <div className="text-center">
-              <div className="text-xl sm:text-2xl font-bold text-yellow-300">
-                {stats.avgRating.toFixed(1)}⭐
-              </div>
-              <div className="text-xs text-tiffany-100">Rating</div>
+            <div className="hidden sm:block w-1.5 h-1.5 rounded-full bg-gray-600" />
+            <div className="flex items-center gap-2">
+               <span className="text-tiffany-500 font-bold">{stats.totalProducts.toLocaleString()}+</span>
+               Products Available
             </div>
           </div>
         </div>
-      </div>
-
-      {/* Wave Divider */}
-      <div className="absolute bottom-0 left-0 right-0">
-        <svg viewBox="0 0 1440 80" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-auto">
-          <path d="M0 80L60 70C120 60 240 40 360 30C480 20 600 20 720 25C840 30 960 40 1080 45C1200 50 1320 50 1380 50L1440 50V80H1380C1320 80 1200 80 1080 80C960 80 840 80 720 80C600 80 480 80 360 80C240 80 120 80 60 80H0V80Z" fill="#F9FAFB"/>
-        </svg>
       </div>
     </div>
   )
