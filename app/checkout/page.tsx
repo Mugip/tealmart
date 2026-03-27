@@ -39,7 +39,7 @@ export default function CheckoutPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const [formData, setFormData] = useState({
+  const[formData, setFormData] = useState({
     email: '',
     name: '',
     address: '',
@@ -53,7 +53,7 @@ export default function CheckoutPage() {
   const [selectedCountry, setSelectedCountry] = useState<ICountry | null>(null)
   const [states, setStates] = useState<IState[]>([])
 
-  const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([])
+  const[savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([])
   const [showSavedAddresses, setShowSavedAddresses] = useState(false)
   const [saveAddress, setSaveAddress] = useState(false)
 
@@ -62,8 +62,7 @@ export default function CheckoutPage() {
   const [discount, setDiscount] = useState<DiscountResult | null>(null)
 
   const countries = useMemo(
-    () => Country.getAllCountries().sort((a, b) => a.name.localeCompare(b.name)),
-    []
+    () => Country.getAllCountries().sort((a, b) => a.name.localeCompare(b.name)),[]
   )
 
   // Pre-fill email from session
@@ -86,7 +85,7 @@ export default function CheckoutPage() {
         }
       })
       .catch(() => {})
-  }, [session?.user?.id])
+  },[session?.user?.id])
 
   // Update states when country changes
   useEffect(() => {
@@ -110,7 +109,7 @@ export default function CheckoutPage() {
       setSelectedCountry(def)
       setStates(State.getStatesOfCountry('US'))
     }
-  }, [])
+  },[])
 
   function applyAddress(addr: SavedAddress) {
     setFormData(prev => ({
@@ -127,7 +126,7 @@ export default function CheckoutPage() {
   }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }))
+    setFormData(prev => ({ ...prev,[e.target.name]: e.target.value }))
   }
 
   const handleCountryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -273,7 +272,7 @@ export default function CheckoutPage() {
   const subtotal = total
   const freeShipping = discount?.type === 'FREE_SHIPPING'
   const shipping = freeShipping || subtotal >= 50 ? 0 : 9.99
-  const tax = subtotal * 0.1
+  const tax = 0; // Flat tax removed for proper Stripe calculation
   const discountAmount = discount?.discountAmount || 0
   const finalTotal = subtotal + shipping + tax - discountAmount
 
@@ -621,7 +620,7 @@ export default function CheckoutPage() {
                   </span>
                 </div>
                 <div className="flex justify-between text-gray-600">
-                  <span>Tax (10%)</span>
+                  <span>Tax</span>
                   <span>${tax.toFixed(2)}</span>
                 </div>
                 {discountAmount > 0 && (
@@ -650,4 +649,3 @@ export default function CheckoutPage() {
       </div>
     </div>
   )
-              }
