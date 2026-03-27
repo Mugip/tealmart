@@ -1,3 +1,5 @@
+'use client'
+
 import { useState, useMemo, useEffect } from 'react'
 import { useCart } from '@/lib/contexts/CartContext'
 import { useSession } from 'next-auth/react'
