@@ -1,4 +1,4 @@
-// app/api/checkout/route.ts - COMPLETE FIXED VERSION
+// app/api/checkout/route.ts
 import { NextRequest, NextResponse } from "next/server"
 import { PrismaClient } from "@prisma/client"
 import Stripe from "stripe"
@@ -6,13 +6,13 @@ import { sendOrderConfirmation } from '@/lib/email/sendOrderConfirmation'
 
 const prisma = new PrismaClient()
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2026-02-25.clover",
+  apiVersion: "2026-02-25.clover" as any,
 })
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { items, email, shippingAddress } = body
+    const { items, email, shippingAddress, discountAmount, discountCode } = body
 
     console.log('📦 Checkout request:', { items: items?.length, email, hasAddress: !!shippingAddress })
 
@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Shipping address is required" }, { status: 400 })
     }
 
-    const requiredFields = ['name', 'address1', 'city', 'state', 'zip', 'phone']
+    const requiredFields =['name', 'address1', 'city', 'state', 'zip', 'phone']
     for (const field of requiredFields) {
       if (!shippingAddress[field]) {
         return NextResponse.json({ error: `${field} is required in shipping address` }, { status: 400 })
@@ -48,48 +48,82 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No valid products found" }, { status: 400 })
     }
 
-    // Validate and calculate totals
+    // Validate and calculate totals securely from the Database
     const productMap = new Map(products.map(p => [p.id, p]))
-    const validatedItems: any[] = []
+    const validatedItems: any[] =[]
     let subtotal = 0
 
     for (const item of items) {
       const baseProductId = item.id.split('-')[0]
+      const variantId = item.id.includes('-') ? item.id.split('-')[1] : null
       const product = productMap.get(baseProductId)
+      
       if (!product) continue
 
-      const price = item.price || product.price
+      // Use database price, NOT the client's requested price
+      let dbPrice = product.price
+
+      // If a variant was selected, check if the variant has a different price
+      if (variantId && product.variants && typeof product.variants === 'object') {
+        const variantsData = product.variants as any
+        if (variantsData.items && Array.isArray(variantsData.items)) {
+          const variant = variantsData.items.find((v: any) => v.id === variantId)
+          if (variant && variant.price) {
+            dbPrice = variant.price
+          }
+        }
+      }
+
       const quantity = item.quantity || 1
 
       validatedItems.push({
         productId: product.id,
         quantity,
-        price,
+        price: dbPrice,
         title: item.title || product.title,
         image: item.image || product.images[0],
       })
 
-      subtotal += price * quantity
+      subtotal += dbPrice * quantity
     }
 
     if (validatedItems.length === 0) {
       return NextResponse.json({ error: "No valid products in cart" }, { status: 400 })
     }
 
-    // Calculate shipping, tax, and total
+    // Handle Stripe Discounts securely
+    let stripeDiscount: any = undefined;
+    let finalDiscountAmount = 0;
+
+    if (discountAmount && discountAmount > 0) {
+      try {
+        const coupon = await stripe.coupons.create({
+          amount_off: Math.round(discountAmount * 100), // Convert to cents for Stripe
+          currency: "usd",
+          duration: "once",
+        });
+        stripeDiscount =[{ coupon: coupon.id }];
+        finalDiscountAmount = discountAmount;
+      } catch (e) {
+        console.error("Failed to create Stripe coupon:", e);
+      }
+    }
+
+    // Calculate shipping, tax, and total (Removed 10% hardcoded tax)
     const shipping = subtotal >= 50 ? 0 : 9.99
-    const tax = subtotal * 0.1
-    const total = subtotal + shipping + tax
+    const tax = 0 
+    const total = subtotal + shipping + tax - finalDiscountAmount
 
     // Create Stripe checkout session
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
+      discounts: stripeDiscount,
       line_items: validatedItems.map(item => ({
         price_data: {
           currency: "usd",
           product_data: { 
             name: item.title,
-            images: item.image ? [item.image] : [],
+            images: item.image ? [item.image] :[],
           },
           unit_amount: Math.round(item.price * 100),
         },
@@ -127,6 +161,8 @@ export async function POST(req: NextRequest) {
         tax,
         shipping,
         total,
+        discountCode: discountCode || null,
+        discountAmount: finalDiscountAmount,
         items: {
           create: validatedItems.map(item => ({
             productId: item.productId,
@@ -183,4 +219,4 @@ export async function POST(req: NextRequest) {
   } finally {
     await prisma.$disconnect()
   }
-}
+      }
