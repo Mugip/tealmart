@@ -1,14 +1,4 @@
 // app/api/admin/cj/register-webhook/route.ts
-//
-// Call this ONCE to register your webhook URL with CJ.
-// After calling, CJ will POST to your /api/webhooks/cj for every
-// order, logistics, stock, and product event.
-//
-// How to call:
-//   curl -X POST https://tealmart.vercel.app/api/admin/cj/register-webhook \
-//     -H "Cookie: admin-auth=YOUR_TOKEN"
-//
-// Or use the button in the admin settings page.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
@@ -27,7 +17,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const baseUrl = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_SITE_URL || 'https://tealmart.vercel.app'
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL;
+  if (!baseUrl || baseUrl.includes('tealmart.vercel.app')) {
+    return NextResponse.json({ 
+      error: 'Please set NEXT_PUBLIC_APP_URL in your environment variables to your actual domain before registering the webhook.' 
+    }, { status: 400 });
+  }
+  
   const webhookUrl = `${baseUrl}/api/webhooks/cj`
 
   let cjToken: string
@@ -101,9 +97,13 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: `Failed to get CJ token: ${err.message}` }, { status: 500 })
   }
 
-  // CJ doesn't have a "get webhook settings" endpoint, so we just confirm
-  // what URL we would register and that the token is valid.
-  const baseUrl = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_SITE_URL || 'https://tealmart.vercel.app'
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL;
+  if (!baseUrl || baseUrl.includes('tealmart.vercel.app')) {
+    return NextResponse.json({ 
+      error: 'Please set NEXT_PUBLIC_APP_URL in your environment variables to your actual domain before registering the webhook.' 
+    }, { status: 400 });
+  }
+  
   const webhookUrl = `${baseUrl}/api/webhooks/cj`
 
   return NextResponse.json({
@@ -111,4 +111,4 @@ export async function GET(req: NextRequest) {
     tokenValid: !!cjToken,
     instructions: 'POST to this endpoint to register the webhook with CJ.',
   })
-}
+        }
