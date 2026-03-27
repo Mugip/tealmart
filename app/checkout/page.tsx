@@ -1,5 +1,3 @@
-'use client'
-
 import { useState, useMemo, useEffect } from 'react'
 import { useCart } from '@/lib/contexts/CartContext'
 import { useSession } from 'next-auth/react'
@@ -297,7 +295,7 @@ export default function CheckoutPage() {
                   <p className="text-red-800 text-sm">{error}</p>
                 </div>
               )}
-
+              
               {/* Saved addresses */}
               {savedAddresses.length > 0 && (
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5">
