@@ -24,7 +24,7 @@ async function getFeaturedProducts() {
       take: 8,
       orderBy:[{ isFeatured: 'desc' }, { views: 'desc' }, { createdAt: 'desc' }],
     })
-  }, 3600) // Cache for 1 hour
+  }, 3600)
 }
 
 async function getLatestProducts() {
@@ -44,7 +44,7 @@ async function getTrendingProducts() {
       take: 8,
       orderBy: { views: 'desc' },
     })
-  }, 1800) // Cache for 30 mins
+  }, 1800)
 }
 
 async function getRecommendedProducts() {
@@ -54,7 +54,7 @@ async function getRecommendedProducts() {
       take: 4,
       orderBy: { rating: 'desc' },
     })
-  }, 7200) // 2 hours
+  }, 7200)
 }
 
 async function getCategories() {
@@ -82,7 +82,7 @@ async function getCategories() {
         }
       })
     )
-  }, 86400) // Cache for 24 hours
+  }, 86400)
 }
 
 async function getStats() {
@@ -116,10 +116,49 @@ export default async function Home() {
   return (
     <div className="bg-gray-50">
       <Hero stats={stats} />
+
+      {/* FIXED SCREENSHOT ISSUE: Sleek Trust Badges instead of massive vertical blocks */}
+      <section className="bg-white py-6 border-b border-gray-100 overflow-x-auto">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex sm:grid sm:grid-cols-3 gap-4 sm:gap-8 min-w-max sm:min-w-0">
+            
+            <div className="flex items-center gap-4 p-4 rounded-2xl bg-gray-50 border border-gray-100 hover:border-tiffany-200 transition-colors group min-w-[250px] sm:min-w-0">
+              <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-sm flex-shrink-0 group-hover:scale-110 transition-transform">
+                <Truck className="text-tiffany-600" size={20} />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-gray-900">Free Shipping</h3>
+                <p className="text-xs text-gray-500">On orders over $50</p>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-4 p-4 rounded-2xl bg-gray-50 border border-gray-100 hover:border-tiffany-200 transition-colors group min-w-[250px] sm:min-w-0">
+              <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-sm flex-shrink-0 group-hover:scale-110 transition-transform">
+                <Shield className="text-tiffany-600" size={20} />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-gray-900">Secure Payment</h3>
+                <p className="text-xs text-gray-500">100% safe checkout</p>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-4 p-4 rounded-2xl bg-gray-50 border border-gray-100 hover:border-tiffany-200 transition-colors group min-w-[250px] sm:min-w-0">
+              <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-sm flex-shrink-0 group-hover:scale-110 transition-transform">
+                <RotateCcw className="text-tiffany-600" size={20} />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-gray-900">Easy Returns</h3>
+                <p className="text-xs text-gray-500">30-day money-back</p>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </section>
       
       <FeaturedCategories categories={categories} />
 
-      {/* Recommended For You - AI Personalization Concept */}
+      {/* Recommended For You */}
       {recommendedProducts.length > 0 && (
         <section className="bg-gradient-to-b from-white to-gray-50 py-12 sm:py-16">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -152,7 +191,7 @@ export default async function Home() {
               </div>
               <p className="text-gray-600 text-sm sm:text-base lg:text-lg">Handpicked favorites just for you</p>
             </div>
-            <Link href="/products" className="hidden md:flex items-center gap-2 px-4 sm:px-6 py-2 sm:py-3 bg-gradient-to-r from-tiffany-500 to-tiffany-600 text-white font-bold rounded-xl hover:shadow-lg transition-all group text-sm sm:text-base">
+            <Link href="/products?featured=true" className="hidden md:flex items-center gap-2 px-4 sm:px-6 py-2 sm:py-3 bg-gradient-to-r from-tiffany-500 to-tiffany-600 text-white font-bold rounded-xl hover:shadow-lg transition-all group text-sm sm:text-base">
               View All
               <ArrowRight className="group-hover:translate-x-1 transition-transform" size={18} />
             </Link>
@@ -187,34 +226,25 @@ export default async function Home() {
         </section>
       )}
 
-      {/* Trust Badges */}
-      <section className="bg-gradient-to-r from-tiffany-600 to-tiffany-700 py-12 sm:py-16 lg:py-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8">
-            <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 sm:p-8 text-center border border-white/20 hover:bg-white/20 transition-all">
-              <div className="bg-white/20 w-12 h-12 sm:w-16 sm:h-16 rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4">
-                <Truck className="text-white" size={24} />
-              </div>
-              <h3 className="text-lg sm:text-2xl font-bold text-white mb-1 sm:mb-2">Free Shipping</h3>
-              <p className="text-tiffany-100 text-sm sm:text-base">On orders over $50 worldwide</p>
+      {/* New Arrivals */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16 lg:py-20">
+        <div className="flex items-center justify-between mb-8 sm:mb-12">
+          <div>
+            <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
+              <Zap className="text-purple-500" size={24} />
+              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900">New Arrivals</h2>
             </div>
-            
-            <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 sm:p-8 text-center border border-white/20 hover:bg-white/20 transition-all">
-              <div className="bg-white/20 w-12 h-12 sm:w-16 sm:h-16 rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4">
-                <Shield className="text-white" size={24} />
-              </div>
-              <h3 className="text-lg sm:text-2xl font-bold text-white mb-1 sm:mb-2">Secure Payment</h3>
-              <p className="text-tiffany-100 text-sm sm:text-base">100% secure encrypted transactions</p>
-            </div>
-            
-            <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 sm:p-8 text-center border border-white/20 hover:bg-white/20 transition-all">
-              <div className="bg-white/20 w-12 h-12 sm:w-16 sm:h-16 rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4">
-                <RotateCcw className="text-white" size={24} />
-              </div>
-              <h3 className="text-lg sm:text-2xl font-bold text-white mb-1 sm:mb-2">Easy Returns</h3>
-              <p className="text-tiffany-100 text-sm sm:text-base">30-day money-back guarantee</p>
-            </div>
+            <p className="text-gray-600 text-sm sm:text-base lg:text-lg">Fresh products added daily</p>
           </div>
+          <Link href="/products?sort=newest" className="hidden md:flex items-center gap-2 px-4 sm:px-6 py-2 sm:py-3 bg-gradient-to-r from-purple-500 to-purple-600 text-white font-bold rounded-xl hover:shadow-lg transition-all group text-sm sm:text-base">
+            View All
+            <ArrowRight className="group-hover:translate-x-1 transition-transform" size={18} />
+          </Link>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+          {latestProducts.map((product) => (
+            <ProductCard key={product.id} product={product} />
+          ))}
         </div>
       </section>
 
