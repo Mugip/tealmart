@@ -23,7 +23,7 @@ export default async function Footer() {
   const topCategories = await getTopCategories()
 
   return (
-    <footer className="bg-gray-900 text-gray-300">
+    <footer className="bg-gray-900 text-gray-300 w-full overflow-hidden">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 sm:gap-12">
           
@@ -97,20 +97,27 @@ export default async function Footer() {
           </div>
         </div>
 
-        {/* Bottom Bar */}
-        <div className="border-t border-gray-800 mt-12 pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
-          <p className="text-sm text-gray-500">
+        {/* Bottom Bar: Copyright & Payment Methods */}
+        <div className="border-t border-gray-800 mt-12 pt-8 flex flex-col md:flex-row items-center justify-between gap-6">
+          <p className="text-sm text-gray-500 text-center md:text-left">
             &copy; {new Date().getFullYear()} TealMart. All rights reserved.
           </p>
-          <div className="flex items-center gap-3 text-gray-500">
-            <span className="text-xs font-semibold uppercase tracking-wider mr-2">Secured By</span>
-            <div className="px-2 py-1 bg-gray-800 rounded text-xs font-bold border border-gray-700">STRIPE</div>
-            <div className="px-2 py-1 bg-gray-800 rounded text-xs font-bold border border-gray-700">VISA</div>
-            <div className="px-2 py-1 bg-gray-800 rounded text-xs font-bold border border-gray-700">MASTERCARD</div>
-            <div className="px-2 py-1 bg-gray-800 rounded text-xs font-bold border border-gray-700">AMEX</div>
+          
+          {/* FIXED: Added flex-wrap and center alignment so badges stack on small screens */}
+          <div className="flex flex-wrap items-center justify-center md:justify-end gap-2 sm:gap-3 text-gray-500">
+            <span className="text-xs font-semibold uppercase tracking-wider w-full text-center sm:w-auto sm:text-left mb-1 sm:mb-0">
+              Secured By
+            </span>
+            <div className="flex flex-wrap justify-center gap-2">
+              <div className="px-2 py-1 bg-gray-800 rounded text-xs font-bold border border-gray-700">STRIPE</div>
+              <div className="px-2 py-1 bg-gray-800 rounded text-xs font-bold border border-gray-700">VISA</div>
+              <div className="px-2 py-1 bg-gray-800 rounded text-xs font-bold border border-gray-700">MASTERCARD</div>
+              <div className="px-2 py-1 bg-gray-800 rounded text-xs font-bold border border-gray-700">AMEX</div>
+            </div>
           </div>
+
         </div>
       </div>
     </footer>
   )
-}
+                    }
