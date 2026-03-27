@@ -1,12 +1,32 @@
 // components/layout/Footer.tsx
 import Link from 'next/link'
-import { Facebook, Twitter, Instagram, CreditCard, ShieldCheck } from 'lucide-react'
+import { Facebook, Twitter, Instagram, ShieldCheck } from 'lucide-react'
+import { prisma } from '@/lib/db'
+import { fetchWithCache } from '@/lib/redis'
+import { formatCategoryName } from '@/lib/productClassifier'
 
-export default function Footer() {
+// Dynamically fetch actual categories existing in your database
+async function getTopCategories() {
+  return fetchWithCache('footer:categories', async () => {
+    const cats = await prisma.product.groupBy({
+      by: ['category'],
+      where: { isActive: true },
+      _count: { category: true },
+      orderBy: { _count: { category: 'desc' } },
+      take: 4
+    })
+    return cats.map(c => c.category)
+  }, 86400) // Cache for 24 hours
+}
+
+export default async function Footer() {
+  const topCategories = await getTopCategories()
+
   return (
     <footer className="bg-gray-900 text-gray-300">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 sm:gap-12">
+          
           {/* Brand & Social */}
           <div className="lg:col-span-1">
             <div className="flex items-center space-x-2 mb-4">
@@ -31,15 +51,22 @@ export default function Footer() {
             </div>
           </div>
 
-          {/* Shop */}
+          {/* Dynamic Shop Links */}
           <div>
             <h3 className="text-white font-bold mb-4 text-base tracking-wide uppercase">Shop Categories</h3>
             <ul className="space-y-3 text-sm text-gray-400">
-              <li><Link href="/products?category=electronics" className="hover:text-tiffany-400 transition-colors">Electronics & Tech</Link></li>
-              <li><Link href="/products?category=fashion" className="hover:text-tiffany-400 transition-colors">Fashion & Apparel</Link></li>
-              <li><Link href="/products?category=home-garden" className="hover:text-tiffany-400 transition-colors">Home & Garden</Link></li>
-              <li><Link href="/products?category=beauty" className="hover:text-tiffany-400 transition-colors">Health & Beauty</Link></li>
-              <li><Link href="/products" className="text-tiffany-500 hover:text-tiffany-400 font-semibold transition-colors">View All Products →</Link></li>
+              {topCategories.map((category) => (
+                <li key={category}>
+                  <Link href={`/products?category=${category}`} className="hover:text-tiffany-400 transition-colors">
+                    {formatCategoryName(category)}
+                  </Link>
+                </li>
+              ))}
+              <li>
+                <Link href="/products" className="text-tiffany-500 hover:text-tiffany-400 font-semibold transition-colors">
+                  View All Products →
+                </Link>
+              </li>
             </ul>
           </div>
 
@@ -70,14 +97,13 @@ export default function Footer() {
           </div>
         </div>
 
-        {/* Bottom Bar: Copyright & Payment Methods */}
+        {/* Bottom Bar */}
         <div className="border-t border-gray-800 mt-12 pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
           <p className="text-sm text-gray-500">
             &copy; {new Date().getFullYear()} TealMart. All rights reserved.
           </p>
           <div className="flex items-center gap-3 text-gray-500">
             <span className="text-xs font-semibold uppercase tracking-wider mr-2">Secured By</span>
-            {/* Simple text representation of badges to avoid missing image assets */}
             <div className="px-2 py-1 bg-gray-800 rounded text-xs font-bold border border-gray-700">STRIPE</div>
             <div className="px-2 py-1 bg-gray-800 rounded text-xs font-bold border border-gray-700">VISA</div>
             <div className="px-2 py-1 bg-gray-800 rounded text-xs font-bold border border-gray-700">MASTERCARD</div>
@@ -87,4 +113,4 @@ export default function Footer() {
       </div>
     </footer>
   )
-        }
+}
