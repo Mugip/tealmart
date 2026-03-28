@@ -1,5 +1,4 @@
 // components/layout/Header.tsx
-
 'use client'
 
 import Link from 'next/link'
@@ -20,7 +19,6 @@ export default function Header() {
 
   const cartItemsCount = items.reduce((sum, item) => sum + item.quantity, 0)
 
-  // Close user dropdown when clicking outside
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
@@ -37,20 +35,22 @@ export default function Header() {
     <header className="bg-white shadow-sm sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-14 sm:h-16 gap-2 sm:gap-4">
-          {/* Logo */}
-          <Link href="/" className="flex items-center space-x-1.5 sm:space-x-2 flex-shrink-0">
-            <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-tiffany-500 to-tiffany-600 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-lg sm:text-xl">T</span>
-            </div>
+          
+          {/* LOGO SECTION FIXED */}
+          <Link href="/" className="flex items-center space-x-2 flex-shrink-0">
+            <img 
+              src="/logo.svg" 
+              alt="TealMart Logo" 
+              className="h-8 sm:h-10 w-auto object-contain" 
+            />
+            {/* Remove the span below if your logo.svg already contains the text "TealMart" */}
             <span className="text-lg sm:text-2xl font-bold text-gray-900">TealMart</span>
           </Link>
 
-          {/* Search bar in middle (desktop only) */}
           <div className="hidden md:block flex-1 max-w-xl">
             <SearchBar />
           </div>
 
-          {/* Desktop Navigation */}
           <nav className="hidden lg:flex items-center space-x-4 xl:space-x-6">
             <Link href="/products" className="text-sm font-medium text-gray-700 hover:text-tiffany-600 transition-colors whitespace-nowrap">
               Products
@@ -63,10 +63,7 @@ export default function Header() {
             </Link>
           </nav>
 
-          {/* Right Side Icons */}
           <div className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
-
-            {/* Wishlist */}
             <Link href="/account/wishlist" className="relative p-2 text-gray-700 hover:text-tiffany-600 transition-colors">
               <Heart size={20} className="sm:w-[22px] sm:h-[22px]" />
               {wishlistIds.size > 0 && (
@@ -76,7 +73,6 @@ export default function Header() {
               )}
             </Link>
 
-            {/* Cart */}
             <Link href="/cart" className="relative p-2 text-gray-700 hover:text-tiffany-600 transition-colors">
               <ShoppingCart size={20} className="sm:w-[22px] sm:h-[22px]" />
               {cartItemsCount > 0 && (
@@ -86,7 +82,6 @@ export default function Header() {
               )}
             </Link>
 
-            {/* User Menu */}
             {status === 'loading' ? (
               <div className="w-8 h-8 rounded-full bg-gray-200 animate-pulse" />
             ) : session ? (
@@ -105,42 +100,23 @@ export default function Header() {
                   <ChevronDown size={14} className={`text-gray-500 transition-transform ${isUserMenuOpen ? 'rotate-180' : ''}`} />
                 </button>
 
-                {/* Dropdown */}
                 {isUserMenuOpen && (
                   <div className="absolute right-0 mt-2 w-52 bg-white rounded-2xl shadow-xl border border-gray-100 py-2 z-50">
                     <div className="px-4 py-3 border-b border-gray-100">
                       <p className="font-semibold text-gray-900 text-sm truncate">{session.user?.name || 'My Account'}</p>
                       <p className="text-xs text-gray-500 truncate">{session.user?.email}</p>
                     </div>
-                    <Link
-                      href="/account"
-                      onClick={() => setIsUserMenuOpen(false)}
-                      className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-tiffany-600 transition-colors"
-                    >
+                    <Link href="/account" onClick={() => setIsUserMenuOpen(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-tiffany-600 transition-colors">
                       <User size={16} /> My Account
                     </Link>
-                    <Link
-                      href="/account/orders"
-                      onClick={() => setIsUserMenuOpen(false)}
-                      className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-tiffany-600 transition-colors"
-                    >
+                    <Link href="/account/orders" onClick={() => setIsUserMenuOpen(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-tiffany-600 transition-colors">
                       <Package size={16} /> My Orders
                     </Link>
-                    <Link
-                      href="/account/wishlist"
-                      onClick={() => setIsUserMenuOpen(false)}
-                      className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-tiffany-600 transition-colors"
-                    >
+                    <Link href="/account/wishlist" onClick={() => setIsUserMenuOpen(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-tiffany-600 transition-colors">
                       <Heart size={16} /> Wishlist
-                      {wishlistIds.size > 0 && (
-                        <span className="ml-auto bg-red-100 text-red-600 text-xs font-bold px-1.5 py-0.5 rounded-full">{wishlistIds.size}</span>
-                      )}
                     </Link>
                     <div className="border-t border-gray-100 mt-1 pt-1">
-                      <button
-                        onClick={() => { signOut({ callbackUrl: '/' }); setIsUserMenuOpen(false) }}
-                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 w-full transition-colors"
-                      >
+                      <button onClick={() => { signOut({ callbackUrl: '/' }); setIsUserMenuOpen(false) }} className="flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 w-full transition-colors">
                         <LogOut size={16} /> Sign Out
                       </button>
                     </div>
@@ -149,57 +125,33 @@ export default function Header() {
               </div>
             ) : (
               <div className="hidden md:flex items-center gap-2">
-                <Link
-                  href="/auth/signin"
-                  className="text-sm font-medium text-gray-700 hover:text-tiffany-600 transition-colors px-3 py-1.5"
-                >
+                <Link href="/auth/signin" className="text-sm font-medium text-gray-700 hover:text-tiffany-600 transition-colors px-3 py-1.5">
                   Sign In
                 </Link>
-                <Link
-                  href="/auth/signup"
-                  className="text-sm font-semibold bg-tiffany-500 hover:bg-tiffany-600 text-white px-4 py-1.5 rounded-lg transition-colors"
-                >
+                <Link href="/auth/signup" className="text-sm font-semibold bg-tiffany-500 hover:bg-tiffany-600 text-white px-4 py-1.5 rounded-lg transition-colors">
                   Sign Up
                 </Link>
               </div>
             )}
 
-            {/* Mobile menu toggle */}
-            <button
-              className="lg:hidden p-2 text-gray-700"
-              onClick={() => setIsMenuOpen(!isMenuOpen)}
-              aria-label="Toggle menu"
-            >
+            <button className="lg:hidden p-2 text-gray-700" onClick={() => setIsMenuOpen(!isMenuOpen)} aria-label="Toggle menu">
               {isMenuOpen ? <X size={20} /> : <Menu size={20} />}
             </button>
           </div>
         </div>
 
-        {/* Mobile Search */}
         <div className="md:hidden pb-2">
           <SearchBar />
         </div>
 
-        {/* Mobile Menu */}
         {isMenuOpen && (
           <div className="lg:hidden border-t py-3">
             <nav className="flex flex-col space-y-1">
-              {[
-                { href: '/products', label: 'Products' },
-                { href: '/categories', label: 'Categories' },
-                { href: '/about', label: 'About' },
-                { href: '/contact', label: 'Contact' },
-              ].map(({ href, label }) => (
-                <Link
-                  key={href}
-                  href={href}
-                  className="text-sm font-medium text-gray-700 hover:text-tiffany-600 hover:bg-gray-50 px-3 py-2 rounded-lg"
-                  onClick={() => setIsMenuOpen(false)}
-                >
+              {[{ href: '/products', label: 'Products' }, { href: '/categories', label: 'Categories' }, { href: '/about', label: 'About' }, { href: '/contact', label: 'Contact' }].map(({ href, label }) => (
+                <Link key={href} href={href} className="text-sm font-medium text-gray-700 hover:text-tiffany-600 hover:bg-gray-50 px-3 py-2 rounded-lg" onClick={() => setIsMenuOpen(false)}>
                   {label}
                 </Link>
               ))}
-
               <div className="border-t pt-2 mt-1">
                 {session ? (
                   <>
@@ -207,27 +159,14 @@ export default function Header() {
                       <p className="text-sm font-semibold text-gray-900">{session.user?.name}</p>
                       <p className="text-xs text-gray-500">{session.user?.email}</p>
                     </div>
-                    <Link href="/account" onClick={() => setIsMenuOpen(false)} className="flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-tiffany-600 hover:bg-gray-50 px-3 py-2 rounded-lg">
-                      <User size={16} /> My Account
-                    </Link>
-                    <Link href="/account/orders" onClick={() => setIsMenuOpen(false)} className="flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-tiffany-600 hover:bg-gray-50 px-3 py-2 rounded-lg">
-                      <Package size={16} /> My Orders
-                    </Link>
-                    <button
-                      onClick={() => signOut({ callbackUrl: '/' })}
-                      className="flex items-center gap-2 text-sm font-medium text-red-600 hover:bg-red-50 px-3 py-2 rounded-lg w-full"
-                    >
-                      <LogOut size={16} /> Sign Out
-                    </button>
+                    <Link href="/account" onClick={() => setIsMenuOpen(false)} className="flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-tiffany-600 hover:bg-gray-50 px-3 py-2 rounded-lg"><User size={16} /> My Account</Link>
+                    <Link href="/account/orders" onClick={() => setIsMenuOpen(false)} className="flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-tiffany-600 hover:bg-gray-50 px-3 py-2 rounded-lg"><Package size={16} /> My Orders</Link>
+                    <button onClick={() => signOut({ callbackUrl: '/' })} className="flex items-center gap-2 text-sm font-medium text-red-600 hover:bg-red-50 px-3 py-2 rounded-lg w-full"><LogOut size={16} /> Sign Out</button>
                   </>
                 ) : (
                   <div className="flex gap-2 px-3">
-                    <Link href="/auth/signin" onClick={() => setIsMenuOpen(false)} className="flex-1 text-center text-sm font-medium border border-gray-300 py-2 rounded-lg hover:bg-gray-50">
-                      Sign In
-                    </Link>
-                    <Link href="/auth/signup" onClick={() => setIsMenuOpen(false)} className="flex-1 text-center text-sm font-semibold bg-tiffany-500 text-white py-2 rounded-lg hover:bg-tiffany-600">
-                      Sign Up
-                    </Link>
+                    <Link href="/auth/signin" onClick={() => setIsMenuOpen(false)} className="flex-1 text-center text-sm font-medium border border-gray-300 py-2 rounded-lg hover:bg-gray-50">Sign In</Link>
+                    <Link href="/auth/signup" onClick={() => setIsMenuOpen(false)} className="flex-1 text-center text-sm font-semibold bg-tiffany-500 text-white py-2 rounded-lg hover:bg-tiffany-600">Sign Up</Link>
                   </div>
                 )}
               </div>
@@ -237,4 +176,4 @@ export default function Header() {
       </div>
     </header>
   )
-              }
+}
