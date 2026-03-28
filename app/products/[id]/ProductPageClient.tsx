@@ -3,7 +3,20 @@
 
 import { useState, useEffect } from 'react'
 import Image from 'next/image'
-import { Star, ShoppingCart, Truck, Shield, ArrowLeft, ChevronLeft, ChevronRight, X, ZoomIn, Heart, Share2, RotateCcw } from 'lucide-react'
+import { 
+  Star, 
+  ShoppingCart, 
+  Truck, 
+  Shield, 
+  ArrowLeft, 
+  ChevronLeft, 
+  ChevronRight, 
+  X, 
+  ZoomIn, 
+  Heart, 
+  Share2, 
+  RotateCcw 
+} from 'lucide-react'
 import { useCart } from '@/lib/contexts/CartContext'
 import { useWishlist } from '@/lib/contexts/WishlistContext'
 import { useRouter } from 'next/navigation'
@@ -11,6 +24,7 @@ import RelatedProducts from '@/components/products/RelatedProducts'
 import RecentlyViewed, { recordRecentlyViewed } from '@/components/products/RecentlyViewed'
 import ReviewSection from '@/components/products/ReviewSection'
 import SocialProof from '@/components/products/SocialProof'
+import UpsellSection from '@/components/products/UpsellSection' // ✅ FIXED: Added missing import
 import toast from 'react-hot-toast'
 
 interface Variant {
@@ -33,14 +47,14 @@ export default function ProductPageClient({ initialProduct }: { initialProduct: 
 
   const [selectedImage, setSelectedImage] = useState(0)
   const [selectedVariant, setSelectedVariant] = useState<Variant | null>(product.variants?.items?.[0] || null)
-  const[quantity, setQuantity] = useState(1)
+  const [quantity, setQuantity] = useState(1)
   const [isZoomed, setIsZoomed] = useState(false)
   const [addedToCart, setAddedToCart] = useState(false)
 
-  const productImages = product.images ||[]
+  const productImages = product.images || []
   const variantImages = product.variants?.items
     ?.map((v: Variant) => v.image)
-    ?.filter((img: string) => img && !productImages.includes(img)) ||[]
+    ?.filter((img: string) => img && !productImages.includes(img)) || []
   const allImages = [...productImages, ...variantImages]
 
   useEffect(() => {
@@ -66,14 +80,14 @@ export default function ProductPageClient({ initialProduct }: { initialProduct: 
 
   const handleAddToCart = () => {
     if (!isInStock) return
-    for (let i = 0; i < quantity; i++) {
-      addItem({
-        id: selectedVariant ? `${product.id}-${selectedVariant.id}` : product.id,
-        title: selectedVariant ? `${product.title} (${selectedVariant.name})` : product.title,
-        price: activePrice,
-        image: activeImage,
-      })
-    }
+    
+    addItem({
+      id: selectedVariant ? `${product.id}-${selectedVariant.id}` : product.id,
+      title: selectedVariant ? `${product.title} (${selectedVariant.name})` : product.title,
+      price: activePrice,
+      image: activeImage,
+    })
+    
     setAddedToCart(true)
     setTimeout(() => setAddedToCart(false), 2000)
   }
@@ -236,7 +250,7 @@ export default function ProductPageClient({ initialProduct }: { initialProduct: 
                 className={`w-full py-4 rounded-xl text-base sm:text-lg font-bold flex items-center justify-center gap-3 transition-all shadow-lg ${isInStock ? addedToCart ? 'bg-green-500 text-white scale-[1.01]' : 'bg-gradient-to-r from-tiffany-500 to-tiffany-600 hover:from-tiffany-600 hover:to-tiffany-700 text-white hover:shadow-xl hover:scale-[1.02]' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}
               >
                 <ShoppingCart size={24} />
-                {addedToCart ? '✓ Added to Cart!' : isInStock ? `Add ${quantity} to Cart` : 'Out of Stock'}
+                {addedToCart ? '✓ Added to Cart!' : isInStock ? `Add to Cart` : 'Out of Stock'}
               </button>
             </div>
 
@@ -256,22 +270,21 @@ export default function ProductPageClient({ initialProduct }: { initialProduct: 
               <h3 className="font-bold text-gray-900 text-base sm:text-lg mb-4">Product Details</h3>
               <div className="product-description prose prose-sm max-w-none text-gray-700" dangerouslySetInnerHTML={{ __html: product.description }} />
             </div>
+
+            {/* Smart Upsell Section */}
+            <UpsellSection currentCategoryId={product.category} excludeId={product.id} />
           </div>
         </div>
-
-        {/* Upsell */}
-        <UpsellSection 
-          currentCategoryId={product.category} 
-          excludeId={product.id}
-        />
 
         <div id="reviews">
           <ReviewSection productId={product.id} productRating={product.rating} reviewCount={product.reviewCount} />
         </div>
+        
         <RelatedProducts productId={product.id} category={product.category} />
         <RecentlyViewed excludeId={product.id} />
       </div>
 
+      {/* Mobile Sticky Bar */}
       <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-3 shadow-2xl z-40">
         <div className="flex items-center gap-3 max-w-lg mx-auto">
           <div className="flex-1 min-w-0">
