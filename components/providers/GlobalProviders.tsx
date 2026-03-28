@@ -7,6 +7,7 @@ import { WishlistProvider } from '@/lib/contexts/WishlistContext'
 import { CurrencyProvider } from '@/lib/contexts/CurrencyContext'
 import { Toaster } from 'react-hot-toast'
 import CookieConsent from '@/components/CookieConsent'
+import CartDrawer from '@/components/layout/CartDrawer'
 
 export default function GlobalProviders({ children }: { children: React.ReactNode }) {
   return (
@@ -15,8 +16,20 @@ export default function GlobalProviders({ children }: { children: React.ReactNod
         <CartProvider>
           <WishlistProvider>
             {children}
-            <Toaster position="top-right" />
+            <Toaster 
+              position="top-right"
+              toastOptions={{
+                duration: 3000,
+                style: {
+                  borderRadius: '12px',
+                  background: '#333',
+                  color: '#fff',
+                },
+              }}
+            />
             <CookieConsent />
+            {/* The Cart Drawer is placed globally so it can be opened from anywhere */}
+            <CartDrawer />
           </WishlistProvider>
         </CartProvider>
       </CurrencyProvider>
