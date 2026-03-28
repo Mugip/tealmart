@@ -1,0 +1,12 @@
+{
+  "HomePage": {
+    "title": "Discover Premium Quality Products",
+    "subtitle": "Rated 4.8/5 by customers worldwide",
+    "cta": "Shop Now"
+  },
+  "Cart": {
+    "header": "Your Shopping Bag",
+    "checkout": "Checkout Now",
+    "empty": "Your bag is empty"
+  }
+}
