@@ -39,14 +39,17 @@ export default function CheckoutPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const[formData, setFormData] = useState({
+  // Payment Method State - Defaulted to flutterwave for African markets
+  const [paymentMethod, setPaymentMethod] = useState<'stripe' | 'flutterwave'>('flutterwave')
+
+  const [formData, setFormData] = useState({
     email: '',
     name: '',
     address: '',
     city: '',
     state: '',
     zip: '',
-    country: 'US',
+    country: 'UG', // Default to Uganda based on your location
     phone: '',
   })
 
@@ -57,7 +60,7 @@ export default function CheckoutPage() {
   const [showSavedAddresses, setShowSavedAddresses] = useState(false)
   const [saveAddress, setSaveAddress] = useState(false)
 
-  const [discountCode, setDiscountCode] = useState('')
+  const[discountCode, setDiscountCode] = useState('')
   const [discountLoading, setDiscountLoading] = useState(false)
   const [discount, setDiscount] = useState<DiscountResult | null>(null)
 
@@ -85,7 +88,7 @@ export default function CheckoutPage() {
         }
       })
       .catch(() => {})
-  },[session?.user?.id])
+  }, [session?.user?.id])
 
   // Update states when country changes
   useEffect(() => {
@@ -104,10 +107,10 @@ export default function CheckoutPage() {
 
   // Init default country
   useEffect(() => {
-    const def = Country.getCountryByCode('US')
+    const def = Country.getCountryByCode('UG') || Country.getCountryByCode('US')
     if (def) {
       setSelectedCountry(def)
-      setStates(State.getStatesOfCountry('US'))
+      setStates(State.getStatesOfCountry(def.isoCode))
     }
   },[])
 
@@ -126,7 +129,7 @@ export default function CheckoutPage() {
   }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setFormData(prev => ({ ...prev,[e.target.name]: e.target.value }))
+    setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }))
   }
 
   const handleCountryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -197,7 +200,10 @@ export default function CheckoutPage() {
         ? State.getStateByCodeAndCountry(formData.state, formData.country)
         : null
 
-      const response = await fetch('/api/checkout', {
+      // Route to the correct payment API
+      const endpoint = paymentMethod === 'stripe' ? '/api/checkout' : '/api/checkout/flutterwave'
+
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -272,7 +278,7 @@ export default function CheckoutPage() {
   const subtotal = total
   const freeShipping = discount?.type === 'FREE_SHIPPING'
   const shipping = freeShipping || subtotal >= 50 ? 0 : 9.99
-  const tax = 0; // Flat tax removed for proper Stripe calculation
+  const tax = 0 // Using API calculation for production
   const discountAmount = discount?.discountAmount || 0
   const finalTotal = subtotal + shipping + tax - discountAmount
 
@@ -297,7 +303,7 @@ export default function CheckoutPage() {
                   <p className="text-red-800 text-sm">{error}</p>
                 </div>
               )}
-              
+
               {/* Saved addresses */}
               {savedAddresses.length > 0 && (
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5">
@@ -392,7 +398,7 @@ export default function CheckoutPage() {
                       onChange={handleChange}
                       required
                       className={inputCls}
-                      placeholder="+1 555 123 4567"
+                      placeholder="+256 700 000 000"
                     />
                   </div>
 
@@ -442,7 +448,7 @@ export default function CheckoutPage() {
                       onChange={handleChange}
                       required
                       className={inputCls}
-                      placeholder="New York"
+                      placeholder="Kampala"
                     />
                   </div>
 
@@ -489,11 +495,7 @@ export default function CheckoutPage() {
                       onChange={handleChange}
                       required
                       className={inputCls}
-                      placeholder={
-                        formData.country === 'US' ? '10001' :
-                        formData.country === 'GB' ? 'SW1A 1AA' :
-                        '12345'
-                      }
+                      placeholder="00000"
                     />
                   </div>
                 </div>
@@ -563,17 +565,49 @@ export default function CheckoutPage() {
                 )}
               </div>
 
+              {/* Payment Method Selection */}
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 space-y-4">
+                <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                  <CreditCard size={20} className="text-tiffany-600" />
+                  Payment Method
+                </h2>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Flutterwave (Mobile Money / Local Cards) */}
+                  <label className={`border-2 rounded-xl p-4 cursor-pointer transition-all ${paymentMethod === 'flutterwave' ? 'border-tiffany-500 bg-tiffany-50' : 'border-gray-200 hover:border-gray-300'}`}>
+                    <div className="flex items-center gap-3">
+                      <input type="radio" name="payment" checked={paymentMethod === 'flutterwave'} onChange={() => setPaymentMethod('flutterwave')} className="w-5 h-5 text-tiffany-600" />
+                      <div>
+                        <p className="font-bold text-gray-900">Mobile Money & Cards</p>
+                        <p className="text-xs text-gray-500">MTN MoMo, Airtel Money, Visa/MC</p>
+                      </div>
+                    </div>
+                  </label>
+
+                  {/* Stripe (International Cards) */}
+                  <label className={`border-2 rounded-xl p-4 cursor-pointer transition-all ${paymentMethod === 'stripe' ? 'border-tiffany-500 bg-tiffany-50' : 'border-gray-200 hover:border-gray-300'}`}>
+                    <div className="flex items-center gap-3">
+                      <input type="radio" name="payment" checked={paymentMethod === 'stripe'} onChange={() => setPaymentMethod('stripe')} className="w-5 h-5 text-tiffany-600" />
+                      <div>
+                        <p className="font-bold text-gray-900">Credit Card</p>
+                        <p className="text-xs text-gray-500">Powered securely by Stripe</p>
+                      </div>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-gradient-to-r from-tiffany-500 to-tiffany-600 hover:from-tiffany-600 hover:to-tiffany-700 text-white py-4 rounded-xl font-bold flex items-center justify-center gap-3 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed text-base"
+                className="w-full bg-gradient-to-r from-tiffany-500 to-tiffany-600 hover:from-tiffany-600 hover:to-tiffany-700 text-white py-4 rounded-xl font-bold flex items-center justify-center gap-3 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 text-base"
               >
                 {loading ? <Loader2 size={22} className="animate-spin" /> : <CreditCard size={22} />}
                 {loading ? 'Processing…' : `Pay ${finalTotal > 0 ? `$${finalTotal.toFixed(2)}` : ''} Securely`}
               </button>
 
               <p className="text-xs text-center text-gray-400">
-                🔒 Secured by Stripe. We never store your card details.
+                🔒 Secured by Stripe & Flutterwave. We never store your card details.
               </p>
             </form>
           </div>
