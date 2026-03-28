@@ -6,6 +6,14 @@ const prisma = new PrismaClient()
 
 export async function POST(req: NextRequest) {
   try {
+    // 1. Safety check for the API key
+    if (!process.env.FLUTTERWAVE_SECRET_KEY) {
+      console.error("❌ FLUTTERWAVE_SECRET_KEY is missing from environment variables.");
+      return NextResponse.json({ 
+        error: "Payment gateway is currently misconfigured. Please contact support or use Stripe." 
+      }, { status: 500 })
+    }
+
     const body = await req.json()
     const { items, email, shippingAddress, discountAmount, discountCode } = body
 
@@ -44,7 +52,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Validate and calculate totals securely from the Database
-    const productMap = new Map(products.map(p =>[p.id, p]))
+    const productMap = new Map(products.map(p => [p.id, p]))
     const validatedItems: any[] =[]
     let subtotal = 0
 
@@ -58,7 +66,6 @@ export async function POST(req: NextRequest) {
       // Use database price, NOT the client's requested price
       let dbPrice = product.price
 
-      // If a variant was selected, check if the variant has a different price
       if (variantId && product.variants && typeof product.variants === 'object') {
         const variantsData = product.variants as any
         if (variantsData.items && Array.isArray(variantsData.items)) {
@@ -87,7 +94,7 @@ export async function POST(req: NextRequest) {
 
     // Calculate shipping, tax, and total
     let finalDiscountAmount = discountAmount || 0;
-    if (finalDiscountAmount > subtotal) finalDiscountAmount = subtotal; // Prevent negative totals
+    if (finalDiscountAmount > subtotal) finalDiscountAmount = subtotal; 
     
     const shipping = subtotal >= 50 ? 0 : 9.99
     const tax = 0 
@@ -132,11 +139,9 @@ export async function POST(req: NextRequest) {
 
     console.log(`✅ Order created in DB (Pending Flutterwave): ${order.orderNumber}`)
 
-    // Flutterwave requires a minimum amount, usually 1 unit of currency depending on the currency used.
-    // Assuming USD for now. Flutterwave handles the USD to UGX conversion automatically on the client side.
     const redirectUrl = `${process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_URL || 'http://localhost:3000'}/success?order=${order.orderNumber}`
 
-    // Call Flutterwave API to generate payment link
+    // Call Flutterwave API
     const flutterwaveResponse = await fetch("https://api.flutterwave.com/v3/payments", {
       method: "POST",
       headers: {
@@ -162,11 +167,12 @@ export async function POST(req: NextRequest) {
 
     const fwData = await flutterwaveResponse.json()
 
+    // 2. Safe error handling from Flutterwave
     if (fwData.status === 'success' && fwData.data && fwData.data.link) {
       return NextResponse.json({ url: fwData.data.link })
     } else {
       console.error("❌ Flutterwave API Error:", fwData)
-      throw new Error(fwData.message || "Failed to generate payment link")
+      throw new Error(fwData.message || "Invalid Flutterwave configuration or Authorization Key.")
     }
 
   } catch (error: any) {
