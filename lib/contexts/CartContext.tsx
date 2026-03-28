@@ -1,6 +1,8 @@
+// lib/contexts/CartContext.tsx
 'use client'
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import { useSession } from 'next-auth/react'
 import toast from 'react-hot-toast'
 
 type CartItem = {
@@ -18,43 +20,72 @@ type CartContextType = {
   updateQuantity: (id: string, quantity: number) => void
   clearCart: () => void
   total: number
+  isDrawerOpen: boolean
+  setIsDrawerOpen: (open: boolean) => void
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined)
 
 export function CartProvider({ children }: { children: ReactNode }) {
+  const { data: session } = useSession()
   const [items, setItems] = useState<CartItem[]>([])
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false)
+  const [isMounted, setIsMounted] = useState(false)
 
-  // Load cart from localStorage on mount
+  // 1. Load cart from localStorage
   useEffect(() => {
     const savedCart = localStorage.getItem('tealmart-cart')
     if (savedCart) {
-      setItems(JSON.parse(savedCart))
+      try {
+        setItems(JSON.parse(savedCart))
+      } catch (e) {
+        console.error("Failed to parse cart", e)
+      }
     }
+    setIsMounted(true)
   }, [])
 
-  // Save cart to localStorage whenever it changes
+  // 2. Save cart to localStorage and sync with Abandoned Cart API
   useEffect(() => {
+    if (!isMounted) return
     localStorage.setItem('tealmart-cart', JSON.stringify(items))
-  }, [items])
+
+    // REVENUE FEATURE: Sync to DB if user is logged in
+    const syncAbandonedCart = async () => {
+      if (items.length > 0 && session?.user?.email) {
+        try {
+          await fetch('/api/abandoned-cart', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email: session.user.email,
+              cartData: items
+            })
+          })
+        } catch (e) { /* silent fail */ }
+      }
+    }
+
+    const timer = setTimeout(syncAbandonedCart, 2000)
+    return () => clearTimeout(timer)
+  }, [items, session, isMounted])
 
   const addItem = (item: Omit<CartItem, 'quantity'>) => {
     setItems((prev) => {
       const existingItem = prev.find((i) => i.id === item.id)
       if (existingItem) {
-        toast.success('Updated quantity in cart')
         return prev.map((i) =>
           i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i
         )
       }
-      toast.success('Added to cart')
       return [...prev, { ...item, quantity: 1 }]
     })
+    // AUTOMATION: Open the drawer immediately so user sees the result
+    setIsDrawerOpen(true)
   }
 
   const removeItem = (id: string) => {
     setItems((prev) => prev.filter((i) => i.id !== id))
-    toast.success('Removed from cart')
   }
 
   const updateQuantity = (id: string, quantity: number) => {
@@ -69,14 +100,17 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const clearCart = () => {
     setItems([])
-    toast.success('Cart cleared')
+    localStorage.removeItem('tealmart-cart')
   }
 
   const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0)
 
   return (
     <CartContext.Provider
-      value={{ items, addItem, removeItem, updateQuantity, clearCart, total }}
+      value={{ 
+        items, addItem, removeItem, updateQuantity, 
+        clearCart, total, isDrawerOpen, setIsDrawerOpen 
+      }}
     >
       {children}
     </CartContext.Provider>
@@ -85,8 +119,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
 export function useCart() {
   const context = useContext(CartContext)
-  if (!context) {
-    throw new Error('useCart must be used within CartProvider')
-  }
+  if (!context) throw new Error('useCart must be used within CartProvider')
   return context
-    }
+                             }
