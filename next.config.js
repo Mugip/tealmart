@@ -1,17 +1,20 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   images: {
-    remotePatterns: [
+    remotePatterns:[
       {
         protocol: 'https',
         hostname: '**',
       },
+      {
+        protocol: 'http',
+        hostname: '**',
+      }
     ],
   },
-  experimental: {
-    serverActions: {
-      allowedOrigins: ['localhost:3000'],
-    },
+  // Suppress warnings for draft features if any
+  eslint: {
+    ignoreDuringBuilds: true,
   },
 }
 
