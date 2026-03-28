@@ -5,7 +5,6 @@ import { prisma } from '@/lib/db'
 import { fetchWithCache } from '@/lib/redis'
 import { formatCategoryName } from '@/lib/productClassifier'
 
-// Dynamically fetch actual categories existing in your database
 async function getTopCategories() {
   return fetchWithCache('footer:categories', async () => {
     const cats = await prisma.product.groupBy({
@@ -16,7 +15,7 @@ async function getTopCategories() {
       take: 4
     })
     return cats.map(c => c.category)
-  }, 86400) // Cache for 24 hours
+  }, 86400) 
 }
 
 export default async function Footer() {
@@ -27,31 +26,26 @@ export default async function Footer() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 sm:gap-12">
           
-          {/* Brand & Social */}
           <div className="lg:col-span-1">
+            {/* LOGO SECTION FIXED */}
             <div className="flex items-center space-x-2 mb-4">
-              <div className="w-10 h-10 bg-gradient-to-br from-tiffany-500 to-tiffany-600 rounded-lg flex items-center justify-center shadow-lg">
-                <span className="text-white font-bold text-xl">T</span>
-              </div>
+              <img 
+                src="/logo.svg" 
+                alt="TealMart Logo" 
+                className="h-10 w-auto object-contain" 
+              />
               <span className="text-2xl font-bold text-white">TealMart</span>
             </div>
             <p className="text-sm leading-relaxed text-gray-400 mb-6">
               Your trusted marketplace for trending products. Quality, affordability, and fast delivery guaranteed.
             </p>
             <div className="flex gap-4">
-              <a href="#" aria-label="Facebook" className="text-gray-400 hover:text-tiffany-400 transition-colors">
-                <Facebook size={20} />
-              </a>
-              <a href="#" aria-label="Instagram" className="text-gray-400 hover:text-tiffany-400 transition-colors">
-                <Instagram size={20} />
-              </a>
-              <a href="#" aria-label="Twitter" className="text-gray-400 hover:text-tiffany-400 transition-colors">
-                <Twitter size={20} />
-              </a>
+              <a href="#" className="text-gray-400 hover:text-tiffany-400 transition-colors"><Facebook size={20} /></a>
+              <a href="#" className="text-gray-400 hover:text-tiffany-400 transition-colors"><Instagram size={20} /></a>
+              <a href="#" className="text-gray-400 hover:text-tiffany-400 transition-colors"><Twitter size={20} /></a>
             </div>
           </div>
 
-          {/* Dynamic Shop Links */}
           <div>
             <h3 className="text-white font-bold mb-4 text-base tracking-wide uppercase">Shop Categories</h3>
             <ul className="space-y-3 text-sm text-gray-400">
@@ -62,15 +56,10 @@ export default async function Footer() {
                   </Link>
                 </li>
               ))}
-              <li>
-                <Link href="/products" className="text-tiffany-500 hover:text-tiffany-400 font-semibold transition-colors">
-                  View All Products →
-                </Link>
-              </li>
+              <li><Link href="/products" className="text-tiffany-500 hover:text-tiffany-400 font-semibold transition-colors">View All Products →</Link></li>
             </ul>
           </div>
 
-          {/* Support */}
           <div>
             <h3 className="text-white font-bold mb-4 text-base tracking-wide uppercase">Customer Support</h3>
             <ul className="space-y-3 text-sm text-gray-400">
@@ -82,7 +71,6 @@ export default async function Footer() {
             </ul>
           </div>
 
-          {/* Legal & Trust */}
           <div>
             <h3 className="text-white font-bold mb-4 text-base tracking-wide uppercase">Legal</h3>
             <ul className="space-y-3 text-sm text-gray-400 mb-6">
@@ -97,17 +85,12 @@ export default async function Footer() {
           </div>
         </div>
 
-        {/* Bottom Bar: Copyright & Payment Methods */}
         <div className="border-t border-gray-800 mt-12 pt-8 flex flex-col md:flex-row items-center justify-between gap-6">
           <p className="text-sm text-gray-500 text-center md:text-left">
             &copy; {new Date().getFullYear()} TealMart. All rights reserved.
           </p>
-          
-          {/* FIXED: Added flex-wrap and center alignment so badges stack on small screens */}
           <div className="flex flex-wrap items-center justify-center md:justify-end gap-2 sm:gap-3 text-gray-500">
-            <span className="text-xs font-semibold uppercase tracking-wider w-full text-center sm:w-auto sm:text-left mb-1 sm:mb-0">
-              Secured By
-            </span>
+            <span className="text-xs font-semibold uppercase tracking-wider w-full text-center sm:w-auto sm:text-left mb-1 sm:mb-0">Secured By</span>
             <div className="flex flex-wrap justify-center gap-2">
               <div className="px-2 py-1 bg-gray-800 rounded text-xs font-bold border border-gray-700">STRIPE</div>
               <div className="px-2 py-1 bg-gray-800 rounded text-xs font-bold border border-gray-700">VISA</div>
@@ -115,9 +98,8 @@ export default async function Footer() {
               <div className="px-2 py-1 bg-gray-800 rounded text-xs font-bold border border-gray-700">AMEX</div>
             </div>
           </div>
-
         </div>
       </div>
     </footer>
   )
-                    }
+              }
