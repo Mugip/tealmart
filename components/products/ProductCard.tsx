@@ -1,5 +1,4 @@
-// components/products/ProductCard.tsx
-
+// components/products/ProductCard.tsx - COMPLETE VERSION
 'use client'
 
 import Image from 'next/image'
@@ -7,6 +6,7 @@ import Link from 'next/link'
 import { ShoppingCart, Star, Heart } from 'lucide-react'
 import { useCart } from '@/lib/contexts/CartContext'
 import { useWishlist } from '@/lib/contexts/WishlistContext'
+import { useCurrency } from '@/lib/contexts/CurrencyContext'
 
 type Product = {
   id: string
@@ -21,6 +21,7 @@ type Product = {
 export default function ProductCard({ product }: { product: Product }) {
   const { addItem } = useCart()
   const { toggle, isWishlisted } = useWishlist()
+  const { formatPrice } = useCurrency()
   const wishlisted = isWishlisted(product.id)
 
   const discount = product.compareAtPrice
@@ -43,7 +44,7 @@ export default function ProductCard({ product }: { product: Product }) {
   }
 
   return (
-    <Link href={`/products/${product.id}`} className="card group relative overflow-hidden">
+    <Link href={`/products/${product.id}`} className="card group relative overflow-hidden bg-white">
       <div className="relative aspect-square overflow-hidden bg-gray-100">
         <Image
           src={product.images[0] || '/placeholder.png'}
@@ -55,7 +56,7 @@ export default function ProductCard({ product }: { product: Product }) {
 
         {/* Discount badge */}
         {discount > 0 && (
-          <div className="absolute top-2 left-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+          <div className="absolute top-2 left-2 bg-red-500 text-white text-[10px] sm:text-xs font-bold px-2 py-1 rounded-full">
             -{discount}%
           </div>
         )}
@@ -86,7 +87,7 @@ export default function ProductCard({ product }: { product: Product }) {
       </div>
 
       <div className="p-3">
-        <h3 className="font-semibold text-gray-900 mb-1.5 line-clamp-2 group-hover:text-tiffany-600 transition-colors text-sm leading-snug">
+        <h3 className="font-semibold text-gray-900 mb-1.5 line-clamp-2 group-hover:text-tiffany-600 transition-colors text-xs sm:text-sm leading-snug">
           {product.title}
         </h3>
 
@@ -96,28 +97,26 @@ export default function ProductCard({ product }: { product: Product }) {
               {[...Array(5)].map((_, i) => (
                 <Star
                   key={i}
-                  size={11}
+                  size={10}
                   className={i < Math.round(product.rating!) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-200 fill-gray-200'}
                 />
               ))}
             </div>
-            <span className="text-xs text-gray-500">
+            <span className="text-[10px] text-gray-500">
               ({product.reviewCount})
             </span>
           </div>
         )}
 
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="text-base font-bold text-gray-900">
-              ${product.price.toFixed(2)}
-            </div>
-            {product.compareAtPrice && product.compareAtPrice > product.price && (
-              <div className="text-xs text-gray-400 line-through">
-                ${product.compareAtPrice.toFixed(2)}
-              </div>
-            )}
+        <div className="flex items-end flex-wrap gap-1.5">
+          <div className="text-sm sm:text-base font-bold text-gray-900">
+            {formatPrice(product.price)}
           </div>
+          {product.compareAtPrice && product.compareAtPrice > product.price && (
+            <div className="text-[10px] sm:text-xs text-gray-400 line-through">
+              {formatPrice(product.compareAtPrice)}
+            </div>
+          )}
         </div>
       </div>
     </Link>
