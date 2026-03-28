@@ -214,9 +214,7 @@ export default function ResetPasswordPage() {
       <div className="max-w-md w-full">
         <div className="text-center mb-8">
           <Link href="/" className="inline-block mb-6">
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-tiffany-600 to-tiffany-400 bg-clip-text text-transparent">
-              TealMart
-            </h1>
+            <img src="/logo.svg" alt="TealMart" className="h-14 w-auto object-contain mx-auto" />
           </Link>
           <h2 className="text-3xl font-bold text-gray-900 mb-2">Set new password</h2>
           <p className="text-gray-600">Choose a strong password for your account</p>
