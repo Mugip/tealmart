@@ -4,49 +4,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db'
-
-export async function GET(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) {
-  const { searchParams } = new URL(req.url)
-  const page = parseInt(searchParams.get('page') || '1')
-  const limit = 10
-  const skip = (page - 1) * limit
-
-  const [reviews, total] = await Promise.all([
-    prisma.review.findMany({
-      where: { productId: params.id },
-      include: {
-        user: { select: { name: true, image: true } },
-      },
-      orderBy: { createdAt: 'desc' },
-      skip,
-      take: limit,
-    }),
-    prisma.review.count({ where: { productId: params.id } }),
-  ])
-
-  // Rating breakdown
-  const breakdown = await prisma.review.groupBy({
-    by: ['rating'],
-    where: { productId: params.id },
-    _count: { rating: true },
-  })
-
-  const ratingMap: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }
-  breakdown.forEach((b) => {
-    ratingMap[b.rating] = b._count.rating
-  })
-
-  return NextResponse.json({
-    reviews,
-    total,
-    page,
-    pages: Math.ceil(total / limit),
-    ratingBreakdown: ratingMap,
-  })
-}
+import { uploadToR2 } from '@/lib/r2' // ✅ IMPORTANT
 
 export async function POST(
   req: NextRequest,
@@ -61,7 +19,6 @@ export async function POST(
     )
   }
 
-  // Added images
   const { rating, title, comment, images } = await req.json()
 
   if (!rating || rating < 1 || rating > 5) {
@@ -80,7 +37,7 @@ export async function POST(
     return NextResponse.json({ error: 'Product not found' }, { status: 404 })
   }
 
-  // One review per user per product
+  // Prevent duplicate review
   const existing = await prisma.review.findFirst({
     where: {
       productId: params.id,
@@ -95,6 +52,31 @@ export async function POST(
     )
   }
 
+  // ✅ NEW: Upload images to R2
+  const uploadedImages: string[] = []
+
+  if (Array.isArray(images)) {
+    for (const base64 of images) {
+      const matches = base64.match(/^data:(.+);base64,(.+)$/)
+      if (!matches) continue
+
+      const contentType = matches[1]
+      const buffer = Buffer.from(matches[2], 'base64')
+
+      const key = `reviews/${params.id}/${Date.now()}-${Math.random()
+        .toString(36)
+        .substring(2, 8)}.jpg`
+
+      try {
+        const url = await uploadToR2(buffer, key, contentType)
+        uploadedImages.push(url)
+      } catch (err) {
+        console.error('R2 upload failed:', err)
+      }
+    }
+  }
+
+  // Create review
   const review = await prisma.review.create({
     data: {
       productId: params.id,
@@ -102,7 +84,7 @@ export async function POST(
       rating,
       title: title?.trim().slice(0, 100) || null,
       comment: comment?.trim().slice(0, 1000) || null,
-      images: Array.isArray(images) ? images : [], // FIXED
+      images: uploadedImages, // ✅ USE URLs now
       verified: false,
     },
     include: {
@@ -110,7 +92,7 @@ export async function POST(
     },
   })
 
-  // Update product aggregate rating
+  // Update product rating
   const allReviews = await prisma.review.findMany({
     where: { productId: params.id },
     select: { rating: true },
@@ -128,4 +110,4 @@ export async function POST(
   })
 
   return NextResponse.json(review, { status: 201 })
-    }
+                   }
