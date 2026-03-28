@@ -2,19 +2,12 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { verifyAdminToken } from '@/lib/adminAuth'
-import createMiddleware from 'next-intl/middleware'
-
-// 1. Setup Internationalization Middleware
-const i18nMiddleware = createMiddleware({
-  locales: ['en', 'fr', 'es', 'sw'],
-  defaultLocale: 'en',
-  // ✅ IMPORTANT: This keeps your URLs exactly as they are (e.g., /cart stays /cart)
-  // while still allowing the code to detect the user's language.
-  localePrefix: 'never' 
-})
 
 let _maintenanceCache: boolean = false
 let _maintenanceCacheExpiry: number = 0
+
+// Supported languages
+const locales = ['en', 'fr', 'es', 'sw']
 
 async function getMaintenanceMode(): Promise<boolean> {
   const now = Date.now()
@@ -47,9 +40,12 @@ async function getMaintenanceMode(): Promise<boolean> {
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
+  const requestHeaders = new Headers(request.headers)
+  
+  // 1. 📍 Pass pathname to Server Components (for Header/Footer logic)
+  requestHeaders.set('x-pathname', pathname)
 
-  // ── A. ADMIN SECURITY ──
-  // Check admin routes first. We use NextResponse.next() here to skip i18n for admin.
+  // 2. 🔐 ADMIN SECURITY
   if (pathname.startsWith('/admin')) {
     const token = request.cookies.get('admin-auth')?.value
     const isValid = token ? await verifyAdminToken(token) : false
@@ -58,13 +54,12 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL('/admin/login', request.url))
     }
     
-    const response = NextResponse.next()
-    response.headers.set('x-pathname', pathname)
-    return response
+    return NextResponse.next({
+      request: { headers: requestHeaders }
+    })
   }
 
-  // ── B. MAINTENANCE MODE ──
-  // Don't block API, maintenance page, or static files
+  // 3. 🏗️ MAINTENANCE MODE
   const isExempt = 
     pathname.startsWith('/api/') || 
     pathname.startsWith('/maintenance') || 
@@ -77,17 +72,33 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // ── C. i18n & STOREFRONT ──
-  // This handles the language detection and storefront routing
-  const response = i18nMiddleware(request)
-  
-  // ✅ IMPORTANT: Pass the pathname to our ConditionalShell (Header/Footer logic)
-  response.headers.set('x-pathname', pathname)
-  
+  // 4. 🌍 i18n DETECTION (Passive Mode)
+  // We detect the language but we DO NOT redirect the user.
+  // This prevents the 404 errors.
+  let locale = request.cookies.get('NEXT_LOCALE')?.value
+
+  if (!locale) {
+    // Detect from browser headers
+    const acceptLang = request.headers.get('accept-language')
+    if (acceptLang) {
+      const detected = acceptLang.split(',')[0].split('-')[0]
+      locale = locales.includes(detected) ? detected : 'en'
+    } else {
+      locale = 'en'
+    }
+  }
+
+  const response = NextResponse.next({
+    request: { headers: requestHeaders }
+  })
+
+  // Set the locale cookie so the i18n engine can read it on the next page load
+  response.cookies.set('NEXT_LOCALE', locale)
+
   return response
 }
 
 export const config = {
-  // Match all paths except for api, _next, and static assets
-  matcher: ['/((?!api|_next/static|_next/image|favicon.ico|logo.svg).*)']
+  // Pattern matches everything except static assets and internal next files
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|logo.svg).*)']
 }
