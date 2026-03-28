@@ -259,6 +259,11 @@ export default function ProductPageClient({ initialProduct }: { initialProduct: 
           </div>
         </div>
 
+        <UpsellSection 
+          currentCategoryId={product.category} 
+          excludeId={product.id}
+        />
+
         <div id="reviews">
           <ReviewSection productId={product.id} productRating={product.rating} reviewCount={product.reviewCount} />
         </div>
