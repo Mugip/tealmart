@@ -26,9 +26,7 @@ function ErrorContent() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-tiffany-50 via-white to-tiffany-50 px-4">
       <div className="max-w-md w-full">                       <div className="text-center mb-8">
           <Link href="/" className="inline-block mb-6">
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-tiffany-600 to-tiffany-400 bg-clip-text text-transparent">
-              TealMart
-            </h1>
+            <img src="/logo.svg" alt="TealMart" className="h-14 w-auto object-contain mx-auto" />
           </Link>
         </div>
 
