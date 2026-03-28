@@ -1,18 +1,13 @@
+// components/ErrorCatcher.tsx
 'use client'
 
 import { useEffect } from 'react'
-
-// Lightweight Sentry integration — no SDK install needed for basic error capture.
-// To use the full Sentry SDK: npm install @sentry/nextjs then follow their wizard.
-// This file sends errors to both your existing /api/debug/client-error endpoint
-// AND to Sentry's ingestion API if NEXT_PUBLIC_SENTRY_DSN is set.
 
 async function sendToSentry(error: string, stack?: string, context?: string) {
   const dsn = process.env.NEXT_PUBLIC_SENTRY_DSN
   if (!dsn) return
 
   try {
-    // Parse DSN: https://KEY@oXXXXXX.ingest.sentry.io/PROJECT_ID
     const url = new URL(dsn)
     const projectId = url.pathname.replace('/', '')
     const sentryEndpoint = `${url.protocol}//${url.host}/api/${projectId}/store/`
@@ -31,14 +26,12 @@ async function sendToSentry(error: string, stack?: string, context?: string) {
         message: error,
         exception: stack
           ? {
-              values: [
+              values:[
                 {
                   type: 'Error',
                   value: error,
                   stacktrace: {
-                    frames: stack.split('\n').map(line => ({
-                      filename: line,
-                    })),
+                    frames: stack.split('\n').map(line => ({ filename: line })),
                   },
                 },
               ],
@@ -50,9 +43,7 @@ async function sendToSentry(error: string, stack?: string, context?: string) {
         },
       }),
     })
-  } catch {
-    // Sentry itself errored — don't break the app
-  }
+  } catch {}
 }
 
 export default function ErrorCatcher() {
@@ -67,7 +58,11 @@ export default function ErrorCatcher() {
           ? payload.error
           : payload.error?.message || 'Unknown client error'
 
-      // Send to your internal log endpoint
+      // IGNORING BROWSER NOISE: Don't log generic cross-origin "Script error."
+      if (errorMessage === 'Script error.' || errorMessage.includes('ResizeObserver')) {
+        return;
+      }
+
       try {
         await fetch('/api/debug/client-error', {
           method: 'POST',
@@ -81,7 +76,6 @@ export default function ErrorCatcher() {
         })
       } catch {}
 
-      // Also send to Sentry if DSN is configured
       await sendToSentry(
         errorMessage,
         payload.stack || payload.error?.stack,
@@ -112,7 +106,4 @@ export default function ErrorCatcher() {
       window.removeEventListener('error', handleError)
       window.removeEventListener('unhandledrejection', handlePromiseError)
     }
-  }, [])
-
-  return null
-}
+  },
