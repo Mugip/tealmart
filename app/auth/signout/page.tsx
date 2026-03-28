@@ -12,9 +12,7 @@ export default function SignOutPage() {
   return (                                                <div className="min-h-screen bg-gradient-to-br from-tiffany-50 via-white to-tiffany-50 flex items-center justify-center px-4">
       <div className="max-w-md w-full text-center">
         <Link href="/" className="inline-block mb-8">
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-tiffany-600 to-tiffany-400 bg-clip-text text-transparent">
-            TealMart
-          </h1>
+          <img src="/logo.svg" alt="TealMart" className="h-14 w-auto object-contain mx-auto" />
         </Link>
 
         <div className="bg-white rounded-3xl shadow-2xl p-10">
