@@ -1,0 +1,12 @@
+{
+  "HomePage": {
+    "title": "Découvrez des produits de qualité supérieure",
+    "subtitle": "Noté 4,8/5 par les clients du monde entier",
+    "cta": "Achetez maintenant"
+  },
+  "Cart": {
+    "header": "Votre panier",
+    "checkout": "Passer à la caisse",
+    "empty": "Votre panier est vide"
+  }
+}
