@@ -3,10 +3,20 @@ import Redis from 'ioredis'
 
 const globalForRedis = global as unknown as { redis: Redis | undefined }
 
-// Initialize Redis client if REDIS_URL exists
+// Serverless-optimized Redis connection
 export const redis =
   globalForRedis.redis ??
-  (process.env.REDIS_URL ? new Redis(process.env.REDIS_URL) : undefined)
+  (process.env.REDIS_URL
+    ? new Redis(process.env.REDIS_URL, {
+        maxRetriesPerRequest: 1, // Don't queue commands if disconnected
+        connectTimeout: 2000,    // Give up connecting after 2 seconds
+        retryStrategy: () => null, // Do not endlessly retry on Vercel
+        // If using Upstash or secure Redis, TLS is required
+        tls: process.env.REDIS_URL.startsWith('rediss://') 
+          ? { rejectUnauthorized: false } 
+          : undefined
+      })
+    : undefined)
 
 if (process.env.NODE_ENV !== 'production' && redis) {
   globalForRedis.redis = redis
@@ -14,35 +24,41 @@ if (process.env.NODE_ENV !== 'production' && redis) {
 
 /**
  * Advanced caching layer: intercepts expensive DB queries.
- * @param key The unique cache key (e.g., 'home:featured-products')
- * @param fetcher The database query to run if cache misses
- * @param ttlSeconds How long to keep the data in cache
+ * Optimized for serverless: never hangs the page load.
  */
 export async function fetchWithCache<T>(
   key: string,
   fetcher: () => Promise<T>,
   ttlSeconds: number = 3600
 ): Promise<T> {
-  // If Redis is not configured, just run the database query normally
+  // If Redis is not configured or dropped, just run the database query normally
   if (!redis) {
     return fetcher()
   }
 
   try {
-    const cached = await redis.get(key)
+    // Timeout race condition: If Redis takes longer than 1.5 seconds, skip it
+    const cached = await Promise.race([
+      redis.get(key),
+      new Promise<null>((_, reject) => 
+        setTimeout(() => reject(new Error('Redis timeout')), 1500)
+      )
+    ])
+
     if (cached) {
-      return JSON.parse(cached)
+      return JSON.parse(cached as string)
     }
 
     // Cache miss: hit the database
     const data = await fetcher()
-    await redis.set(key, JSON.stringify(data), 'EX', ttlSeconds)
     
-    // Normalize data (ensures dates are stringified identically to cached versions)
+    // Fire-and-forget: set cache in the background so it doesn't slow down the user
+    redis.set(key, JSON.stringify(data), 'EX', ttlSeconds).catch(() => {})
+    
     return JSON.parse(JSON.stringify(data))
   } catch (error) {
-    console.error(`Redis cache error for key [${key}]:`, error)
-    // Fallback to database if Redis drops connection
+    // Silently catch ECONNRESET or Timeouts and instantly fallback to Database
+    console.warn(`[Redis Fast-Fail] Falling back to DB for ${key}`);
     return fetcher()
   }
 }
