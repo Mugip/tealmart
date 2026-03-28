@@ -4,27 +4,22 @@ import { PrismaClient } from "@prisma/client"
 
 const prisma = new PrismaClient()
 
+// Standard exchange rate to convert USD base prices to UGX for Flutterwave
+const USD_TO_UGX_RATE = 3800;
+
 export async function POST(req: NextRequest) {
   try {
-    // 1. Safety check for the API key
     if (!process.env.FLUTTERWAVE_SECRET_KEY) {
-      console.error("❌ FLUTTERWAVE_SECRET_KEY is missing from environment variables.");
-      return NextResponse.json({ 
-        error: "Payment gateway is currently misconfigured. Please contact support or use Stripe." 
-      }, { status: 500 })
+      return NextResponse.json({ error: "Payment gateway is currently misconfigured." }, { status: 500 })
     }
 
     const body = await req.json()
     const { items, email, shippingAddress, discountAmount, discountCode } = body
 
-    console.log('📦 Flutterwave Checkout request:', { items: items?.length, email })
-
-    // Validate email
     if (!email || typeof email !== 'string' || !email.includes('@')) {
       return NextResponse.json({ error: "Valid email is required" }, { status: 400 })
     }
 
-    // Validate shipping address
     if (!shippingAddress || typeof shippingAddress !== 'object') {
       return NextResponse.json({ error: "Shipping address is required" }, { status: 400 })
     }
@@ -36,12 +31,10 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Validate items
     if (!items || !Array.isArray(items) || items.length === 0) {
       return NextResponse.json({ error: "Cart is empty" }, { status: 400 })
     }
 
-    // Fetch products from database securely
     const productIds = items.map(item => item.id.split('-')[0])
     const products = await prisma.product.findMany({
       where: { id: { in: productIds } }
@@ -51,7 +44,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No valid products found" }, { status: 400 })
     }
 
-    // Validate and calculate totals securely from the Database
     const productMap = new Map(products.map(p => [p.id, p]))
     const validatedItems: any[] =[]
     let subtotal = 0
@@ -63,9 +55,7 @@ export async function POST(req: NextRequest) {
       
       if (!product) continue
 
-      // Use database price, NOT the client's requested price
       let dbPrice = product.price
-
       if (variantId && product.variants && typeof product.variants === 'object') {
         const variantsData = product.variants as any
         if (variantsData.items && Array.isArray(variantsData.items)) {
@@ -77,22 +67,15 @@ export async function POST(req: NextRequest) {
       }
 
       const quantity = item.quantity || 1
-
       validatedItems.push({
         productId: product.id,
         quantity,
         price: dbPrice,
         title: item.title || product.title,
       })
-
       subtotal += dbPrice * quantity
     }
 
-    if (validatedItems.length === 0) {
-      return NextResponse.json({ error: "No valid products in cart" }, { status: 400 })
-    }
-
-    // Calculate shipping, tax, and total
     let finalDiscountAmount = discountAmount || 0;
     if (finalDiscountAmount > subtotal) finalDiscountAmount = subtotal; 
     
@@ -104,10 +87,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Order total must be greater than 0" }, { status: 400 })
     }
 
-    // Generate order number
     const orderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`
 
-    // Create order in database as PENDING
+    // Create Order
     const order = await prisma.order.create({
       data: {
         orderNumber,
@@ -137,11 +119,15 @@ export async function POST(req: NextRequest) {
       }
     })
 
-    console.log(`✅ Order created in DB (Pending Flutterwave): ${order.orderNumber}`)
+    // FLUTTERWAVE LOCALIZATION FIX:
+    // If the country is Uganda (UG), pass UGX and convert the total. This forces Mobile Money options to appear.
+    const isUganda = shippingAddress.country === 'UG' || shippingAddress.country === 'Uganda';
+    const chargeCurrency = isUganda ? 'UGX' : 'USD';
+    const chargeAmount = isUganda ? Math.round(order.total * USD_TO_UGX_RATE) : Number(order.total.toFixed(2));
 
-    const redirectUrl = `${process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_URL || 'http://localhost:3000'}/success?order=${order.orderNumber}`
+    // IMPORTANT: Redirect to the unified Checkout Success page
+    const redirectUrl = `${process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_URL || 'http://localhost:3000'}/checkout/success?order=${order.orderNumber}`
 
-    // Call Flutterwave API
     const flutterwaveResponse = await fetch("https://api.flutterwave.com/v3/payments", {
       method: "POST",
       headers: {
@@ -150,8 +136,10 @@ export async function POST(req: NextRequest) {
       },
       body: JSON.stringify({
         tx_ref: order.orderNumber,
-        amount: Number(order.total.toFixed(2)),
-        currency: "USD",
+        amount: chargeAmount,
+        currency: chargeCurrency,
+        // Explicitly request all African payment forms
+        payment_options: "card, mobilemoneyuganda, mobilemoneyghana, mobilemoneyrwanda, mobilemoneyzambia, mobilemoneyfranco, mpesa, ussd",
         redirect_url: redirectUrl,
         customer: {
           email: email,
@@ -160,27 +148,23 @@ export async function POST(req: NextRequest) {
         },
         customizations: {
           title: "TealMart Checkout",
-          description: `Payment for Order ${order.orderNumber}`
+          description: `Order ${order.orderNumber}`
         }
       })
     })
 
     const fwData = await flutterwaveResponse.json()
 
-    // 2. Safe error handling from Flutterwave
     if (fwData.status === 'success' && fwData.data && fwData.data.link) {
       return NextResponse.json({ url: fwData.data.link })
     } else {
       console.error("❌ Flutterwave API Error:", fwData)
-      throw new Error(fwData.message || "Invalid Flutterwave configuration or Authorization Key.")
+      throw new Error(fwData.message || "Failed to generate payment link")
     }
 
   } catch (error: any) {
-    console.error("Flutterwave Checkout error:", error)
-    return NextResponse.json({ 
-      error: error.message || "Checkout failed" 
-    }, { status: 500 })
+    return NextResponse.json({ error: error.message || "Checkout failed" }, { status: 500 })
   } finally {
     await prisma.$disconnect()
   }
-  }
+}
