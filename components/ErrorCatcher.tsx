@@ -107,3 +107,4 @@ export default function ErrorCatcher() {
       window.removeEventListener('unhandledrejection', handlePromiseError)
     }
   }
+            }
