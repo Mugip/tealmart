@@ -1,4 +1,4 @@
-// components/layout/Header.tsx - FIXED LOGO
+// components/layout/Header.tsx - FIXED LOGO + Language & Currency Quick Switcher
 'use client'
 
 import Link from 'next/link'
@@ -13,7 +13,7 @@ import SearchBar from './SearchBar'
 export default function Header() {
   const { items } = useCart()
   const { wishlistIds } = useWishlist()
-  const { currency, setCurrency } = useCurrency()
+  const { currency, setCurrency, rates } = useCurrency()
   const { data: session, status } = useSession()
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
@@ -31,19 +31,22 @@ export default function Header() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  const userInitial = session?.user?.name?.[0]?.toUpperCase() || session?.user?.email?.[0]?.toUpperCase() || 'U'
+  const userInitial =
+    session?.user?.name?.[0]?.toUpperCase() ||
+    session?.user?.email?.[0]?.toUpperCase() ||
+    'U'
 
   return (
     <header className="bg-white shadow-sm sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-14 sm:h-16 gap-2 sm:gap-4">
-          
-          {/* Logo - FIXED: Always show TealMart text */}
+
+          {/* Logo - FIXED */}
           <Link href="/" className="flex items-center space-x-2 flex-shrink-0">
-            <img 
-              src="/logo.svg" 
-              alt="TealMart Logo" 
-              className="h-8 sm:h-10 w-auto object-contain" 
+            <img
+              src="/logo.svg"
+              alt="TealMart Logo"
+              className="h-8 sm:h-10 w-auto object-contain"
             />
             <span className="text-lg sm:text-2xl font-bold text-gray-900">TealMart</span>
           </Link>
@@ -68,19 +71,29 @@ export default function Header() {
 
           {/* Right Side Icons */}
           <div className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
-            
-            {/* Currency Selector */}
-            <div className="hidden sm:flex items-center bg-gray-50 rounded-lg px-2 py-1 border border-gray-200">
-              <Globe size={14} className="text-gray-500 mr-1" />
-              <select 
-                value={currency} 
-                onChange={(e) => setCurrency(e.target.value)}
-                className="bg-transparent text-xs font-bold text-gray-700 outline-none cursor-pointer"
+
+            {/* Language & Currency Quick Switcher */}
+            <div className="hidden sm:flex items-center gap-2 bg-gray-50 p-1 rounded-xl border border-gray-200">
+              {/* Language */}
+              <select
+                defaultValue="en"
+                className="bg-transparent text-[10px] font-bold uppercase outline-none cursor-pointer px-2 border-r border-gray-200"
+                onChange={(e) => window.location.pathname = `/${e.target.value}`}
               >
-                <option value="USD">USD</option>
-                <option value="UGX">UGX</option>
-                <option value="EUR">EUR</option>
-                <option value="GBP">GBP</option>
+                <option value="en">EN</option>
+                <option value="fr">FR</option>
+                <option value="sw">SW</option>
+              </select>
+
+              {/* Currency */}
+              <select
+                value={currency}
+                onChange={(e) => setCurrency(e.target.value)}
+                className="bg-transparent text-[10px] font-bold outline-none cursor-pointer px-1"
+              >
+                {rates && Object.keys(rates).map(c => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
               </select>
             </div>
 
@@ -104,7 +117,7 @@ export default function Header() {
               )}
             </Link>
 
-            {/* User Menu - Desktop */}
+            {/* User Menu & Mobile Menu */}
             {status === 'loading' ? (
               <div className="w-8 h-8 rounded-full bg-gray-200 animate-pulse hidden md:block" />
             ) : session ? (
@@ -177,8 +190,8 @@ export default function Header() {
               <div className="sm:hidden px-3 py-2">
                 <div className="flex items-center bg-gray-50 rounded-lg px-3 py-2 border border-gray-200">
                   <Globe size={14} className="text-gray-500 mr-2" />
-                  <select 
-                    value={currency} 
+                  <select
+                    value={currency}
                     onChange={(e) => setCurrency(e.target.value)}
                     className="bg-transparent text-sm font-bold text-gray-700 outline-none cursor-pointer flex-1"
                   >
@@ -190,16 +203,17 @@ export default function Header() {
                 </div>
               </div>
 
+              {/* Mobile Nav Links & Auth */}
               {[
                 { href: '/products', label: 'Products' },
                 { href: '/categories', label: 'Categories' },
                 { href: '/about', label: 'About' },
                 { href: '/contact', label: 'Contact' }
               ].map(({ href, label }) => (
-                <Link 
-                  key={href} 
-                  href={href} 
-                  className="text-sm font-medium text-gray-700 hover:text-tiffany-600 hover:bg-gray-50 px-3 py-2 rounded-lg" 
+                <Link
+                  key={href}
+                  href={href}
+                  className="text-sm font-medium text-gray-700 hover:text-tiffany-600 hover:bg-gray-50 px-3 py-2 rounded-lg"
                   onClick={() => setIsMenuOpen(false)}
                 >
                   {label}
@@ -240,4 +254,4 @@ export default function Header() {
       </div>
     </header>
   )
-}
+                      }
