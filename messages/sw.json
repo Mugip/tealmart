@@ -1,0 +1,41 @@
+{
+  "Navigation": {
+    "products": "Bidhaa",
+    "categories": "Jamii",
+    "about": "Kuhusu Sisi",
+    "contact": "Mawasiliano",
+    "signIn": "Ingia",
+    "myProfile": "Akaunti Yangu",
+    "orderHistory": "Historia ya Agizo",
+    "signOut": "Ondoka"
+  },
+  "HomePage": {
+    "title": "Gundua Bidhaa za Ubora wa Juu",
+    "subtitle": "Imeidhinishwa 4.8/5 na wateja ulimwenguni kote",
+    "cta": "Nunua Sasa",
+    "trending": "Zinazovuma Sasa",
+    "newArrivals": "Bidhaa Mpya"
+  },
+  "Cart": {
+    "header": "Mfuko Wako wa Manunuzi",
+    "checkout": "Lipa Sasa",
+    "viewCart": "Angalia Mfuko",
+    "empty": "Mfuko wako ni tupu",
+    "total": "Jumla Inayokadiriwa",
+    "items": "bidhaa",
+    "pairsWell": "Inaenda vizuri na..."
+  },
+  "TrustBadges": {
+    "freeShipping": "Usafirishaji wa Bure",
+    "securePayment": "Malipo Salama",
+    "easyReturns": "Kurudisha kwa Urahisi",
+    "fastDelivery": "Uwasilishaji wa Haraka"
+  },
+  "Product": {
+    "addToCart": "Weka Kwenye Mfuko",
+    "buyNow": "Nunua Sasa hivi",
+    "description": "Maelezo ya Bidhaa",
+    "reviews": "Maoni ya Wateja",
+    "relatedProducts": "Bidhaa Zinazofanana"
+  }
+}
