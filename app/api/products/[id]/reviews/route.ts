@@ -35,7 +35,9 @@ export async function GET(
   })
 
   const ratingMap: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }
-  breakdown.forEach(b => { ratingMap[b.rating] = b._count.rating })
+  breakdown.forEach((b) => {
+    ratingMap[b.rating] = b._count.rating
+  })
 
   return NextResponse.json({
     reviews,
@@ -51,26 +53,46 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   const session = await getServerSession(authOptions)
+
   if (!session?.user?.id) {
-    return NextResponse.json({ error: 'You must be signed in to leave a review' }, { status: 401 })
+    return NextResponse.json(
+      { error: 'You must be signed in to leave a review' },
+      { status: 401 }
+    )
   }
 
-  const { rating, title, comment } = await req.json()
+  // Added images
+  const { rating, title, comment, images } = await req.json()
 
   if (!rating || rating < 1 || rating > 5) {
-    return NextResponse.json({ error: 'Rating must be between 1 and 5' }, { status: 400 })
+    return NextResponse.json(
+      { error: 'Rating must be between 1 and 5' },
+      { status: 400 }
+    )
   }
 
   // Check product exists
-  const product = await prisma.product.findUnique({ where: { id: params.id } })
-  if (!product) return NextResponse.json({ error: 'Product not found' }, { status: 404 })
+  const product = await prisma.product.findUnique({
+    where: { id: params.id },
+  })
+
+  if (!product) {
+    return NextResponse.json({ error: 'Product not found' }, { status: 404 })
+  }
 
   // One review per user per product
   const existing = await prisma.review.findFirst({
-    where: { productId: params.id, userId: session.user.id },
+    where: {
+      productId: params.id,
+      userId: session.user.id,
+    },
   })
+
   if (existing) {
-    return NextResponse.json({ error: 'You have already reviewed this product' }, { status: 400 })
+    return NextResponse.json(
+      { error: 'You have already reviewed this product' },
+      { status: 400 }
+    )
   }
 
   const review = await prisma.review.create({
@@ -80,6 +102,7 @@ export async function POST(
       rating,
       title: title?.trim().slice(0, 100) || null,
       comment: comment?.trim().slice(0, 1000) || null,
+      images: Array.isArray(images) ? images : [], // FIXED
       verified: false,
     },
     include: {
@@ -92,7 +115,9 @@ export async function POST(
     where: { productId: params.id },
     select: { rating: true },
   })
-  const avgRating = allReviews.reduce((s, r) => s + r.rating, 0) / allReviews.length
+
+  const avgRating =
+    allReviews.reduce((sum, r) => sum + r.rating, 0) / allReviews.length
 
   await prisma.product.update({
     where: { id: params.id },
@@ -103,4 +128,4 @@ export async function POST(
   })
 
   return NextResponse.json(review, { status: 201 })
-}
+    }
