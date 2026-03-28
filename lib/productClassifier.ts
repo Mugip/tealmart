@@ -59,8 +59,8 @@ const RULES: CategoryRule[] =[
   { category: "Food & Grocery", weight: 20, pattern: /\b(food|grocery|snacks?|coffee|tea|chocolate|candy|spice|seasoning)\b/gi },
 ];
 
-export function classifyProductSync(title?: string, description?: string): Category {
-  // We strictly search the Title. (Descriptions often contain generic words that confuse algorithms).
+// FIXED: Added `cjCategoryHint?: string` back to the signature to satisfy TypeScript
+export function classifyProductSync(title?: string, description?: string, cjCategoryHint?: string): Category {
   const text = `${title || ""} ${description?.slice(0, 100) || ""}`.toLowerCase();
   
   const scores: Record<string, number> = {};
@@ -82,8 +82,9 @@ export function classifyProductSync(title?: string, description?: string): Categ
   return "General";
 }
 
-export async function classifyProduct(title?: string, description?: string): Promise<Category> {
-  return classifyProductSync(title, description);
+// FIXED: Added `cjCategoryHint?: string` back to the signature to satisfy TypeScript
+export async function classifyProduct(title?: string, description?: string, cjCategoryHint?: string): Promise<Category> {
+  return classifyProductSync(title, description, cjCategoryHint);
 }
 
 export function formatCategoryName(category: string): string {
