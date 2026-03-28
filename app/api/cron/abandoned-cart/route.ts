@@ -1,7 +1,5 @@
 // app/api/cron/abandoned-cart/route.ts
-// Schedule in vercel.json: { "path": "/api/cron/abandoned-cart", "schedule": "0 * * * *" }
-
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { Resend } from 'resend'
 
@@ -10,120 +8,84 @@ const resend = new Resend(process.env.RESEND_API_KEY)
 export async function GET(request: Request) {
   const auth = request.headers.get('authorization')
   if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return new NextResponse('Unauthorized', { status: 401 })
   }
 
-  // Find carts abandoned > 1 hour ago, email not yet sent
+  // Find carts abandoned more than 1 hour ago, but less than 24 hours ago
   const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000)
+  const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000)
 
-  const carts = await prisma.abandonedCart.findMany({
+  const pendingCarts = await prisma.abandonedCart.findMany({
     where: {
       emailSent: false,
-      updatedAt: { lte: oneHourAgo },
+      updatedAt: { lte: oneHourAgo, gte: twentyFourHoursAgo },
     },
-    take: 50, // limit per run
+    take: 20,
   })
 
-  let sent = 0
-  let failed = 0
+  let sentCount = 0
 
-  for (const cart of carts) {
+  for (const cart of pendingCarts) {
+    // 1. Check if the user completed an order recently with this email
+    const completedOrder = await prisma.order.findFirst({
+      where: {
+        email: cart.email,
+        createdAt: { gte: cart.createdAt },
+      },
+    })
+
+    // If they bought something, delete the abandoned cart record and skip
+    if (completedOrder) {
+      await prisma.abandonedCart.delete({ where: { id: cart.id } })
+      continue
+    }
+
+    // 2. Prepare Email Content
+    const items = cart.cartData as any[]
+    const itemsListHtml = items.map(item => `
+      <div style="display:flex; margin-bottom:10px; border-bottom:1px solid #eee; padding-bottom:10px;">
+        <img src="${item.image}" width="50" height="50" style="object-fit:cover; border-radius:5px; margin-right:15px;" />
+        <div>
+          <p style="margin:0; font-weight:bold;">${item.title}</p>
+          <p style="margin:0; color:#666;">$${item.price.toFixed(2)} x ${item.quantity}</p>
+        </div>
+      </div>
+    `).join('')
+
+    // 3. Send Email via Resend
     try {
-      const items = (cart.cartData as any[]) || []
-      if (!items.length) continue
-
-      const itemsHtml = items
-        .map(
-          (item) => `
-          <tr>
-            <td style="padding:12px;border-bottom:1px solid #f3f4f6">
-              <img src="${item.image || ''}" width="48" height="48" style="border-radius:8px;object-fit:cover;vertical-align:middle;margin-right:10px" />
-              ${item.title}
-            </td>
-            <td style="padding:12px;border-bottom:1px solid #f3f4f6;text-align:right">
-              $${(item.price * item.quantity).toFixed(2)}
-            </td>
-          </tr>
-        `
-        )
-        .join('')
-
-      const subtotal = items.reduce(
-        (s: number, i: any) => s + i.price * i.quantity,
-        0
-      )
-
       await resend.emails.send({
         from: 'TealMart <orders@tealmart.com>',
         to: cart.email,
-        subject: '🛒 You left something behind!',
+        subject: '🛒 You left something in your cart!',
         html: `
-          <!DOCTYPE html>
-          <html>
-          <body style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;color:#333">
-            
-            <div style="background:linear-gradient(135deg,#14B8A6,#0D9488);padding:30px;border-radius:12px 12px 0 0;text-align:center">
-              <h1 style="color:white;margin:0;font-size:24px">
-                You left something behind!
-              </h1>
+          <div style="font-family:sans-serif; max-width:600px; margin:0 auto; padding:20px; border:1px solid #e2e8f0; border-radius:10px;">
+            <h2 style="color:#14b8a6;">Items are waiting for you!</h2>
+            <p>Hi there, we noticed you left some great items in your TealMart cart. They are still available, but they move fast!</p>
+            <div style="margin:25px 0;">
+              ${itemsListHtml}
             </div>
-
-            <div style="background:#f9fafb;padding:30px;border-radius:0 0 12px 12px">
-              <p style="font-size:16px;color:#374151">
-                Hi there! You have items in your TealMart cart. Come back and complete your order before they sell out!
-              </p>
-
-              <table style="width:100%;border-collapse:collapse;background:white;border-radius:8px;overflow:hidden;margin:20px 0">
-                ${itemsHtml}
-              </table>
-
-              <p style="font-size:18px;font-weight:bold;text-align:right;color:#111">
-                Subtotal: $${subtotal.toFixed(2)}
-              </p>
-
-              <div style="text-align:center;margin:24px 0">
-                <a href="${process.env.NEXTAUTH_URL || 'https://tealmart.vercel.app'}/cart"
-                   style="background:linear-gradient(135deg,#14B8A6,#0D9488);color:white;padding:14px 36px;border-radius:50px;text-decoration:none;font-weight:bold;font-size:16px;display:inline-block">
-                  Complete My Order →
-                </a>
-              </div>
-
-              <p style="font-size:12px;color:#9ca3af;text-align:center">
-                This email was sent because you started a checkout on TealMart.<br/>
-                <a href="${process.env.NEXTAUTH_URL}/unsubscribe?email=${encodeURIComponent(
-                  cart.email
-                )}" style="color:#9ca3af">
-                  Unsubscribe
-                </a>
-              </p>
-            </div>
-
-          </body>
-          </html>
-        `,
+            <a href="${process.env.NEXT_PUBLIC_APP_URL}/cart" 
+               style="display:inline-block; background:#14b8a6; color:white; padding:12px 25px; text-decoration:none; border-radius:8px; font-weight:bold;">
+               Finish Checkout Now →
+            </a>
+            <p style="font-size:12px; color:#94a3b8; margin-top:30px;">
+              You received this because you started a checkout on TealMart.
+            </p>
+          </div>
+        `
       })
 
+      // 4. Mark as sent
       await prisma.abandonedCart.update({
         where: { id: cart.id },
-        data: {
-          emailSent: true,
-          sentAt: new Date(),
-        },
+        data: { emailSent: true, sentAt: new Date() }
       })
-
-      sent++
-    } catch (err) {
-      console.error(
-        `[abandoned-cart cron] Failed for ${cart.email}:`,
-        err
-      )
-      failed++
+      sentCount++
+    } catch (e) {
+      console.error(`Failed to send email to ${cart.email}`, e)
     }
   }
 
-  console.log(
-    `[abandoned-cart cron] Sent: ${sent}, Failed: ${failed}`
-  )
-
-  return NextResponse.json({ ok: true, sent, failed })
+  return NextResponse.json({ success: true, emailsSent: sentCount })
 }
