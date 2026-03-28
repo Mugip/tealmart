@@ -1,0 +1,41 @@
+{
+  "Navigation": {
+    "products": "Productos",
+    "categories": "Categorías",
+    "about": "Nosotros",
+    "contact": "Contacto",
+    "signIn": "Iniciar Sesión",
+    "myProfile": "Mi Perfil",
+    "orderHistory": "Mis Pedidos",
+    "signOut": "Cerrar Sesión"
+  },
+  "HomePage": {
+    "title": "Descubre Productos de Calidad Superior",
+    "subtitle": "Calificado con 4.8/5 por clientes en todo el mundo",
+    "cta": "Comprar Ahora",
+    "trending": "Tendencias Actuales",
+    "newArrivals": "Recién Llegados"
+  },
+  "Cart": {
+    "header": "Tu Bolsa de Compras",
+    "checkout": "Pagar Ahora",
+    "viewCart": "Ver Carrito",
+    "empty": "Tu bolsa está vacía",
+    "total": "Total Estimado",
+    "items": "artículos",
+    "pairsWell": "Combina bien con..."
+  },
+  "TrustBadges": {
+    "freeShipping": "Envío Gratis",
+    "securePayment": "Pago Seguro",
+    "easyReturns": "Devoluciones Fáciles",
+    "fastDelivery": "Entrega Rápida"
+  },
+  "Product": {
+    "addToCart": "Añadir al Carrito",
+    "buyNow": "Comprar Ya",
+    "description": "Descripción",
+    "reviews": "Reseñas",
+    "relatedProducts": "Productos Relacionados"
+  }
+  }
