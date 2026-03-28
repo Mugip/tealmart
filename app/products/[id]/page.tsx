@@ -1,7 +1,4 @@
 // app/products/[id]/page.tsx
-// SERVER COMPONENT (SEO wrapper)
-// The actual interactive UI lives in ProductPageClient.tsx
-
 import { prisma } from '@/lib/db'
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
@@ -20,8 +17,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       images: true,
       price: true,
       category: true,
-      rating: true,
-      reviewCount: true,
     },
   })
 
@@ -41,67 +36,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     openGraph: {
       title: product.title,
       description: cleanDescription,
-      images: product.images[0]
-        ? [{ url: product.images[0], width: 800, height: 800 }]
-        : [],
+      images: product.images[0] ? [{ url: product.images[0], width: 800, height: 800 }] :[],
       type: 'website',
     },
-    twitter: {
-      card: 'summary_large_image',
-      title: product.title,
-      description: cleanDescription,
-      images: product.images[0] ? [product.images[0]] : [],
-    },
   }
-}
-
-// JSON-LD structured data for SEO
-function ProductJsonLd({ product, id }: { product: any; id: string }) {
-  const schema = {
-    '@context': 'https://schema.org',
-    '@type': 'Product',
-    name: product.title,
-    description: product.description
-      .replace(/<[^>]+>/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim()
-      .slice(0, 500),
-    image: product.images,
-    sku: id,
-    brand: { '@type': 'Brand', name: 'TealMart' },
-    offers: {
-      '@type': 'Offer',
-      url: `https://tealmart.vercel.app/products/${id}`,
-      priceCurrency: 'USD',
-      price: product.price.toFixed(2),
-      availability:
-        product.stock > 0
-          ? 'https://schema.org/InStock'
-          : 'https://schema.org/OutOfStock',
-      seller: { '@type': 'Organization', name: 'TealMart' },
-    },
-    ...(product.rating && product.reviewCount > 0
-      ? {
-          aggregateRating: {
-            '@type': 'AggregateRating',
-            ratingValue: product.rating,
-            reviewCount: product.reviewCount,
-            bestRating: 5,
-            worstRating: 1,
-          },
-        }
-      : {}),
-  }
-
-  return (
-    <script
-      type="application/ld+json"
-      dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
-    />
-  )
 }
 
 export default async function ProductPage({ params }: Props) {
+  // SERVER-SIDE FETCH: Zero loading spinners on the client!
   const product = await prisma.product.findUnique({
     where: { id: params.id },
     select: {
@@ -109,19 +51,28 @@ export default async function ProductPage({ params }: Props) {
       title: true,
       description: true,
       price: true,
+      compareAtPrice: true,
       images: true,
       rating: true,
       reviewCount: true,
       stock: true,
+      category: true,
+      tags: true,
+      variants: true,
     },
   })
 
   if (!product) notFound()
 
+  // Increment views silently in the background
+  prisma.product.update({
+    where: { id: params.id },
+    data: { views: { increment: 1 } },
+  }).catch(() => {})
+
   return (
     <>
-      <ProductJsonLd product={product} id={params.id} />
-      <ProductPageClient params={params} />
+      <ProductPageClient initialProduct={product} />
     </>
   )
-               }
+}
