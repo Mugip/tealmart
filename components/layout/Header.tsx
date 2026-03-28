@@ -1,4 +1,4 @@
-// components/layout/Header.tsx 
+// components/layout/Header.tsx - FIXED LOGO
 'use client'
 
 import Link from 'next/link'
@@ -38,14 +38,14 @@ export default function Header() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-14 sm:h-16 gap-2 sm:gap-4">
           
-          {/* Logo */}
+          {/* Logo - FIXED: Always show TealMart text */}
           <Link href="/" className="flex items-center space-x-2 flex-shrink-0">
             <img 
               src="/logo.svg" 
               alt="TealMart Logo" 
               className="h-8 sm:h-10 w-auto object-contain" 
             />
-            <span className="text-lg sm:text-2xl font-bold text-gray-900 hidden sm:block">TealMart</span>
+            <span className="text-lg sm:text-2xl font-bold text-gray-900">TealMart</span>
           </Link>
 
           {/* Desktop Search */}
