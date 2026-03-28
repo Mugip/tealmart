@@ -259,6 +259,7 @@ export default function ProductPageClient({ initialProduct }: { initialProduct: 
           </div>
         </div>
 
+        {/* Upsell */}
         <UpsellSection 
           currentCategoryId={product.category} 
           excludeId={product.id}
