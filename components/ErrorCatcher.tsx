@@ -25,7 +25,7 @@ async function sendToSentry(error: string, stack?: string, context?: string) {
         message: error,
         exception: stack
           ? {
-              values:[
+              values: [
                 {
                   type: 'Error',
                   value: error,
@@ -57,9 +57,12 @@ export default function ErrorCatcher() {
           ? payload.error
           : payload.error?.message || 'Unknown client error'
 
-      // IGNORING BROWSER NOISE: Don't log generic cross-origin "Script error."
-      if (errorMessage === 'Script error.' || errorMessage.includes('ResizeObserver')) {
-        return;
+      // Ignore noisy browser errors
+      if (
+        errorMessage === 'Script error.' ||
+        errorMessage.includes('ResizeObserver')
+      ) {
+        return
       }
 
       try {
@@ -105,4 +108,7 @@ export default function ErrorCatcher() {
       window.removeEventListener('error', handleError)
       window.removeEventListener('unhandledrejection', handlePromiseError)
     }
-  },
+  }, [])
+
+  return null
+}
