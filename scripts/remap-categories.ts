@@ -24,8 +24,8 @@ async function remapAllCategories() {
     for (let i = 0; i < products.length; i++) {
       const product = products[i]
 
-      // We intentionally DO NOT pass `product.category` here, because it contains the bad data.
-      // We force the classifier to read ONLY the title and description.
+      // We intentionally DO NOT pass `product.category` here, because it contains the bad data from the previous engine.
+      // We force the new NLP classifier to read ONLY the title and description to fix the database.
       const newCategory = classifyProductSync(
         product.title,
         product.description
@@ -37,7 +37,7 @@ async function remapAllCategories() {
           data: { category: newCategory },
         })
         updated++
-        console.log(`✏️  ${product.title.substring(0, 30)}... | ${product.category} → ${newCategory}`)
+        console.log(`✏️  ${product.title.substring(0, 40)}... | ${product.category} → ${newCategory}`)
       }
     }
 
