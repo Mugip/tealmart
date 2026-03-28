@@ -1,23 +1,17 @@
 // app/layout.tsx
-
 import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
-import { SessionProvider } from '@/components/providers/SessionProvider'
-import { Toaster } from 'react-hot-toast'
-import { CartProvider } from '@/lib/contexts/CartContext'
-import { WishlistProvider } from '@/lib/contexts/WishlistContext'
+import GlobalProviders from '@/components/providers/GlobalProviders'
 import ConditionalShell from '@/components/layout/ConditionalShell'
 import ErrorCatcher from '@/components/ErrorCatcher'
-import CookieConsent from '@/components/CookieConsent'
 import { generateMetadata } from '@/lib/metadata'
 
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = generateMetadata({
   title: 'TealMart - Shop Quality Products at Amazing Prices',
-  description:
-    'Discover trending products across fashion, electronics, home goods, and more. Free shipping on orders over $50. 30-day money-back guarantee.',
+  description: 'Discover trending products across fashion, electronics, home goods, and more.',
 })
 
 export const viewport: Viewport = {
@@ -28,43 +22,18 @@ export const viewport: Viewport = {
   themeColor: '#14B8A6',
 }
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
       <head>
-        {/* Strictly enforce scalable SVG icons */}
         <link rel="icon" type="image/svg+xml" href="/favicon.svg" sizes="any" />
         <link rel="apple-touch-icon" type="image/svg+xml" href="/apple-touch-icon.svg" />
-        <link rel="manifest" href="/manifest.json" />
-
-        <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta
-          name="apple-mobile-web-app-status-bar-style"
-          content="default"
-        />
-        <meta name="apple-mobile-web-app-title" content="TealMart" />
-
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://cdn.jsdelivr.net" />
       </head>
-
-      <body className={inter.className}>
+      <body className={`${inter.className} overflow-x-hidden w-full max-w-[100vw]`}>
         <ErrorCatcher />
-
-        <SessionProvider>
-          <CartProvider>
-            <WishlistProvider>
-              <ConditionalShell>{children}</ConditionalShell>
-
-              <Toaster position="top-right" />
-              <CookieConsent />
-            </WishlistProvider>
-          </CartProvider>
-        </SessionProvider>
+        <GlobalProviders>
+          <ConditionalShell>{children}</ConditionalShell>
+        </GlobalProviders>
       </body>
     </html>
   )
