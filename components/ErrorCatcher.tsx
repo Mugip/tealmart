@@ -1,4 +1,3 @@
-// components/ErrorCatcher.tsx
 'use client'
 
 import { useEffect } from 'react'
@@ -106,5 +105,4 @@ export default function ErrorCatcher() {
       window.removeEventListener('error', handleError)
       window.removeEventListener('unhandledrejection', handlePromiseError)
     }
-  }
-            }
+  },
