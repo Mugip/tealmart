@@ -24,7 +24,7 @@ export default function ChatBot() {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight
     }
   }, [messages])
-
+    
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!input.trim() || isLoading) return
@@ -40,15 +40,18 @@ export default function ChatBot() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: [...messages, { role: 'user', content: userMsg }] })
       })
+      
       const data = await res.json()
+      
+      // If the AI says it's loading, we don't treat it as a final failure
       setMessages(prev => [...prev, data])
     } catch (err) {
-      setMessages(prev => [...prev, { role: 'assistant', content: "Sorry, I lost my connection. 🔌 Please try again!" }])
+      setMessages(prev => [...prev, { role: 'assistant', content: "Connection lost. Please check your internet! 🌐" }])
     } finally {
       setIsLoading(false)
     }
   }
-
+  
   return (
     <div className="fixed bottom-6 right-6 z-[100] flex flex-col items-end">
       
