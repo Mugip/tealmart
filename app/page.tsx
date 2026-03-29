@@ -125,44 +125,7 @@ export default async function Home() {
       {/* Hero Section - FIXED: Products prop added */}
       <Hero stats={stats} products={featuredProducts} />
 
-      {/* 🛡️ Premium Trust Badges */}
-      <section className="bg-white py-10 border-b border-gray-100">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-            <div className="flex flex-col items-center text-center p-4 rounded-3xl bg-gray-50 border border-gray-100 transition-all hover:shadow-lg">
-              <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center shadow-sm mb-4">
-                <Truck className="text-tiffany-600" size={28} />
-              </div>
-              <h3 className="text-sm font-black text-gray-900 uppercase tracking-widest">Free Shipping</h3>
-              <p className="text-xs text-gray-500 mt-1">On orders over $50</p>
-            </div>
-            
-            <div className="flex flex-col items-center text-center p-4 rounded-3xl bg-gray-50 border border-gray-100 transition-all hover:shadow-lg">
-              <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center shadow-sm mb-4">
-                <Shield className="text-tiffany-600" size={28} />
-              </div>
-              <h3 className="text-sm font-black text-gray-900 uppercase tracking-widest">Secure Payment</h3>
-              <p className="text-xs text-gray-500 mt-1">100% Encrypted</p>
-            </div>
-            
-            <div className="flex flex-col items-center text-center p-4 rounded-3xl bg-gray-50 border border-gray-100 transition-all hover:shadow-lg">
-              <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center shadow-sm mb-4">
-                <RotateCcw className="text-tiffany-600" size={28} />
-              </div>
-              <h3 className="text-sm font-black text-gray-900 uppercase tracking-widest">Easy Returns</h3>
-              <p className="text-xs text-gray-500 mt-1">30-Day Guarantee</p>
-            </div>
-
-            <div className="flex flex-col items-center text-center p-4 rounded-3xl bg-gray-50 border border-gray-100 transition-all hover:shadow-lg">
-              <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center shadow-sm mb-4">
-                <Sparkles className="text-tiffany-600" size={28} />
-              </div>
-              <h3 className="text-sm font-black text-gray-900 uppercase tracking-widest">Premium Quality</h3>
-              <p className="text-xs text-gray-500 mt-1">Sourced Globally</p>
-            </div>
-          </div>
-        </div>
-      </section>
+      {/* 🛡️ category preview */}
       
       <FeaturedCategories categories={categories} />
 
