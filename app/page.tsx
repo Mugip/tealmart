@@ -22,7 +22,7 @@ async function getFeaturedProducts() {
     return await prisma.product.findMany({
       where: { isActive: true },
       take: 8,
-      orderBy:[{ isFeatured: 'desc' }, { views: 'desc' }, { createdAt: 'desc' }],
+      orderBy: [{ isFeatured: 'desc' }, { views: 'desc' }, { createdAt: 'desc' }],
     })
   }, 3600)
 }
@@ -104,7 +104,14 @@ async function getStats() {
 }
 
 export default async function Home() {
-  const[featuredProducts, latestProducts, trendingProducts, recommendedProducts, categories, stats] = await Promise.all([
+  const [
+    featuredProducts, 
+    latestProducts, 
+    trendingProducts, 
+    recommendedProducts, 
+    categories, 
+    stats
+  ] = await Promise.all([
     getFeaturedProducts(),
     getLatestProducts(),
     getTrendingProducts(),
@@ -115,43 +122,44 @@ export default async function Home() {
 
   return (
     <div className="bg-gray-50">
-      <Hero stats={stats} />
+      {/* Hero Section - FIXED: Products prop added */}
+      <Hero stats={stats} products={featuredProducts} />
 
-      {/* FIXED SCREENSHOT ISSUE: Sleek Trust Badges instead of massive vertical blocks */}
-      <section className="bg-white py-6 border-b border-gray-100 overflow-x-auto">
+      {/* 🛡️ Premium Trust Badges */}
+      <section className="bg-white py-10 border-b border-gray-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex sm:grid sm:grid-cols-3 gap-4 sm:gap-8 min-w-max sm:min-w-0">
-            
-            <div className="flex items-center gap-4 p-4 rounded-2xl bg-gray-50 border border-gray-100 hover:border-tiffany-200 transition-colors group min-w-[250px] sm:min-w-0">
-              <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-sm flex-shrink-0 group-hover:scale-110 transition-transform">
-                <Truck className="text-tiffany-600" size={20} />
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+            <div className="flex flex-col items-center text-center p-4 rounded-3xl bg-gray-50 border border-gray-100 transition-all hover:shadow-lg">
+              <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center shadow-sm mb-4">
+                <Truck className="text-tiffany-600" size={28} />
               </div>
-              <div>
-                <h3 className="text-sm font-bold text-gray-900">Free Shipping</h3>
-                <p className="text-xs text-gray-500">On orders over $50</p>
-              </div>
+              <h3 className="text-sm font-black text-gray-900 uppercase tracking-widest">Free Shipping</h3>
+              <p className="text-xs text-gray-500 mt-1">On orders over $50</p>
             </div>
             
-            <div className="flex items-center gap-4 p-4 rounded-2xl bg-gray-50 border border-gray-100 hover:border-tiffany-200 transition-colors group min-w-[250px] sm:min-w-0">
-              <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-sm flex-shrink-0 group-hover:scale-110 transition-transform">
-                <Shield className="text-tiffany-600" size={20} />
+            <div className="flex flex-col items-center text-center p-4 rounded-3xl bg-gray-50 border border-gray-100 transition-all hover:shadow-lg">
+              <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center shadow-sm mb-4">
+                <Shield className="text-tiffany-600" size={28} />
               </div>
-              <div>
-                <h3 className="text-sm font-bold text-gray-900">Secure Payment</h3>
-                <p className="text-xs text-gray-500">100% safe checkout</p>
-              </div>
+              <h3 className="text-sm font-black text-gray-900 uppercase tracking-widest">Secure Payment</h3>
+              <p className="text-xs text-gray-500 mt-1">100% Encrypted</p>
             </div>
             
-            <div className="flex items-center gap-4 p-4 rounded-2xl bg-gray-50 border border-gray-100 hover:border-tiffany-200 transition-colors group min-w-[250px] sm:min-w-0">
-              <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-sm flex-shrink-0 group-hover:scale-110 transition-transform">
-                <RotateCcw className="text-tiffany-600" size={20} />
+            <div className="flex flex-col items-center text-center p-4 rounded-3xl bg-gray-50 border border-gray-100 transition-all hover:shadow-lg">
+              <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center shadow-sm mb-4">
+                <RotateCcw className="text-tiffany-600" size={28} />
               </div>
-              <div>
-                <h3 className="text-sm font-bold text-gray-900">Easy Returns</h3>
-                <p className="text-xs text-gray-500">30-day money-back</p>
-              </div>
+              <h3 className="text-sm font-black text-gray-900 uppercase tracking-widest">Easy Returns</h3>
+              <p className="text-xs text-gray-500 mt-1">30-Day Guarantee</p>
             </div>
 
+            <div className="flex flex-col items-center text-center p-4 rounded-3xl bg-gray-50 border border-gray-100 transition-all hover:shadow-lg">
+              <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center shadow-sm mb-4">
+                <Sparkles className="text-tiffany-600" size={28} />
+              </div>
+              <h3 className="text-sm font-black text-gray-900 uppercase tracking-widest">Premium Quality</h3>
+              <p className="text-xs text-gray-500 mt-1">Sourced Globally</p>
+            </div>
           </div>
         </div>
       </section>
@@ -160,18 +168,18 @@ export default async function Home() {
 
       {/* Recommended For You */}
       {recommendedProducts.length > 0 && (
-        <section className="bg-gradient-to-b from-white to-gray-50 py-12 sm:py-16">
+        <section className="bg-gradient-to-b from-white to-gray-50 py-16">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between mb-8">
               <div>
                 <div className="flex items-center gap-2 mb-2">
                   <Sparkles className="text-purple-500" size={24} />
-                  <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">Recommended For You</h2>
+                  <h2 className="text-2xl sm:text-3xl font-black text-gray-900 tracking-tight">Recommended For You</h2>
                 </div>
-                <p className="text-gray-600 text-sm sm:text-base">Based on global top-rated customer purchases</p>
+                <p className="text-gray-500 text-sm sm:text-base font-medium">Based on your browsing habits and global ratings.</p>
               </div>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
               {recommendedProducts.map((product) => (
                 <ProductCard key={product.id} product={product} />
               ))}
@@ -180,44 +188,24 @@ export default async function Home() {
         </section>
       )}
 
-      {/* Featured Products */}
-      {featuredProducts.length > 0 && (
-        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16 lg:py-20">
-          <div className="flex items-center justify-between mb-8 sm:mb-12">
-            <div>
-              <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
-                <Star className="text-yellow-500 fill-yellow-500" size={24} />
-                <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900">Featured Products</h2>
-              </div>
-              <p className="text-gray-600 text-sm sm:text-base lg:text-lg">Handpicked favorites just for you</p>
-            </div>
-            <Link href="/products?featured=true" className="hidden md:flex items-center gap-2 px-4 sm:px-6 py-2 sm:py-3 bg-gradient-to-r from-tiffany-500 to-tiffany-600 text-white font-bold rounded-xl hover:shadow-lg transition-all group text-sm sm:text-base">
-              View All
-              <ArrowRight className="group-hover:translate-x-1 transition-transform" size={18} />
-            </Link>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-            {featuredProducts.map((product) => (
-              <ProductCard key={product.id} product={product} />
-            ))}
-          </div>
-        </section>
-      )}
-
       {/* Trending Products */}
       {trendingProducts.length > 0 && (
-        <section className="bg-gradient-to-br from-orange-50 to-red-50 py-12 sm:py-16 lg:py-20">
+        <section className="bg-gray-900 py-20 overflow-hidden">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex items-center justify-between mb-8 sm:mb-12">
+            <div className="flex items-center justify-between mb-12">
               <div>
-                <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
-                  <TrendingUp className="text-orange-500" size={24} />
-                  <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900">Trending Now</h2>
-                </div>
-                <p className="text-gray-600 text-sm sm:text-base lg:text-lg">What everyone's buying right now</p>
+                <h2 className="text-3xl sm:text-4xl font-black text-white tracking-tighter flex items-center gap-3">
+                  <TrendingUp className="text-tiffany-400" />
+                  Trending <span className="text-tiffany-400">Right Now</span>
+                </h2>
+                <p className="text-gray-400 mt-2 font-medium">Items that are selling out fast across the globe.</p>
               </div>
+              <Link href="/products?sort=popular" className="hidden md:flex items-center gap-2 text-white font-bold hover:text-tiffany-400 transition-colors group">
+                Shop Trends
+                <ArrowRight className="group-hover:translate-x-1 transition-transform" size={18} />
+              </Link>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-8">
               {trendingProducts.map((product) => (
                 <ProductCard key={product.id} product={product} />
               ))}
@@ -227,49 +215,53 @@ export default async function Home() {
       )}
 
       {/* New Arrivals */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16 lg:py-20">
-        <div className="flex items-center justify-between mb-8 sm:mb-12">
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+        <div className="flex items-center justify-between mb-10">
           <div>
-            <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
-              <Zap className="text-purple-500" size={24} />
-              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900">New Arrivals</h2>
-            </div>
-            <p className="text-gray-600 text-sm sm:text-base lg:text-lg">Fresh products added daily</p>
+            <h2 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight flex items-center gap-3">
+              <Zap className="text-yellow-500 fill-yellow-500" />
+              New Arrivals
+            </h2>
+            <p className="text-gray-500 mt-2 font-medium">Fresh styles and tech added to the catalog every day.</p>
           </div>
-          <Link href="/products?sort=newest" className="hidden md:flex items-center gap-2 px-4 sm:px-6 py-2 sm:py-3 bg-gradient-to-r from-purple-500 to-purple-600 text-white font-bold rounded-xl hover:shadow-lg transition-all group text-sm sm:text-base">
-            View All
-            <ArrowRight className="group-hover:translate-x-1 transition-transform" size={18} />
-          </Link>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
           {latestProducts.map((product) => (
             <ProductCard key={product.id} product={product} />
           ))}
         </div>
+        <div className="mt-12 text-center">
+            <Link href="/products?sort=newest" className="inline-flex items-center gap-2 px-10 py-4 bg-gray-100 hover:bg-gray-200 text-gray-900 font-bold rounded-2xl transition-all">
+                Explore New Drops
+                <ArrowRight size={18} />
+            </Link>
+        </div>
       </section>
 
-      {/* Newsletter Section */}
-      <section className="bg-white py-16 sm:py-24 border-b border-gray-100">
+      {/* ✉️ Newsletter Section */}
+      <section className="bg-tiffany-500 py-20">
         <div className="max-w-4xl mx-auto px-4 text-center">
-          <Mail className="w-12 h-12 text-tiffany-500 mx-auto mb-4" />
-          <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">Get 10% Off Your First Order</h2>
-          <p className="text-gray-600 mb-8">Join our newsletter to receive exclusive drops, special offers, and more.</p>
-          <form className="flex flex-col sm:flex-row gap-3 max-w-lg mx-auto">
+          <div className="w-20 h-20 bg-white/20 backdrop-blur-md rounded-3xl flex items-center justify-center mx-auto mb-6">
+            <Mail className="text-white" size={32} />
+          </div>
+          <h2 className="text-3xl sm:text-5xl font-black text-white mb-4 tracking-tighter">Get 10% Off Your First Order</h2>
+          <p className="text-tiffany-100 text-lg mb-10 font-medium">Join 50,000+ shoppers receiving weekly curated deals and exclusive drops.</p>
+          <form className="flex flex-col sm:flex-row gap-3 max-w-lg mx-auto p-2 bg-white/10 backdrop-blur-xl rounded-[2rem] border border-white/20">
             <input 
               type="email" 
-              placeholder="Enter your email address" 
+              placeholder="Enter your email" 
               required
-              className="flex-1 px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-tiffany-500 focus:border-tiffany-500 outline-none"
+              className="flex-1 px-6 py-4 rounded-2xl bg-white text-gray-900 placeholder:text-gray-400 focus:ring-0 outline-none font-bold"
             />
             <button 
               type="submit" 
-              className="px-6 py-3 bg-gray-900 hover:bg-gray-800 text-white font-bold rounded-xl transition-colors whitespace-nowrap"
+              className="px-8 py-4 bg-gray-900 hover:bg-black text-white font-black rounded-2xl transition-all"
             >
-              Subscribe
+              Join Us
             </button>
           </form>
         </div>
       </section>
     </div>
   )
-              }
+      }
