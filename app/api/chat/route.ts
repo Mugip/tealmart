@@ -1,99 +1,101 @@
 // app/api/chat/route.ts
+
 import { NextRequest, NextResponse } from 'next/server'
 
 const HUGGINGFACE_API_KEY = process.env.HUGGINGFACE_API_KEY;
 
-// ✅ NEW HUGGING FACE ROUTER ENDPOINT (Updated for 2024/2025)
-const MODEL_URL = "https://router.huggingface.co/hf-inference/models/mistralai/Mistral-7B-Instruct-v0.3";
+// ✅ Using the most stable OpenAI-compatible endpoint for Hugging Face
+const API_URL = "https://api-inference.huggingface.co/v1/chat/completions";
 
 export async function POST(req: NextRequest) {
   try {
     const { messages } = await req.json();
 
     if (!HUGGINGFACE_API_KEY) {
-      console.error("❌ CHAT ERROR: HUGGINGFACE_API_KEY is missing from .env");
+      console.error("❌ CHAT ERROR: HUGGINGFACE_API_KEY missing");
       return NextResponse.json({ 
         role: 'assistant', 
-        content: "Configuration error: API Key missing on server. ⚙️" 
+        content: "Configuration error on server. API Key missing. ⚙️" 
       });
     }
 
-    // 1. TealMart Intelligence
-    const systemPrompt = `You are Tealy, the AI support for TealMart. 
-    TealMart Info: 
-    - Free shipping over $50 (7-14 days). 
-    - 30-day money-back guarantee. 
-    - We use live exchange rates for global currencies.
-    - If asked about an order, suggest checking the "Track Order" page.
-    Be friendly, short, and use emojis. 🛍️`;
+    // 1. TealMart Core Knowledge
+    const systemPrompt = `You are Tealy, the helpful AI assistant for TealMart.
+    Rules:
+    - Shipping: Free on orders over $50. Global delivery in 7-14 days.
+    - Returns: 30-day money-back guarantee.
+    - Payments: We accept Stripe and Flutterwave.
+    - Tracking: Tell users to visit the "Track Order" page with their email and order number.
+    - Tone: Friendly, concise, and use emojis. 🛍️`;
 
-    const userMessage = messages[messages.length - 1].content;
+    // 2. Prepare the payload in OpenAI format
+    const payload = {
+      model: "mistralai/Mistral-7B-Instruct-v0.3",
+      messages: [
+        { role: "system", content: systemPrompt },
+        ...messages
+      ],
+      max_tokens: 200,
+      temperature: 0.7,
+      stream: false
+    };
 
-    // 2. Prepare the prompt for Mistral
-    const prompt = `<s>[INST] ${systemPrompt} \n\n User Question: ${userMessage} [/INST]`;
+    console.log("🤖 Tealy is calling the v1 Chat API...");
 
-    console.log("🤖 Tealy is connecting to the new HF Router...");
-
-    // 3. Make the request to the new endpoint
-    const response = await fetch(MODEL_URL, {
+    // 3. Fetch with extra error safety
+    const response = await fetch(API_URL, {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${HUGGINGFACE_API_KEY}`,
         "Content-Type": "application/json",
+        "x-wait-for-model": "true" // Tells HF to wait for model to load instead of failing
       },
-      body: JSON.stringify({
-        inputs: prompt,
-        parameters: { 
-          max_new_tokens: 200, 
-          temperature: 0.7,
-          wait_for_model: true // Crucial: API will wait up to 60s for model to load
-        }
-      }),
+      body: JSON.stringify(payload),
     });
+
+    // 4. Safely parse JSON to avoid "Unexpected token N" error
+    const contentType = response.headers.get("content-type");
+    if (!contentType || !contentType.includes("application/json")) {
+      const textError = await response.text();
+      console.error("❌ NON-JSON API RESPONSE:", textError);
+      return NextResponse.json({ 
+        role: 'assistant', 
+        content: "I'm having a hard time connecting right now. Please try again in 30 seconds! ☕" 
+      });
+    }
 
     const result = await response.json();
 
-    // 4. Handle Errors from the new Router
+    // 5. Handle standard API errors
     if (!response.ok) {
-      console.error("❌ NEW ROUTER ERROR:", JSON.stringify(result, null, 2));
+      console.error("❌ API ERROR:", result);
       
-      // Handle the specific "Model Loading" case
       if (result.error?.includes("loading")) {
         return NextResponse.json({ 
           role: 'assistant', 
-          content: "I'm just stretching and waking up! ☕ Give me 10 seconds and ask me again!" 
+          content: "I'm just waking up! Give me about 10 seconds and ask me again. 😴" 
         });
       }
 
       return NextResponse.json({ 
         role: 'assistant', 
-        content: "I'm having a bit of trouble reaching my database. Please try again in a moment! 🙏" 
+        content: "My connection to the brain is a bit shaky. Try again? 🙏" 
       });
     }
 
-    // 5. Parse and Clean the Output
-    let aiText = "";
-    if (Array.isArray(result)) {
-      aiText = result[0].generated_text || "";
-    } else {
-      aiText = result.generated_text || "";
-    }
-
-    // Mistral often returns the prompt + answer. This extracts just the answer.
-    const cleanText = aiText.includes("[/INST]") 
-      ? aiText.split("[/INST]").pop()?.trim() 
-      : aiText;
+    // 6. Return the actual message content
+    const aiMessage = result.choices?.[0]?.message?.content;
 
     return NextResponse.json({ 
       role: 'assistant', 
-      content: cleanText || "I'm here! How can I help you today? 😊" 
+      content: aiMessage || "I'm here! How can I help you shop today? 😊" 
     });
 
   } catch (error) {
-    console.error("💥 CHAT ROUTE CRITICAL FAILURE:", error);
+    console.error("💥 CRITICAL CHAT FAILURE:", error);
     return NextResponse.json({ 
       role: 'assistant', 
-      content: "Snagged a technical wire. Please try again or email us! 🔌" 
+      content: "Technical snag! 🔌 Please refresh the page and try again." 
     });
   }
 }
