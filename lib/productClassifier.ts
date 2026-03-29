@@ -1,6 +1,6 @@
 // lib/productClassifier.ts
 
-export const CANONICAL_CATEGORIES =[
+export const CANONICAL_CATEGORIES = [
   "Women's Clothing",
   "Men's Clothing",
   "Bags & Shoes",
@@ -25,11 +25,12 @@ interface CategoryRule {
   pattern: RegExp;
 }
 
-// ADVANCED HEURISTIC ENGINE:
-// Higher weight rules OVERRIDE lower weight rules. 
-// Phrases (weight 50+) beat single words (weight 20).
-const RULES: CategoryRule[] =[
-  // ── 1. HIGH PRIORITY PHRASES (Weight: 50-100) ──
+/**
+ * 1. ADVANCED HEURISTIC ENGINE RULES
+ * Phrases (weight 80) override single words (weight 20).
+ */
+const RULES: CategoryRule[] = [
+  // ── HIGH PRIORITY PHRASES (Weight: 80) ──
   { category: "Office & Stationery", weight: 80, pattern: /\b(gel pen|fountain pen|ballpoint|ink pen|sticky note|desk organizer|memo pad|pencil case|notebook planner)\b/gi },
   { category: "Health & Beauty", weight: 80, pattern: /\b(nail polish|gel nail|phototherapy pen|nail art|face cream|skin care|essential oil|hair dryer|hair clipper|makeup brush)\b/gi },
   { category: "Automotive", weight: 80, pattern: /\b(car bracket|car mount|car phone|car charger|steering wheel|dash cam|dashcam|car seat|tire pressure|car air freshener|car organizer|car decor)\b/gi },
@@ -40,11 +41,11 @@ const RULES: CategoryRule[] =[
   { category: "Women's Clothing", weight: 80, pattern: /\b(two-piece|two piece|evening dress|crop top|women's clothing|ladies blouse|cheongsam)\b/gi },
   { category: "Bags & Shoes", weight: 80, pattern: /\b(canvas shoes|running shoes|leather shoes|sports shoes|messenger bag|shoulder bag|tote bag|bucket bag|daddy shoes|pea shoes)\b/gi },
 
-  // ── 2. STRONG EXACT MATCHES (Weight: 30) ──
+  // ── STRONG EXACT MATCHES (Weight: 35) ──
   { category: "Bags & Shoes", weight: 35, pattern: /\b(shoes?|sneakers?|boots?|sandals?|slippers?|backpacks?|handbags?|purse|wallet|luggage)\b/gi },
   { category: "Jewelry & Watches", weight: 35, pattern: /\b(jewelry|jewellery|necklace|bracelet|earrings?|rings?|pendant|watches|wristwatch|silver|gold|diamond|gemstone)\b/gi },
 
-  // ── 3. STANDARD SINGLE WORDS (Weight: 20) ──
+  // ── STANDARD SINGLE WORDS (Weight: 20) ──
   { category: "Pet Supplies", weight: 20, pattern: /\b(pet|pets|dogs?|cats?|puppy|kitten|aquarium|bird cage|leash|harness|litter)\b/gi },
   { category: "Automotive", weight: 20, pattern: /\b(car|cars|auto|vehicle|motorcycle|windshield|tires?|tyres?|obd)\b/gi },
   { category: "Toys, Kids & Baby", weight: 20, pattern: /\b(toy|toys|plush|lego|puzzle|doll|baby|infant|toddler|stroller|diaper|kids?|childrens?|boys?|girls?)\b/gi },
@@ -59,10 +60,83 @@ const RULES: CategoryRule[] =[
   { category: "Food & Grocery", weight: 20, pattern: /\b(food|grocery|snacks?|coffee|tea|chocolate|candy|spice|seasoning)\b/gi },
 ];
 
-// FIXED: Added `cjCategoryHint?: string` back to the signature to satisfy TypeScript
-export function classifyProductSync(title?: string, description?: string, cjCategoryHint?: string): Category {
-  const text = `${title || ""} ${description?.slice(0, 100) || ""}`.toLowerCase();
-  
+/**
+ * 2. AI POWERED CLASSIFICATION (Hugging Face)
+ */
+let hfEnabled = true;
+let hfConsecutiveFailures = 0;
+const MAX_CONSECUTIVE_FAILURES = 5;
+
+async function classifyWithHuggingFace(
+  title: string,
+  description: string,
+  cjCategoryHint?: string
+): Promise<Category | null> {
+  if (!hfEnabled || hfConsecutiveFailures >= MAX_CONSECUTIVE_FAILURES) return null;
+
+  try {
+    const apiKey = process.env.HUGGINGFACE_API_KEY;
+    if (!apiKey) {
+      hfEnabled = false;
+      return null;
+    }
+
+    // Clean HTML and noise from description
+    const cleanDesc = (description || "").replace(/<[^>]*>?/gm, '').replace(/&nbsp;/g, ' ').slice(0, 300);
+    const text = `Product: ${title}. Description: ${cleanDesc}. Native Category: ${cjCategoryHint || 'None'}`;
+
+    const response = await fetch(
+      "https://api-inference.huggingface.co/models/facebook/bart-large-mnli",
+      {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          inputs: text,
+          parameters: { candidate_labels: CANONICAL_CATEGORIES, multi_label: false },
+        }),
+        signal: AbortSignal.timeout(6000),
+      }
+    );
+
+    const result = await response.json();
+
+    // Handle Model Loading State
+    if (result.error && result.error.includes('loading')) {
+      console.log(`🔄 HF Model waking up (Estimated: ${result.estimated_time || '5'}s)... using fallback`);
+      return null;
+    }
+
+    if (!response.ok) throw new Error(`HF Status: ${response.status}`);
+
+    hfConsecutiveFailures = 0;
+
+    // Return best match if confidence > 35%
+    if (result.scores && result.scores[0] > 0.35) {
+      console.log(`🤖 AI Result: ${result.labels[0]} (${(result.scores[0] * 100).toFixed(1)}%)`);
+      return result.labels[0] as Category;
+    }
+
+    return null;
+  } catch (error) {
+    hfConsecutiveFailures++;
+    console.error(`❌ AI Failed (${hfConsecutiveFailures}/${MAX_CONSECUTIVE_FAILURES})`);
+    if (hfConsecutiveFailures >= MAX_CONSECUTIVE_FAILURES) hfEnabled = false;
+    return null;
+  }
+}
+
+/**
+ * 3. HEURISTIC FALLBACK ENGINE
+ */
+function classifyWithHeuristics(
+  title?: string,
+  description?: string,
+  cjCategoryHint?: string
+): Category {
+  const text = `${title || ""} ${description?.slice(0, 150) || ""} ${cjCategoryHint || ""}`.toLowerCase();
   const scores: Record<string, number> = {};
 
   for (const rule of RULES) {
@@ -72,21 +146,70 @@ export function classifyProductSync(title?: string, description?: string, cjCate
     }
   }
 
-  // Sort by highest score
-  const sortedCategories = Object.entries(scores).sort((a, b) => b[1] - a[1]);
+  const sorted = Object.entries(scores).sort((a, b) => b[1] - a[1]);
   
-  if (sortedCategories.length > 0 && sortedCategories[0][1] >= 15) {
-    return sortedCategories[0][0] as Category;
+  if (sorted.length > 0 && sorted[0][1] >= 20) {
+    return sorted[0][0] as Category;
   }
 
   return "General";
 }
 
-// FIXED: Added `cjCategoryHint?: string` back to the signature to satisfy TypeScript
-export async function classifyProduct(title?: string, description?: string, cjCategoryHint?: string): Promise<Category> {
-  return classifyProductSync(title, description, cjCategoryHint);
+/**
+ * 4. PUBLIC INTERFACE
+ */
+
+export function classifyProductSync(
+  title?: string,
+  description?: string,
+  cjCategoryHint?: string
+): Category {
+  return classifyWithHeuristics(title, description, cjCategoryHint);
 }
 
+export async function classifyProduct(
+  title?: string,
+  description?: string,
+  cjCategoryHint?: string,
+  options?: { useAI?: boolean; forceHeuristic?: boolean }
+): Promise<Category> {
+  const shouldAttemptAI = options?.useAI !== false && !options?.forceHeuristic && title && title.length > 5;
+
+  if (shouldAttemptAI && hfEnabled) {
+    const aiResult = await classifyWithHuggingFace(title!, description || "", cjCategoryHint);
+    if (aiResult) return aiResult;
+  }
+
+  return classifyWithHeuristics(title, description, cjCategoryHint);
+}
+
+/**
+ * Smart batch: Calls AI only when heuristics are not confident ("General")
+ */
+export async function classifyProductsBatchSmart(
+  products: Array<{ title?: string; description?: string; cjCategoryHint?: string }>
+): Promise<Category[]> {
+  const results: Category[] = [];
+  
+  for (const p of products) {
+    const heuristic = classifyProductSync(p.title, p.description, p.cjCategoryHint);
+    
+    if (heuristic !== "General" || !hfEnabled) {
+      results.push(heuristic);
+    } else {
+      const aiResult = await classifyProduct(p.title, p.description, p.cjCategoryHint);
+      results.push(aiResult);
+      // Small delay to prevent rate-limiting on bulk AI calls
+      await new Promise(r => setTimeout(r, 100));
+    }
+  }
+  
+  return results;
+}
+
+/**
+ * UTILITIES
+ */
 export function formatCategoryName(category: string): string {
   if (!category || category === "General") return "All Products";
   return category;
@@ -94,19 +217,30 @@ export function formatCategoryName(category: string): string {
 
 export function getCategoryIcon(category: string): string {
   const lower = category.toLowerCase();
-  if (lower.includes("electronics")) return "📱";
-  if (lower.includes("women")) return "👗";
-  if (lower.includes("men")) return "👔";
-  if (lower.includes("bags") || lower.includes("shoes")) return "👜";
-  if (lower.includes("jewelry") || lower.includes("watch")) return "💍";
-  if (lower.includes("beauty") || lower.includes("hair")) return "💄";
-  if (lower.includes("home") || lower.includes("garden")) return "🏠";
+  if (lower.includes("clothing")) {
+     if (lower.includes("women")) return "👗";
+     return "👔";
+  }
+  if (lower.includes("shoe") || lower.includes("footwear")) return "👟";
+  if (lower.includes("bag") || lower.includes("backpack")) return "🎒";
+  if (lower.includes("jewelry") || lower.includes("watch") || lower.includes("ring")) return "💍";
+  if (lower.includes("beauty") || lower.includes("makeup") || lower.includes("hair")) return "💄";
+  if (lower.includes("electronics") || lower.includes("phone") || lower.includes("tech")) return "📱";
+  if (lower.includes("home") || lower.includes("garden") || lower.includes("furniture")) return "🏠";
   if (lower.includes("pet")) return "🐾";
   if (lower.includes("toy") || lower.includes("kids") || lower.includes("baby")) return "🧸";
-  if (lower.includes("sports") || lower.includes("outdoor")) return "⚽";
+  if (lower.includes("sports") || lower.includes("outdoor") || lower.includes("fitness")) return "⚽";
   if (lower.includes("automotive") || lower.includes("car")) return "🚗";
   if (lower.includes("tools") || lower.includes("hardware")) return "🔧";
-  if (lower.includes("office") || lower.includes("stationery")) return "📎";
-  if (lower.includes("food") || lower.includes("grocery")) return "🛒";
+  if (lower.includes("office") || lower.includes("stationery") || lower.includes("pen")) return "✒️";
+  if (lower.includes("food") || lower.includes("grocery") || lower.includes("snack")) return "🛒";
   return "🛍️";
 }
+
+export function getClassifierHealth() {
+  return {
+    aiEnabled: hfEnabled,
+    consecutiveFailures: hfConsecutiveFailures,
+    status: hfEnabled ? 'healthy' : 'disabled (too many failures)',
+  };
+            }
