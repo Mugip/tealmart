@@ -2,7 +2,7 @@
 'use client'
 
 import Link from 'next/link'
-import { ShoppingCart, Menu, User, Heart, LogOut, Package, ChevronDown, X, Globe } from 'lucide-react'
+import { ShoppingCart, Menu, User, Heart, LogOut, Package, ChevronDown, X } from 'lucide-react'
 import { useCart } from '@/lib/contexts/CartContext'
 import { useWishlist } from '@/lib/contexts/WishlistContext'
 import { useCurrency } from '@/lib/contexts/CurrencyContext'
@@ -39,25 +39,24 @@ export default function Header() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 gap-4">
           
-          {/* Logo */}
           <Link href="/" className="flex items-center space-x-2 flex-shrink-0 group">
             <img src="/logo.svg" alt="TealMart" className="h-9 w-auto object-contain transition-transform group-hover:scale-110" />
             <span className="text-xl sm:text-2xl font-black text-gray-900 tracking-tighter">TealMart</span>
           </Link>
 
-          {/* Desktop Search */}
           <div className="hidden md:block flex-1 max-w-md">
             <SearchBar />
           </div>
 
-          {/* High-End Global Switcher (Desktop) */}
-          <div className="hidden xl:flex items-center gap-2 bg-gray-50 p-1.5 rounded-2xl border border-gray-100 hover:border-tiffany-200 transition-colors group">
-            <span className="text-lg ml-1">{getFlag(currency)}</span>
+          {/* Dynamic Global Switcher (Desktop) */}
+          <div className="hidden lg:flex items-center gap-2 bg-gray-50 p-1.5 rounded-2xl border border-gray-100 hover:border-tiffany-200 transition-all shadow-sm">
+            <span className="text-xl ml-1 leading-none">{getFlag(currency)}</span>
             <select 
               value={currency} 
               onChange={(e) => setCurrency(e.target.value)}
-              className="bg-transparent text-xs font-black text-gray-700 outline-none cursor-pointer pr-1 uppercase tracking-tighter"
+              className="bg-transparent text-xs font-black text-gray-700 outline-none cursor-pointer pr-1"
             >
+              {/* Maps EVERY currency rate from the API to its dynamic flag */}
               {Object.keys(rates).sort().map(code => (
                 <option key={code} value={code}>
                   {getFlag(code)} {code}
@@ -66,15 +65,7 @@ export default function Header() {
             </select>
           </div>
 
-          {/* Desktop Navigation */}
-          <nav className="hidden lg:flex items-center space-x-6">
-            <Link href="/products" className="text-sm font-bold text-gray-600 hover:text-tiffany-600">Products</Link>
-            <Link href="/categories" className="text-sm font-bold text-gray-600 hover:text-tiffany-600">Categories</Link>
-          </nav>
-
-          {/* Right Icons */}
           <div className="flex items-center space-x-1 sm:space-x-3">
-            
             <Link href="/account/wishlist" className="relative p-2 text-gray-600 hover:text-red-500 transition-all">
               <Heart size={22} />
               {wishlistIds.size > 0 && <span className="absolute top-1 right-1 bg-red-500 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">{wishlistIds.size}</span>}
@@ -85,7 +76,6 @@ export default function Header() {
               {cartItemsCount > 0 && <span className="absolute top-1 right-1 bg-tiffany-500 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">{cartItemsCount}</span>}
             </Link>
 
-            {/* User Dropdown */}
             <div className="relative" ref={userMenuRef}>
               {session ? (
                 <button onClick={() => setIsUserMenuOpen(!isUserMenuOpen)} className="flex items-center gap-2 p-1 border rounded-full hover:bg-gray-50">
@@ -94,8 +84,8 @@ export default function Header() {
                   </div>
                 </button>
               ) : (
-                <Link href="/auth/signin" className="hidden sm:flex items-center gap-2 bg-gray-900 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-tiffany-600 transition-all">
-                  <User size={16} /> Sign In
+                <Link href="/auth/signin" className="hidden sm:flex items-center gap-2 bg-gray-900 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-tiffany-600 transition-all shadow-md">
+                   Sign In
                 </Link>
               )}
 
@@ -105,13 +95,13 @@ export default function Header() {
                     <p className="font-bold text-gray-900 text-sm truncate">{session.user?.name}</p>
                     <p className="text-[10px] text-gray-500 uppercase tracking-widest">{session.user?.email}</p>
                   </div>
-                  <Link href="/account" className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-600 hover:bg-tiffany-50 hover:text-tiffany-700 transition-colors font-medium">
+                  <Link href="/account" className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-600 hover:bg-tiffany-50 hover:text-tiffany-700 font-medium transition-colors">
                     <User size={16} /> My Account
                   </Link>
                   <Link href="/account/orders" className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-600 hover:bg-tiffany-50 hover:text-tiffany-700 font-medium transition-colors">
                     <Package size={16} /> Order History
                   </Link>
-                  <button onClick={() => signOut()} className="flex items-center gap-3 px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 w-full font-bold transition-colors">
+                  <button onClick={() => signOut()} className="flex items-center gap-3 px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 w-full font-bold transition-colors text-left">
                     <LogOut size={16} /> Sign Out
                   </button>
                 </div>
@@ -124,13 +114,11 @@ export default function Header() {
           </div>
         </div>
 
-        {/* Mobile Search Bar */}
         <div className="md:hidden pb-4">
           <SearchBar />
         </div>
       </div>
 
-      {/* Mobile Menu */}
       {isMenuOpen && (
         <div className="lg:hidden absolute top-full left-0 w-full bg-white border-t border-gray-100 shadow-2xl animate-in slide-in-from-top duration-300">
           <nav className="flex flex-col p-6 space-y-4">
@@ -138,10 +126,9 @@ export default function Header() {
             <Link href="/categories" onClick={() => setIsMenuOpen(false)} className="text-lg font-black text-gray-900">Categories</Link>
             
             <div className="pt-4 border-t flex flex-col gap-4">
-               {/* Mobile Currency Switcher */}
-               <div className="flex items-center justify-between bg-gray-50 p-4 rounded-2xl border border-gray-100">
+               <div className="flex items-center justify-between bg-gray-50 p-4 rounded-2xl border border-gray-100 shadow-inner">
                  <div className="flex items-center gap-3">
-                   <span className="text-2xl">{getFlag(currency)}</span>
+                   <span className="text-2xl leading-none">{getFlag(currency)}</span>
                    <span className="text-sm font-black text-gray-900 uppercase">Currency</span>
                  </div>
                  <select 
@@ -149,7 +136,7 @@ export default function Header() {
                   onChange={(e) => setCurrency(e.target.value)}
                   className="bg-white border-2 border-gray-200 px-3 py-1.5 rounded-xl font-black text-xs outline-none"
                  >
-                   {Object.keys(rates).map(c => <option key={c} value={c}>{getFlag(c)} {c}</option>)}
+                   {Object.keys(rates).sort().map(c => <option key={c} value={c}>{getFlag(c)} {c}</option>)}
                  </select>
                </div>
 
@@ -164,4 +151,4 @@ export default function Header() {
       )}
     </header>
   )
-            }
+              }
