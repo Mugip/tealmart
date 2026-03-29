@@ -1,10 +1,11 @@
-// components/home/FeaturedCategories.tsx - Update the Link wrapper
+// components/home/FeaturedCategories.tsx
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
-import { ChevronLeft, ChevronRight, ArrowRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ArrowRight, Sparkles, ShoppingBag } from 'lucide-react'
 import { formatCategoryName, getCategoryIcon } from '@/lib/productClassifier'
+import { useCurrency } from '@/lib/contexts/CurrencyContext' // ✅ Currency Integration
 import Image from 'next/image'
 
 interface Category {
@@ -24,173 +25,174 @@ interface FeaturedCategoriesProps {
 }
 
 export default function FeaturedCategories({ categories }: FeaturedCategoriesProps) {
-  const [currentIndex, setCurrentIndex] = useState(0)
-  const [isAutoScrolling, setIsAutoScrolling] = useState(true)
+  const { formatPrice } = useCurrency()
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const [showLeftArrow, setShowLeftArrow] = useState(false)
+  const [showRightArrow, setShowRightArrow] = useState(true)
 
-  useEffect(() => {
-    if (!isAutoScrolling || categories.length <= 1) return
-
-    const interval = setInterval(() => {
-      setCurrentIndex((prev) => (prev + 1) % categories.length)
-    }, 4000)
-
-    return () => clearInterval(interval)
-  }, [isAutoScrolling, categories.length])
-
-  const nextSlide = () => {
-    setCurrentIndex((prev) => (prev + 1) % categories.length)
-    setIsAutoScrolling(false)
-    setTimeout(() => setIsAutoScrolling(true), 10000)
+  // Handle Arrow Visibility based on scroll position
+  const handleScroll = () => {
+    if (scrollRef.current) {
+      const { scrollLeft, scrollWidth, clientWidth } = scrollRef.current
+      setShowLeftArrow(scrollLeft > 10)
+      setShowRightArrow(scrollLeft < scrollWidth - clientWidth - 10)
+    }
   }
 
-  const prevSlide = () => {
-    setCurrentIndex((prev) => (prev - 1 + categories.length) % categories.length)
-    setIsAutoScrolling(false)
-    setTimeout(() => setIsAutoScrolling(true), 10000)
+  const scroll = (direction: 'left' | 'right') => {
+    if (scrollRef.current) {
+      const { clientWidth } = scrollRef.current
+      const scrollAmount = direction === 'left' ? -clientWidth : clientWidth
+      scrollRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' })
+    }
   }
 
-  const scrollToIndex = (index: number) => {
-    setCurrentIndex(index)
-    setIsAutoScrolling(false)
-    setTimeout(() => setIsAutoScrolling(true), 10000)
-  }
-
-  if (categories.length === 0) {
-    return null
-  }
+  if (categories.length === 0) return null
 
   return (
-    <section className="py-12 sm:py-16 bg-white">
+    <section className="py-16 sm:py-24 bg-gradient-to-b from-white to-gray-50 overflow-hidden">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
         {/* Section Header */}
-        <div className="text-center mb-8">
-          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-2">
-            Shop by Category
-          </h2>
-          <p className="text-gray-600 text-sm sm:text-base">
-            Explore our {categories.length} popular categories
-          </p>
+        <div className="flex flex-col md:flex-row md:items-end justify-between mb-10 gap-4">
+          <div className="max-w-2xl">
+            <h2 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight flex items-center gap-3">
+              <ShoppingBag className="text-tiffany-600" />
+              Shop by Category
+            </h2>
+            <p className="mt-3 text-gray-500 text-base sm:text-lg font-medium leading-relaxed">
+              Explore our curated collections. From high-tech gadgets to daily essentials, find exactly what you need.
+            </p>
+          </div>
+          
+          <Link
+            href="/categories"
+            className="hidden md:flex items-center gap-2 text-tiffany-600 font-bold hover:text-tiffany-700 transition-colors group"
+          >
+            Explore All
+            <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+          </Link>
         </div>
 
-        {/* Category Carousel */}
-        <div className="relative">
-          {/* Navigation Buttons */}
-          {categories.length > 1 && (
-            <>
-              <button
-                onClick={prevSlide}
-                className="absolute left-0 top-1/2 -translate-y-1/2 z-20 bg-white shadow-lg rounded-full p-2 sm:p-3 hover:bg-gray-50 transition-all -ml-4 sm:-ml-6"
-                aria-label="Previous category"
-              >
-                <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6 text-gray-700" />
-              </button>
-
-              <button
-                onClick={nextSlide}
-                className="absolute right-0 top-1/2 -translate-y-1/2 z-20 bg-white shadow-lg rounded-full p-2 sm:p-3 hover:bg-gray-50 transition-all -mr-4 sm:-mr-6"
-                aria-label="Next category"
-              >
-                <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6 text-gray-700" />
-              </button>
-            </>
+        {/* Carousel Container */}
+        <div className="relative group">
+          
+          {/* Desktop Navigation Buttons (hidden on mobile) */}
+          {showLeftArrow && (
+            <button
+              onClick={() => scroll('left')}
+              className="absolute -left-5 top-1/2 -translate-y-1/2 z-30 bg-white shadow-2xl rounded-full p-4 hover:bg-tiffany-50 transition-all text-gray-800 hidden md:flex items-center justify-center border border-gray-100"
+              aria-label="Scroll Left"
+            >
+              <ChevronLeft className="w-6 h-6" />
+            </button>
           )}
 
-          {/* Categories Container */}
-          <div className="overflow-hidden">
-            <div
-              className="flex transition-transform duration-500 ease-out"
-              style={{ transform: `translateX(-${currentIndex * 100}%)` }}
+          {showRightArrow && (
+            <button
+              onClick={() => scroll('right')}
+              className="absolute -right-5 top-1/2 -translate-y-1/2 z-30 bg-white shadow-2xl rounded-full p-4 hover:bg-tiffany-50 transition-all text-gray-800 hidden md:flex items-center justify-center border border-gray-100"
+              aria-label="Scroll Right"
             >
-              {categories.map((category) => (
+              <ChevronRight className="w-6 h-6" />
+            </button>
+          )}
+
+          {/* Categories Horizontal Scroll */}
+          <div
+            ref={scrollRef}
+            onScroll={handleScroll}
+            className="flex gap-5 sm:gap-8 overflow-x-auto scrollbar-hide snap-x snap-mandatory pb-8 px-2 -mx-2"
+          >
+            {categories.map((category) => (
+              <div
+                key={category.slug}
+                className="flex-shrink-0 w-[85%] sm:w-[45%] lg:w-[31%] snap-center"
+              >
                 <div
-                  key={category.slug}
-                  className="w-full flex-shrink-0 px-2"
+                  onClick={() => window.location.href = `/products?category=${category.slug}`}
+                  className="relative h-full bg-white rounded-[2rem] p-6 sm:p-8 shadow-sm border border-gray-100 hover:border-tiffany-300 hover:shadow-2xl hover:-translate-y-2 transition-all duration-500 cursor-pointer group flex flex-col"
                 >
-                  {/* FIXED: Changed to a clickable div with proper event handling */}
-                  <div
-                    onClick={() => window.location.href = `/products?category=${category.slug}`}
-                    className="bg-gradient-to-br from-tiffany-50 to-purple-50 rounded-2xl p-6 sm:p-8 hover:shadow-xl transition-all group cursor-pointer border-2 border-tiffany-100 hover:border-tiffany-300"
-                  >
-                    
-                    {/* Category Header */}
-                    <div className="flex items-center justify-between mb-6">
-                      <div className="flex items-center gap-3">
-                        <div className="text-4xl sm:text-5xl">
-                          {getCategoryIcon(category.slug)}
+                  
+                  {/* Decorative Background Element */}
+                  <div className="absolute top-0 right-0 p-6 opacity-[0.03] group-hover:opacity-10 transition-opacity">
+                    <div className="text-[120px] font-black leading-none select-none">
+                      {getCategoryIcon(category.slug)}
+                    </div>
+                  </div>
+
+                  {/* Category Info */}
+                  <div className="relative z-10 mb-8">
+                    <div className="w-16 h-16 bg-gray-50 rounded-2xl flex items-center justify-center text-4xl mb-5 group-hover:bg-tiffany-100 group-hover:scale-110 transition-all duration-500">
+                      {getCategoryIcon(category.slug)}
+                    </div>
+                    <h3 className="text-2xl font-black text-gray-900 mb-1 leading-tight group-hover:text-tiffany-600 transition-colors">
+                      {formatCategoryName(category.name)}
+                    </h3>
+                    <p className="text-gray-400 font-bold text-xs uppercase tracking-widest">
+                      {category.count.toLocaleString()} PRODUCTS
+                    </p>
+                  </div>
+
+                  {/* Sample Product "Preview" Card */}
+                  {category.sampleProduct && (
+                    <div className="relative mt-auto bg-gray-50 rounded-[1.5rem] p-4 border border-gray-100 group-hover:bg-white group-hover:border-tiffany-100 transition-all duration-500">
+                      
+                      {/* Badge */}
+                      <div className="absolute -top-3 left-4 bg-gray-900 text-white text-[10px] font-black px-3 py-1 rounded-full flex items-center gap-1 shadow-lg">
+                        <Sparkles size={10} className="text-tiffany-400" />
+                        TRENDING
+                      </div>
+
+                      <div className="flex items-center gap-4">
+                        <div className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-xl overflow-hidden bg-white shadow-sm flex-shrink-0">
+                          <Image
+                            src={category.sampleProduct.images[0]}
+                            alt={category.sampleProduct.title}
+                            fill
+                            sizes="80px"
+                            className="object-cover group-hover:scale-110 transition-transform duration-700"
+                          />
                         </div>
-                        <div>
-                          <h3 className="text-xl sm:text-2xl font-bold text-gray-900 group-hover:text-tiffany-600 transition-colors">
-                            {formatCategoryName(category.name)}
-                          </h3>
-                          <p className="text-sm text-gray-600">
-                            {category.count} products
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-bold text-gray-800 line-clamp-1 mb-1">
+                            {category.sampleProduct.title}
+                          </p>
+                          <p className="text-lg font-black text-tiffany-600">
+                            {formatPrice(category.sampleProduct.price)} {/* ✅ Converts correctly */}
                           </p>
                         </div>
                       </div>
-                      <ArrowRight className="w-6 h-6 text-tiffany-600 group-hover:translate-x-2 transition-transform" />
                     </div>
+                  )}
 
-                    {/* Sample Product Preview */}
-                    {category.sampleProduct && category.sampleProduct.images[0] && (
-                      <div className="bg-white rounded-xl p-4 shadow-sm">
-                        <div className="flex items-center gap-4">
-                          <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
-                            <Image
-                              src={category.sampleProduct.images[0]}
-                              alt={category.sampleProduct.title}
-                              fill
-                              sizes="(max-width: 640px) 80px, 96px"
-                              className="object-cover"
-                            />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-gray-900 line-clamp-2 mb-1">
-                              {category.sampleProduct.title}
-                            </p>
-                            <p className="text-lg font-bold text-tiffany-600">
-                              ${category.sampleProduct.price.toFixed(2)}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    )}
+                  {/* Link indicator */}
+                  <div className="mt-6 flex items-center gap-2 text-sm font-bold text-gray-300 group-hover:text-tiffany-500 transition-colors">
+                    Browse Collection
+                    <ArrowRight className="w-4 h-4 group-hover:translate-x-2 transition-transform" />
                   </div>
                 </div>
-              ))}
-            </div>
+              </div>
+            ))}
           </div>
-
-          {/* Dots Indicator */}
-          {categories.length > 1 && (
-            <div className="flex justify-center gap-2 mt-6">
-              {categories.map((_, index) => (
-                <button
-                  key={index}
-                  onClick={() => scrollToIndex(index)}
-                  className={`h-2 rounded-full transition-all ${
-                    index === currentIndex
-                      ? 'w-8 bg-tiffany-600'
-                      : 'w-2 bg-gray-300 hover:bg-gray-400'
-                  }`}
-                  aria-label={`Go to category ${index + 1}`}
-                />
-              ))}
-            </div>
-          )}
         </div>
 
-        {/* View All Categories Link */}
-        <div className="text-center mt-8">
+        {/* Mobile View All Link */}
+        <div className="text-center mt-6 md:hidden">
           <Link
             href="/categories"
-            className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-tiffany-500 to-tiffany-600 text-white font-bold rounded-xl hover:shadow-lg transition-all group"
+            className="inline-flex items-center gap-2 text-tiffany-600 font-bold"
           >
-            View All Categories
-            <ArrowRight className="group-hover:translate-x-1 transition-transform" size={18} />
+            Explore All Categories
+            <ArrowRight size={16} />
           </Link>
         </div>
       </div>
+
+      <style jsx global>{`
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+      `}</style>
     </section>
   )
 }
