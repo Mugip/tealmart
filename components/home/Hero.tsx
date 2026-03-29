@@ -1,14 +1,15 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef, TouchEvent } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import type { TouchEvent } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import {
   ArrowRight, ShieldCheck, Star, ChevronLeft, ChevronRight,
-  Zap, TrendingUp, ShoppingBag, Sparkles, Flame, Eye,
-  ShoppingCart, Package
+  Truck, RotateCcw, Zap, ShoppingCart, Clock, TrendingUp,
+  BadgeCheck, Flame, Package
 } from 'lucide-react'
 import { useCurrency } from '@/lib/contexts/CurrencyContext'
-import Image from 'next/image'
 
 interface HeroProps {
   stats: {
@@ -19,537 +20,750 @@ interface HeroProps {
   products: any[]
 }
 
-// Per-slide accent palette — each slide gets its own color identity
-const SLIDE_PALETTES = [
-  {
-    name: 'teal',
-    primary: '#14b8a6',
-    glow: 'rgba(20,184,166,0.45)',
-    glowHover: 'rgba(20,184,166,0.7)',
-    badge: 'rgba(20,184,166,0.15)',
-    badgeBorder: 'rgba(20,184,166,0.35)',
-    badgeText: '#5eead4',
-    gradFrom: '#14b8a6',
-    gradTo: '#34d399',
-    overlayFrom: 'rgba(2,44,40,0.92)',
-    overlayMid: 'rgba(2,44,40,0.6)',
-    btnBg: '#14b8a6',
-    btnHover: '#2dd4bf',
-    btnText: '#0f172a',
-  },
-  {
-    name: 'violet',
-    primary: '#8b5cf6',
-    glow: 'rgba(139,92,246,0.45)',
-    glowHover: 'rgba(139,92,246,0.7)',
-    badge: 'rgba(139,92,246,0.15)',
-    badgeBorder: 'rgba(139,92,246,0.35)',
-    badgeText: '#c4b5fd',
-    gradFrom: '#8b5cf6',
-    gradTo: '#ec4899',
-    overlayFrom: 'rgba(15,5,40,0.93)',
-    overlayMid: 'rgba(15,5,40,0.6)',
-    btnBg: '#8b5cf6',
-    btnHover: '#a78bfa',
-    btnText: '#ffffff',
-  },
-  {
-    name: 'amber',
-    primary: '#f59e0b',
-    glow: 'rgba(245,158,11,0.45)',
-    glowHover: 'rgba(245,158,11,0.7)',
-    badge: 'rgba(245,158,11,0.15)',
-    badgeBorder: 'rgba(245,158,11,0.35)',
-    badgeText: '#fcd34d',
-    gradFrom: '#f59e0b',
-    gradTo: '#ef4444',
-    overlayFrom: 'rgba(30,15,0,0.93)',
-    overlayMid: 'rgba(30,15,0,0.6)',
-    btnBg: '#f59e0b',
-    btnHover: '#fbbf24',
-    btnText: '#0f172a',
-  },
-  {
-    name: 'rose',
-    primary: '#f43f5e',
-    glow: 'rgba(244,63,94,0.45)',
-    glowHover: 'rgba(244,63,94,0.7)',
-    badge: 'rgba(244,63,94,0.15)',
-    badgeBorder: 'rgba(244,63,94,0.35)',
-    badgeText: '#fda4af',
-    gradFrom: '#f43f5e',
-    gradTo: '#fb923c',
-    overlayFrom: 'rgba(30,2,10,0.93)',
-    overlayMid: 'rgba(30,2,10,0.6)',
-    btnBg: '#f43f5e',
-    btnHover: '#fb7185',
-    btnText: '#ffffff',
-  },
-  {
-    name: 'sky',
-    primary: '#0ea5e9',
-    glow: 'rgba(14,165,233,0.45)',
-    glowHover: 'rgba(14,165,233,0.7)',
-    badge: 'rgba(14,165,233,0.15)',
-    badgeBorder: 'rgba(14,165,233,0.35)',
-    badgeText: '#7dd3fc',
-    gradFrom: '#0ea5e9',
-    gradTo: '#6366f1',
-    overlayFrom: 'rgba(0,10,30,0.93)',
-    overlayMid: 'rgba(0,10,30,0.6)',
-    btnBg: '#0ea5e9',
-    btnHover: '#38bdf8',
-    btnText: '#ffffff',
-  },
-]
+/* ─── Countdown timer hook ─── */
+function useCountdown(hours = 5, minutes = 47, seconds = 33) {
+  const endRef = useRef<number>(
+    Date.now() + (hours * 3600 + minutes * 60 + seconds) * 1000
+  )
+  const [timeLeft, setTimeLeft] = useState({ h: hours, m: minutes, s: seconds })
 
-function StarRating({ rating, count }: { rating: number; count: number }) {
-  const stars = Math.round(rating ?? 4)
+  useEffect(() => {
+    const tick = () => {
+      const diff = Math.max(0, endRef.current - Date.now())
+      setTimeLeft({
+        h: Math.floor(diff / 3_600_000),
+        m: Math.floor((diff % 3_600_000) / 60_000),
+        s: Math.floor((diff % 60_000) / 1_000),
+      })
+    }
+    tick()
+    const id = setInterval(tick, 1000)
+    return () => clearInterval(id)
+  }, [])
+
+  return timeLeft
+}
+
+/* ─── Digit flip cell ─── */
+function TimeCell({ value, label }: { value: number; label: string }) {
+  const str = String(value).padStart(2, '0')
   return (
-    <div className="flex items-center gap-2">
-      <div className="flex items-center gap-0.5">
-        {[1, 2, 3, 4, 5].map((s) => (
-          <Star
-            key={s}
-            size={14}
-            className={s <= stars ? 'text-yellow-400 fill-yellow-400' : 'text-gray-600'}
-          />
+    <div className="flex flex-col items-center">
+      <div className="flex gap-0.5">
+        {str.split('').map((d, i) => (
+          <span
+            key={i}
+            className="inline-flex items-center justify-center w-8 h-9 rounded-md text-white font-black text-lg tabular-nums"
+            style={{
+              background: '#0f1923',
+              border: '1px solid rgba(255,255,255,0.08)',
+              fontVariantNumeric: 'tabular-nums',
+            }}
+          >
+            {d}
+          </span>
         ))}
       </div>
-      <span className="text-gray-400 text-xs font-semibold">
-        {rating?.toFixed(1) ?? '4.5'} ({count?.toLocaleString() ?? '0'} reviews)
+      <span className="text-[10px] text-gray-500 uppercase tracking-widest mt-1 font-semibold">
+        {label}
       </span>
     </div>
   )
 }
 
-function DiscountBadge({ price, compareAtPrice, palette }: { price: number; compareAtPrice: number; palette: typeof SLIDE_PALETTES[0] }) {
-  if (!compareAtPrice || compareAtPrice <= price) return null
-  const pct = Math.round(((compareAtPrice - price) / compareAtPrice) * 100)
+/* ─── Star row ─── */
+function Stars({ rating = 4.5, count = 0 }: { rating?: number; count?: number }) {
+  const full = Math.floor(rating)
+  const half = rating % 1 >= 0.5
   return (
-    <div
-      className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-black tracking-wide"
-      style={{ background: palette.badge, border: `1px solid ${palette.badgeBorder}`, color: palette.badgeText }}
-    >
-      <Flame size={12} />
-      SAVE {pct}%
+    <div className="flex items-center gap-2">
+      <div className="flex items-center gap-px">
+        {[1, 2, 3, 4, 5].map((n) => (
+          <Star
+            key={n}
+            size={13}
+            className={
+              n <= full
+                ? 'fill-amber-400 text-amber-400'
+                : n === full + 1 && half
+                ? 'fill-amber-400/50 text-amber-400'
+                : 'text-gray-600'
+            }
+          />
+        ))}
+      </div>
+      <span className="text-gray-400 text-xs">
+        <span className="text-amber-400 font-bold">{rating.toFixed(1)}</span>
+        {count > 0 && (
+          <span className="ml-1">({count.toLocaleString()} reviews)</span>
+        )}
+      </span>
     </div>
   )
 }
 
+/* ─── Discount pill ─── */
+function Savings({
+  price,
+  compareAtPrice,
+}: {
+  price: number
+  compareAtPrice?: number
+}) {
+  if (!compareAtPrice || compareAtPrice <= price) return null
+  const pct = Math.round(((compareAtPrice - price) / compareAtPrice) * 100)
+  return (
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-black bg-red-500/15 text-red-400 border border-red-500/20">
+      <Flame size={11} />
+      {pct}% OFF
+    </span>
+  )
+}
+
+/* ─── Flash deal mini card ─── */
+function FlashCard({
+  product,
+  formatPrice,
+  onClick,
+  active,
+}: {
+  product: any
+  formatPrice: (n: number) => string
+  onClick: () => void
+  active: boolean
+}) {
+  const pct =
+    product.compareAtPrice && product.compareAtPrice > product.price
+      ? Math.round(
+          ((product.compareAtPrice - product.price) / product.compareAtPrice) *
+            100
+        )
+      : null
+
+  return (
+    <button
+      onClick={onClick}
+      className="group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-all w-full"
+      style={{
+        background: active
+          ? 'rgba(20,184,166,0.08)'
+          : 'rgba(255,255,255,0.02)',
+        border: active
+          ? '1px solid rgba(20,184,166,0.3)'
+          : '1px solid rgba(255,255,255,0.05)',
+      }}
+    >
+      {/* Thumb */}
+      <div className="relative flex-shrink-0 w-14 h-14 rounded-lg overflow-hidden bg-gray-800">
+        <Image
+          src={product.images?.[0]}
+          alt={product.title}
+          fill
+          className="object-cover group-hover:scale-105 transition-transform duration-500"
+        />
+        {pct && (
+          <div className="absolute top-0 left-0 bg-red-500 text-white text-[9px] font-black px-1 rounded-br-md">
+            -{pct}%
+          </div>
+        )}
+      </div>
+      {/* Info */}
+      <div className="flex-1 min-w-0">
+        <p className="text-gray-300 text-xs font-semibold leading-snug line-clamp-2 group-hover:text-white transition-colors">
+          {product.title}
+        </p>
+        <div className="flex items-center gap-2 mt-1">
+          <span className="text-teal-400 font-black text-sm">
+            {formatPrice(product.price)}
+          </span>
+          {product.compareAtPrice && (
+            <span className="text-gray-600 line-through text-xs">
+              {formatPrice(product.compareAtPrice)}
+            </span>
+          )}
+        </div>
+      </div>
+      {/* Active bar */}
+      {active && (
+        <div className="w-1 h-8 rounded-full bg-teal-500 flex-shrink-0" />
+      )}
+    </button>
+  )
+}
+
+/* ══════════════════════════════════════════════════════════
+   MAIN HERO
+══════════════════════════════════════════════════════════ */
 export default function Hero({ stats, products }: HeroProps) {
   const { formatPrice } = useCurrency()
   const [currentIndex, setCurrentIndex] = useState(0)
-  const [prevIndex, setPrevIndex] = useState<number | null>(null)
-  const [isHovered, setIsHovered] = useState(false)
   const [progress, setProgress] = useState(0)
-  const [isTransitioning, setIsTransitioning] = useState(false)
+  const [isHovered, setIsHovered] = useState(false)
   const [addedToCart, setAddedToCart] = useState(false)
+  const [imgLoaded, setImgLoaded] = useState(false)
   const [touchStart, setTouchStart] = useState<number | null>(null)
   const [touchEnd, setTouchEnd] = useState<number | null>(null)
-  const progressRef = useRef<NodeJS.Timeout | null>(null)
-  const progressStartRef = useRef<number>(Date.now())
+  const progressStart = useRef(Date.now())
+  const countdown = useCountdown(5, 47, 33)
+  const DURATION = 7000
 
-  const displayItems = products?.length > 0 ? products.slice(0, 5) : []
-  const palette = SLIDE_PALETTES[currentIndex % SLIDE_PALETTES.length]
-  const SLIDE_DURATION = 6000
-
-  const goToSlide = useCallback((idx: number) => {
-    if (isTransitioning || idx === currentIndex) return
-    setIsTransitioning(true)
-    setPrevIndex(currentIndex)
-    setCurrentIndex(idx)
-    setProgress(0)
-    progressStartRef.current = Date.now()
-    setTimeout(() => setIsTransitioning(false), 900)
-  }, [currentIndex, isTransitioning])
-
-  const nextSlide = useCallback(() => {
-    if (displayItems.length === 0) return
-    goToSlide(currentIndex === displayItems.length - 1 ? 0 : currentIndex + 1)
-  }, [currentIndex, displayItems.length, goToSlide])
-
-  const prevSlide = useCallback(() => {
-    if (displayItems.length === 0) return
-    goToSlide(currentIndex === 0 ? displayItems.length - 1 : currentIndex - 1)
-  }, [currentIndex, displayItems.length, goToSlide])
-
-  // Progress bar ticker
-  useEffect(() => {
-    if (isHovered || displayItems.length <= 1) {
-      if (progressRef.current) clearInterval(progressRef.current)
-      return
-    }
-    progressStartRef.current = Date.now()
-    progressRef.current = setInterval(() => {
-      const elapsed = Date.now() - progressStartRef.current
-      const pct = Math.min((elapsed / SLIDE_DURATION) * 100, 100)
-      setProgress(pct)
-      if (pct >= 100) {
-        nextSlide()
-        progressStartRef.current = Date.now()
-      }
-    }, 30)
-    return () => { if (progressRef.current) clearInterval(progressRef.current) }
-  }, [isHovered, nextSlide, displayItems.length, currentIndex])
-
-  // Touch swipe
-  const handleTouchStart = (e: TouchEvent) => setTouchStart(e.targetTouches[0].clientX)
-  const handleTouchMove = (e: TouchEvent) => setTouchEnd(e.targetTouches[0].clientX)
-  const handleTouchEnd = () => {
-    if (!touchStart || !touchEnd) return
-    if (touchStart - touchEnd > 50) nextSlide()
-    if (touchStart - touchEnd < -50) prevSlide()
-    setTouchStart(null); setTouchEnd(null)
-  }
-
-  // Fake urgency numbers — seeded by product id for consistency
-  const getViewers = (id: string) => 23 + (id?.charCodeAt(0) ?? 5) % 40
-  const getStock = (id: string) => 4 + (id?.charCodeAt(1) ?? 3) % 14
-
-  if (displayItems.length === 0) return null
-
+  const displayItems = products?.slice(0, 5) ?? []
   const current = displayItems[currentIndex]
 
+  const goTo = useCallback(
+    (idx: number) => {
+      setCurrentIndex(idx)
+      setProgress(0)
+      setImgLoaded(false)
+      progressStart.current = Date.now()
+    },
+    []
+  )
+
+  const next = useCallback(
+    () =>
+      goTo(
+        currentIndex === displayItems.length - 1 ? 0 : currentIndex + 1
+      ),
+    [currentIndex, displayItems.length, goTo]
+  )
+
+  const prev = useCallback(
+    () =>
+      goTo(
+        currentIndex === 0 ? displayItems.length - 1 : currentIndex - 1
+      ),
+    [currentIndex, displayItems.length, goTo]
+  )
+
+  /* Progress ticker */
+  useEffect(() => {
+    if (isHovered || displayItems.length <= 1) return
+    progressStart.current = Date.now()
+    const id = setInterval(() => {
+      const pct = Math.min(
+        ((Date.now() - progressStart.current) / DURATION) * 100,
+        100
+      )
+      setProgress(pct)
+      if (pct >= 100) next()
+    }, 40)
+    return () => clearInterval(id)
+  }, [isHovered, next, displayItems.length, currentIndex])
+
+  /* Touch */
+  const onTouchStart = (e: TouchEvent) =>
+    setTouchStart(e.targetTouches[0].clientX)
+  const onTouchMove = (e: TouchEvent) =>
+    setTouchEnd(e.targetTouches[0].clientX)
+  const onTouchEnd = () => {
+    if (!touchStart || !touchEnd) return
+    if (touchStart - touchEnd > 50) next()
+    if (touchStart - touchEnd < -50) prev()
+    setTouchStart(null)
+    setTouchEnd(null)
+  }
+
+  /* Seeded urgency */
+  const viewers = current
+    ? 18 + (current.id?.charCodeAt(0) ?? 4) % 55
+    : 0
+  const bought = current
+    ? 1200 + (current.id?.charCodeAt(1) ?? 3) % 3000
+    : 0
+  const stock = current
+    ? 5 + (current.id?.charCodeAt(2) ?? 2) % 18
+    : 0
+
+  if (!displayItems.length || !current) return null
+
   return (
-    <div
-      className="relative w-full overflow-hidden"
-      style={{ height: 'min(90vh, 780px)', minHeight: 520 }}
+    <section
+      className="w-full select-none"
+      style={{ background: '#0a0f14' }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
     >
-      {/* ── Progress Bar ── */}
-      <div className="absolute top-0 left-0 right-0 z-50 h-[3px] bg-white/5">
+      {/* ── Top progress bar ── */}
+      <div className="h-[2px] w-full" style={{ background: '#111820' }}>
         <div
-          className="h-full transition-none"
+          className="h-full bg-teal-500"
           style={{
-            width: `${isHovered ? progress : progress}%`,
-            background: `linear-gradient(90deg, ${palette.gradFrom}, ${palette.gradTo})`,
-            boxShadow: `0 0 8px ${palette.glow}`,
-            transition: isHovered ? 'none' : 'width 0.03s linear',
+            width: `${progress}%`,
+            transition: isHovered ? 'none' : 'width 0.04s linear',
           }}
         />
       </div>
 
-      {/* ── Background Slides (parallax-style: image moves independently) ── */}
-      <div className="absolute inset-0 z-0">
-        {displayItems.map((product, idx) => {
-          const pal = SLIDE_PALETTES[idx % SLIDE_PALETTES.length]
-          const isActive = idx === currentIndex
-          const wasPrev = idx === prevIndex
-          return (
+      {/* ── Flash deals banner ── */}
+      <div
+        className="flex items-center gap-3 px-4 py-2 text-xs overflow-x-auto scrollbar-none"
+        style={{
+          background: '#0d1520',
+          borderBottom: '1px solid rgba(255,255,255,0.04)',
+        }}
+      >
+        <div className="flex items-center gap-1.5 text-red-400 font-black shrink-0">
+          <Flame size={13} className="animate-pulse" />
+          FLASH DEALS
+        </div>
+        <div className="w-px h-4 bg-white/10 shrink-0" />
+        <div className="flex items-center gap-1.5 text-gray-500 shrink-0">
+          <Clock size={12} />
+          <span className="text-gray-400">Ends in</span>
+          <span className="text-red-400 font-black tabular-nums">
+            {String(countdown.h).padStart(2, '0')}:
+            {String(countdown.m).padStart(2, '0')}:
+            {String(countdown.s).padStart(2, '0')}
+          </span>
+        </div>
+        <div className="w-px h-4 bg-white/10 shrink-0" />
+        <div className="flex items-center gap-2 shrink-0 text-gray-500">
+          <TrendingUp size={12} className="text-teal-500" />
+          <span>{stats.totalProducts.toLocaleString()}+ products</span>
+          <span className="text-white/10">·</span>
+          <span>{stats.totalCategories}+ categories</span>
+          <span className="text-white/10">·</span>
+          <BadgeCheck size={12} className="text-teal-500" />
+          <span>Verified quality</span>
+        </div>
+      </div>
+
+      {/* ── Main hero body ── */}
+      <div className="max-w-[1400px] mx-auto px-3 sm:px-4 lg:px-6 py-4 lg:py-5">
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_420px_260px] gap-3 lg:gap-4 items-start">
+
+          {/* ══ COL 1: Deal info panel ══ */}
+          <div
+            className="rounded-2xl p-5 lg:p-7 flex flex-col gap-5 relative overflow-hidden"
+            style={{
+              background: '#0d1520',
+              border: '1px solid rgba(255,255,255,0.055)',
+              minHeight: 520,
+            }}
+          >
+            {/* Corner glow */}
             <div
-              key={product.id}
-              className="absolute inset-0"
+              className="absolute top-0 left-0 w-72 h-72 pointer-events-none"
               style={{
-                opacity: isActive ? 1 : wasPrev ? 0 : 0,
-                transition: 'opacity 0.9s cubic-bezier(0.4,0,0.2,1)',
-                zIndex: isActive ? 2 : wasPrev ? 1 : 0,
+                background:
+                  'radial-gradient(circle at 0% 0%, rgba(20,184,166,0.07) 0%, transparent 65%)',
               }}
-            >
-              {/* Background image with ken-burns scale */}
+            />
+
+            <div className="relative z-10 space-y-4 flex-1">
+              {/* Badge row */}
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-widest bg-teal-500/10 text-teal-400 border border-teal-500/20">
+                  <Zap size={11} />
+                  {(current.reviewCount ?? 0) > 100
+                    ? "Today's Best Deal"
+                    : 'Featured Pick'}
+                </span>
+                <Savings
+                  price={current.price}
+                  compareAtPrice={current.compareAtPrice}
+                />
+              </div>
+
+              {/* Title */}
+              <div key={`t-${currentIndex}`} className="hero-slide-in">
+                <h1
+                  className="text-2xl sm:text-3xl lg:text-4xl font-black text-white leading-tight tracking-tight"
+                  style={{ fontFamily: "'DM Serif Display', Georgia, serif" }}
+                >
+                  {current.title.length > 60
+                    ? current.title.slice(0, 60) + '…'
+                    : current.title}
+                </h1>
+              </div>
+
+              {/* Stars + social proof */}
+              <div className="flex flex-wrap items-center gap-3">
+                <Stars
+                  rating={current.avgRating ?? 4.5}
+                  count={current.reviewCount ?? 0}
+                />
+                <span className="text-gray-600 text-xs">·</span>
+                <span className="text-xs text-gray-400">
+                  <span className="text-teal-400 font-bold">
+                    {bought.toLocaleString()}
+                  </span>{' '}
+                  bought this week
+                </span>
+              </div>
+
+              {/* Price block */}
+              <div className="flex items-baseline gap-3 flex-wrap">
+                <span className="text-4xl lg:text-5xl font-black text-white tracking-tight">
+                  {formatPrice(current.price)}
+                </span>
+                {current.compareAtPrice &&
+                  current.compareAtPrice > current.price && (
+                    <div className="flex flex-col">
+                      <span className="text-gray-500 line-through text-lg font-semibold">
+                        {formatPrice(current.compareAtPrice)}
+                      </span>
+                      <span className="text-green-400 text-xs font-bold">
+                        You save{' '}
+                        {formatPrice(current.compareAtPrice - current.price)}
+                      </span>
+                    </div>
+                  )}
+              </div>
+
+              {/* Description */}
+              <p className="text-gray-400 text-sm leading-relaxed line-clamp-2 max-w-lg">
+                {current.description?.replace(/<[^>]*>?/gm, '') ?? ''}
+              </p>
+
+              {/* Urgency */}
+              <div className="flex flex-wrap items-center gap-4">
+                <div className="flex items-center gap-1.5 text-xs text-orange-400 font-semibold">
+                  <div className="w-1.5 h-1.5 rounded-full bg-orange-400 animate-pulse" />
+                  {viewers} people viewing now
+                </div>
+                <div className="flex items-center gap-1.5 text-xs text-red-400 font-semibold">
+                  <Package size={12} />
+                  Only {stock} left
+                </div>
+              </div>
+
+              {/* Countdown */}
               <div
-                className="absolute inset-0"
+                className="inline-flex items-center gap-3 px-4 py-3 rounded-xl"
                 style={{
-                  transform: isActive ? 'scale(1.05)' : 'scale(1.0)',
-                  transition: 'transform 8s ease-out',
+                  background: 'rgba(255,255,255,0.03)',
+                  border: '1px solid rgba(255,255,255,0.06)',
                 }}
               >
+                <div className="flex items-center gap-1.5 text-xs text-gray-400 font-bold uppercase tracking-widest">
+                  <Clock size={13} className="text-red-400" />
+                  Deal ends in
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <TimeCell value={countdown.h} label="hrs" />
+                  <span className="text-gray-500 font-black mb-4">:</span>
+                  <TimeCell value={countdown.m} label="min" />
+                  <span className="text-gray-500 font-black mb-4">:</span>
+                  <TimeCell value={countdown.s} label="sec" />
+                </div>
+              </div>
+            </div>
+
+            {/* CTAs */}
+            <div className="relative z-10 flex flex-col sm:flex-row gap-3">
+              <Link
+                href={`/products/${current.id}`}
+                className="flex-1 flex items-center justify-center gap-2 py-4 rounded-xl font-black text-base text-gray-950 bg-teal-500 hover:bg-teal-400 transition-all hover:-translate-y-0.5 shadow-lg shadow-teal-500/20 hover:shadow-teal-500/40"
+              >
+                Buy Now
+                <ArrowRight size={18} />
+              </Link>
+              <button
+                onClick={() => {
+                  setAddedToCart(true)
+                  setTimeout(() => setAddedToCart(false), 2000)
+                  // addToCart({ productId: current.id, quantity: 1 })
+                }}
+                className="flex-1 flex items-center justify-center gap-2 py-4 rounded-xl font-bold text-base transition-all hover:-translate-y-0.5"
+                style={{
+                  background: addedToCart
+                    ? 'rgba(20,184,166,0.15)'
+                    : 'rgba(255,255,255,0.05)',
+                  border: addedToCart
+                    ? '1px solid rgba(20,184,166,0.4)'
+                    : '1px solid rgba(255,255,255,0.08)',
+                  color: addedToCart ? '#2dd4bf' : 'white',
+                }}
+              >
+                <ShoppingCart size={18} />
+                {addedToCart ? 'Added to cart ✓' : 'Add to Cart'}
+              </button>
+            </div>
+
+            {/* Trust badges */}
+            <div className="relative z-10 grid grid-cols-3 gap-2">
+              {[
+                { icon: <Truck size={13} />, line1: 'Free Shipping', line2: 'Orders over $29' },
+                { icon: <RotateCcw size={13} />, line1: 'Easy Returns', line2: '30-day policy' },
+                { icon: <ShieldCheck size={13} />, line1: 'Secure Pay', line2: '256-bit SSL' },
+              ].map(({ icon, line1, line2 }) => (
+                <div
+                  key={line1}
+                  className="flex flex-col items-center gap-1 py-2 px-1 rounded-lg text-center"
+                  style={{
+                    background: 'rgba(255,255,255,0.025)',
+                    border: '1px solid rgba(255,255,255,0.05)',
+                  }}
+                >
+                  <span className="text-teal-500">{icon}</span>
+                  <span className="text-white text-[11px] font-bold leading-tight">
+                    {line1}
+                  </span>
+                  <span className="text-gray-600 text-[10px] leading-tight">
+                    {line2}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {/* Slide controls */}
+            <div className="relative z-10 flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                {displayItems.map((_, i) => (
+                  <button
+                    key={i}
+                    onClick={() => goTo(i)}
+                    className="rounded-full transition-all duration-400"
+                    style={{
+                      height: 6,
+                      width: i === currentIndex ? 28 : 6,
+                      background:
+                        i === currentIndex
+                          ? '#14b8a6'
+                          : 'rgba(255,255,255,0.15)',
+                    }}
+                  />
+                ))}
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={prev}
+                  className="p-2 rounded-lg text-gray-400 hover:text-white transition-colors"
+                  style={{ background: 'rgba(255,255,255,0.05)' }}
+                >
+                  <ChevronLeft size={16} />
+                </button>
+                <button
+                  onClick={next}
+                  className="p-2 rounded-lg text-gray-400 hover:text-white transition-colors"
+                  style={{ background: 'rgba(255,255,255,0.05)' }}
+                >
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* ══ COL 2: Product image ══ */}
+          <div
+            className="hidden lg:flex rounded-2xl overflow-hidden relative items-center justify-center"
+            style={{
+              background: '#0d1520',
+              border: '1px solid rgba(255,255,255,0.055)',
+              minHeight: 520,
+            }}
+          >
+            {/* Ambient glow */}
+            <div
+              className="absolute inset-0 pointer-events-none"
+              style={{
+                background:
+                  'radial-gradient(ellipse at 50% 60%, rgba(20,184,166,0.06) 0%, transparent 70%)',
+              }}
+            />
+            {/* Category label */}
+            <div className="absolute top-4 left-4 z-10">
+              <span className="text-[11px] text-gray-500 font-bold uppercase tracking-widest">
+                {current.category ?? 'Product'}
+              </span>
+            </div>
+            {/* Image */}
+            <div
+              key={`img-${currentIndex}`}
+              className="relative w-full h-full img-fade-in"
+              style={{ minHeight: 420 }}
+            >
+              <Image
+                src={current.images?.[0]}
+                alt={current.title}
+                fill
+                priority
+                className="object-contain p-8"
+                onLoad={() => setImgLoaded(true)}
+                style={{
+                  transform: imgLoaded ? 'scale(1)' : 'scale(0.96)',
+                  transition: 'transform 0.6s cubic-bezier(0.22,1,0.36,1)',
+                }}
+              />
+            </div>
+            {/* Photo count */}
+            {current.images?.length > 1 && (
+              <div
+                className="absolute bottom-4 right-4 text-[11px] text-gray-500 font-semibold px-2 py-1 rounded-md"
+                style={{
+                  background: 'rgba(0,0,0,0.5)',
+                  backdropFilter: 'blur(8px)',
+                }}
+              >
+                1 / {current.images.length} photos
+              </div>
+            )}
+          </div>
+
+          {/* ══ COL 3: Flash deal sidebar ══ */}
+          <div
+            className="hidden lg:flex flex-col gap-3 rounded-2xl p-3"
+            style={{
+              background: '#0d1520',
+              border: '1px solid rgba(255,255,255,0.055)',
+            }}
+          >
+            <div className="flex items-center justify-between px-1">
+              <div className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-red-400">
+                <Flame size={13} className="animate-pulse" />
+                Flash Deals
+              </div>
+              <Link
+                href="/products"
+                className="text-[11px] text-teal-400 hover:text-teal-300 font-semibold transition-colors"
+              >
+                See all →
+              </Link>
+            </div>
+
+            {/* Sidebar countdown */}
+            <div
+              className="flex items-center justify-center gap-2 py-2 rounded-xl"
+              style={{
+                background: 'rgba(239,68,68,0.06)',
+                border: '1px solid rgba(239,68,68,0.12)',
+              }}
+            >
+              <Clock size={11} className="text-red-400" />
+              <span className="text-red-400 font-black text-xs tabular-nums tracking-wider">
+                {String(countdown.h).padStart(2, '0')}:
+                {String(countdown.m).padStart(2, '0')}:
+                {String(countdown.s).padStart(2, '0')}
+              </span>
+              <span className="text-gray-600 text-[10px]">remaining</span>
+            </div>
+
+            {/* Cards */}
+            <div className="flex flex-col gap-1.5">
+              {displayItems.map((product, idx) => (
+                <FlashCard
+                  key={product.id}
+                  product={product}
+                  formatPrice={formatPrice}
+                  onClick={() => goTo(idx)}
+                  active={idx === currentIndex}
+                />
+              ))}
+            </div>
+
+            {/* Browse CTA */}
+            <Link
+              href="/products"
+              className="mt-auto flex items-center justify-center gap-2 py-3 rounded-xl text-teal-400 text-xs font-bold hover:text-teal-300 transition-colors"
+              style={{
+                background: 'rgba(20,184,166,0.06)',
+                border: '1px solid rgba(20,184,166,0.12)',
+              }}
+            >
+              Browse all {stats.totalProducts.toLocaleString()}+ products
+              <ArrowRight size={13} />
+            </Link>
+          </div>
+        </div>
+
+        {/* ── Mobile: product image ── */}
+        <div
+          className="lg:hidden mt-3 rounded-2xl overflow-hidden relative"
+          style={{
+            height: 260,
+            background: '#0d1520',
+            border: '1px solid rgba(255,255,255,0.055)',
+          }}
+        >
+          <Image
+            src={current.images?.[0]}
+            alt={current.title}
+            fill
+            priority
+            className="object-contain p-6"
+          />
+        </div>
+
+        {/* ── Mobile: thumbnail strip ── */}
+        <div className="lg:hidden mt-3 flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-1">
+          {displayItems.map((product, idx) => (
+            <button
+              key={product.id}
+              onClick={() => goTo(idx)}
+              className="flex-shrink-0 rounded-xl overflow-hidden transition-all"
+              style={{
+                width: 64,
+                height: 64,
+                border:
+                  idx === currentIndex
+                    ? '2px solid #14b8a6'
+                    : '2px solid rgba(255,255,255,0.06)',
+                opacity: idx === currentIndex ? 1 : 0.5,
+              }}
+            >
+              <div className="relative w-full h-full">
                 <Image
                   src={product.images?.[0]}
                   alt={product.title}
                   fill
-                  priority={idx === 0}
                   className="object-cover"
-                  style={{ opacity: 0.38 }}
                 />
               </div>
-              {/* Color-tinted overlay per slide */}
-              <div
-                className="absolute inset-0"
-                style={{
-                  background: `linear-gradient(105deg, ${pal.overlayFrom} 0%, ${pal.overlayMid} 55%, rgba(0,0,0,0.1) 100%)`,
-                }}
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-gray-950 via-transparent to-transparent" />
-              {/* Subtle colored radial bloom bottom-left */}
-              <div
-                className="absolute bottom-0 left-0 w-[600px] h-[400px] rounded-full pointer-events-none"
-                style={{
-                  background: `radial-gradient(ellipse at 20% 90%, ${pal.glow} 0%, transparent 70%)`,
-                  filter: 'blur(40px)',
-                }}
-              />
-            </div>
-          )
-        })}
-      </div>
-
-      {/* ── Content Layer ── */}
-      <div className="absolute inset-0 z-20 flex items-center pb-20 md:pb-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
-          <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-8 items-center">
-
-            {/* LEFT: Main content */}
-            <div className="max-w-2xl space-y-4 md:space-y-5">
-
-              {/* Badge row */}
-              <div className="flex flex-wrap items-center gap-3">
-                <div
-                  className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-black tracking-widest uppercase"
-                  style={{
-                    background: palette.badge,
-                    border: `1px solid ${palette.badgeBorder}`,
-                    color: palette.badgeText,
-                    backdropFilter: 'blur(12px)',
-                  }}
-                >
-                  <Sparkles size={13} />
-                  {(current.reviewCount ?? 0) > 100 ? 'Best Seller' : 'Featured Arrival'}
-                </div>
-                <DiscountBadge price={current.price} compareAtPrice={current.compareAtPrice} palette={palette} />
-              </div>
-
-              {/* Title */}
-              <div key={`title-${currentIndex}`} className="hero-content-in">
-                <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black text-white leading-[1.05] tracking-tighter">
-                  {current.title.split(' ').slice(0, 4).join(' ')}
-                  <span
-                    className="block"
-                    style={{
-                      background: `linear-gradient(90deg, ${palette.gradFrom}, ${palette.gradTo})`,
-                      WebkitBackgroundClip: 'text',
-                      WebkitTextFillColor: 'transparent',
-                    }}
-                  >
-                    Exclusive Deal
-                  </span>
-                </h1>
-              </div>
-
-              {/* Stars */}
-              <StarRating rating={current.avgRating ?? 4.5} count={current.reviewCount ?? 0} />
-
-              {/* Price row */}
-              <div className="flex items-baseline gap-4">
-                <span className="text-3xl md:text-4xl font-black text-white">
-                  {formatPrice(current.price)}
-                </span>
-                {current.compareAtPrice && current.compareAtPrice > current.price && (
-                  <span className="text-xl text-gray-500 line-through font-bold">
-                    {formatPrice(current.compareAtPrice)}
-                  </span>
-                )}
-              </div>
-
-              {/* Description */}
-              <p className="text-gray-400 text-base md:text-lg font-medium max-w-xl leading-relaxed line-clamp-2">
-                {current.description?.replace(/<[^>]*>?/gm, '')}
-              </p>
-
-              {/* Urgency signals */}
-              <div className="flex flex-wrap items-center gap-4 text-xs font-bold">
-                <div className="flex items-center gap-1.5 text-orange-400">
-                  <Eye size={13} />
-                  <span>{getViewers(current.id)} people viewing now</span>
-                </div>
-                <div className="flex items-center gap-1.5 text-red-400">
-                  <Package size={13} />
-                  <span>Only {getStock(current.id)} left in stock</span>
-                </div>
-              </div>
-
-              {/* CTA Buttons */}
-              <div className="flex flex-wrap gap-3 pt-2">
-                <Link
-                  href={`/products/${current.id}`}
-                  className="group flex items-center justify-center gap-2 px-8 py-4 font-black rounded-2xl transition-all text-base"
-                  style={{
-                    background: palette.btnBg,
-                    color: palette.btnText,
-                    boxShadow: `0 0 36px ${palette.glow}`,
-                  }}
-                  onMouseEnter={e => {
-                    (e.currentTarget as HTMLElement).style.background = palette.btnHover
-                    ;(e.currentTarget as HTMLElement).style.boxShadow = `0 0 52px ${palette.glowHover}, 0 -4px 0 0 rgba(255,255,255,0.12) inset`
-                    ;(e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)'
-                  }}
-                  onMouseLeave={e => {
-                    (e.currentTarget as HTMLElement).style.background = palette.btnBg
-                    ;(e.currentTarget as HTMLElement).style.boxShadow = `0 0 36px ${palette.glow}`
-                    ;(e.currentTarget as HTMLElement).style.transform = 'translateY(0)'
-                  }}
-                >
-                  Get it Now
-                  <ArrowRight className="w-5 h-5 group-hover:translate-x-1.5 transition-transform" />
-                </Link>
-
-                {/* Add to Cart quick action */}
-                <button
-                  onClick={() => {
-                    setAddedToCart(true)
-                    setTimeout(() => setAddedToCart(false), 2000)
-                    // Hook into your cart context here:
-                    // addToCart({ productId: current.id, quantity: 1 })
-                  }}
-                  className="flex items-center justify-center gap-2 px-8 py-4 font-black rounded-2xl backdrop-blur-xl border border-white/10 transition-all text-base text-white hover:-translate-y-0.5"
-                  style={{ background: 'rgba(255,255,255,0.06)' }}
-                >
-                  <ShoppingCart size={18} className={addedToCart ? 'text-green-400' : 'text-white'} />
-                  {addedToCart ? 'Added!' : 'Add to Cart'}
-                </button>
-
-                <Link
-                  href="/products"
-                  className="flex items-center justify-center gap-2 px-8 py-4 font-bold rounded-2xl backdrop-blur-xl border border-white/10 text-white transition-all text-base hover:-translate-y-0.5 hover:bg-white/10"
-                  style={{ background: 'rgba(255,255,255,0.04)' }}
-                >
-                  Browse All
-                </Link>
-              </div>
-            </div>
-
-            {/* RIGHT: Thumbnail Strip (desktop) */}
-            <div className="hidden xl:flex flex-col gap-2.5 w-[130px]">
-              {displayItems.map((product, idx) => {
-                const pal = SLIDE_PALETTES[idx % SLIDE_PALETTES.length]
-                const isActive = idx === currentIndex
-                return (
-                  <button
-                    key={product.id}
-                    onClick={() => goToSlide(idx)}
-                    className="relative rounded-xl overflow-hidden transition-all duration-300 group/thumb"
-                    style={{
-                      height: isActive ? 96 : 72,
-                      opacity: isActive ? 1 : 0.5,
-                      border: isActive ? `2px solid ${pal.primary}` : '2px solid transparent',
-                      boxShadow: isActive ? `0 0 16px ${pal.glow}` : 'none',
-                      transform: isActive ? 'scale(1.04)' : 'scale(1)',
-                    }}
-                  >
-                    <Image
-                      src={product.images?.[0]}
-                      alt={product.title}
-                      fill
-                      className="object-cover group-hover/thumb:scale-110 transition-transform duration-500"
-                    />
-                    <div className="absolute inset-0 bg-black/30 group-hover/thumb:bg-black/10 transition-colors" />
-                    {isActive && (
-                      <div
-                        className="absolute bottom-0 left-0 right-0 h-0.5"
-                        style={{ background: `linear-gradient(90deg, ${pal.gradFrom}, ${pal.gradTo})` }}
-                      />
-                    )}
-                  </button>
-                )
-              })}
-            </div>
-
-          </div>
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* ── Mobile Bottom Card ── */}
-      <div className="md:hidden absolute bottom-16 left-0 right-0 z-30 px-4">
-        <div
-          className="rounded-2xl p-4 flex items-center justify-between gap-4"
-          style={{
-            background: 'rgba(10,10,15,0.75)',
-            backdropFilter: 'blur(20px)',
-            border: `1px solid ${palette.badgeBorder}`,
-          }}
-        >
-          <div className="flex-1 min-w-0">
-            <div className="text-white font-black text-base truncate">{current.title.split(' ').slice(0, 3).join(' ')}</div>
-            <div className="text-sm font-bold mt-0.5" style={{ color: palette.primary }}>
-              {formatPrice(current.price)}
-            </div>
-          </div>
-          <Link
-            href={`/products/${current.id}`}
-            className="flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl font-black text-sm"
-            style={{ background: palette.btnBg, color: palette.btnText }}
-          >
-            Buy <ArrowRight size={14} />
-          </Link>
-        </div>
-      </div>
-
-      {/* ── Arrow Controls ── */}
-      <div className="absolute bottom-20 md:bottom-14 right-4 md:right-12 z-30 flex items-center gap-2">
-        <button
-          onClick={prevSlide}
-          className="p-3 rounded-xl border border-white/10 text-white transition-all hover:-translate-y-0.5"
-          style={{ background: 'rgba(255,255,255,0.06)', backdropFilter: 'blur(12px)' }}
-          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = palette.btnBg; (e.currentTarget as HTMLElement).style.color = palette.btnText }}
-          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.06)'; (e.currentTarget as HTMLElement).style.color = 'white' }}
-          aria-label="Previous"
-        >
-          <ChevronLeft size={20} />
-        </button>
-        <button
-          onClick={nextSlide}
-          className="p-3 rounded-xl border border-white/10 text-white transition-all hover:-translate-y-0.5"
-          style={{ background: 'rgba(255,255,255,0.06)', backdropFilter: 'blur(12px)' }}
-          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = palette.btnBg; (e.currentTarget as HTMLElement).style.color = palette.btnText }}
-          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.06)'; (e.currentTarget as HTMLElement).style.color = 'white' }}
-          aria-label="Next"
-        >
-          <ChevronRight size={20} />
-        </button>
-      </div>
-
-      {/* ── Dot Navigation ── */}
-      <div className="absolute bottom-20 md:bottom-14 left-1/2 -translate-x-1/2 z-30 flex items-center gap-1.5">
-        {displayItems.map((_, index) => (
-          <button
-            key={index}
-            onClick={() => goToSlide(index)}
-            className="h-1.5 transition-all duration-500 rounded-full"
-            style={{
-              width: currentIndex === index ? 32 : 8,
-              background: currentIndex === index
-                ? `linear-gradient(90deg, ${palette.gradFrom}, ${palette.gradTo})`
-                : 'rgba(255,255,255,0.2)',
-              boxShadow: currentIndex === index ? `0 0 8px ${palette.glow}` : 'none',
-            }}
-          />
-        ))}
-      </div>
-
-      {/* ── Trust Stats Bar ── */}
+      {/* ── Bottom trust bar ── */}
       <div
-        className="absolute bottom-0 left-0 right-0 z-30 hidden md:block border-t py-3"
-        style={{ background: 'rgba(5,5,10,0.55)', backdropFilter: 'blur(16px)', borderColor: 'rgba(255,255,255,0.05)' }}
+        className="mt-0 px-4 py-3 hidden md:block"
+        style={{
+          background: '#080d13',
+          borderTop: '1px solid rgba(255,255,255,0.04)',
+        }}
       >
-        <div className="max-w-7xl mx-auto px-8 flex justify-between items-center">
+        <div className="max-w-[1400px] mx-auto flex items-center justify-between flex-wrap gap-4">
           {[
-            { icon: <Zap size={14} />, color: palette.primary, label: `${stats.totalProducts.toLocaleString()}+ Items` },
-            { icon: <Star size={14} className="fill-yellow-400 text-yellow-400" />, color: '#facc15', label: 'Top Rated Store' },
-            { icon: <ShieldCheck size={14} />, color: palette.primary, label: 'Secure Global Checkout' },
-            { icon: <TrendingUp size={14} />, color: palette.primary, label: `${stats.totalCategories}+ Departments` },
-          ].map(({ icon, color, label }, i) => (
-            <div key={i} className="flex items-center gap-2 text-xs font-bold text-gray-400 uppercase tracking-widest" style={{ color }}>
+            { icon: <Truck size={14} className="text-teal-500" />, text: 'Free shipping on orders over $29' },
+            { icon: <RotateCcw size={14} className="text-teal-500" />, text: '30-day hassle-free returns' },
+            { icon: <ShieldCheck size={14} className="text-teal-500" />, text: 'Buyer protection on every order' },
+            { icon: <BadgeCheck size={14} className="text-teal-500" />, text: 'Verified quality products' },
+            {
+              icon: <Star size={14} className="text-amber-400 fill-amber-400" />,
+              text: `Avg ${stats.avgRating?.toFixed(1) ?? '4.5'}★ store rating`,
+            },
+          ].map(({ icon, text }) => (
+            <div key={text} className="flex items-center gap-2 text-xs text-gray-500">
               {icon}
-              <span className="text-gray-400">{label}</span>
+              {text}
             </div>
           ))}
         </div>
       </div>
-      
-      {/* ── CSS for content entrance animation ── */}
+
       <style jsx>{`
-        @keyframes heroIn {
-          from { opacity: 0; transform: translateY(24px); }
+        @keyframes slideIn {
+          from { opacity: 0; transform: translateY(16px); }
           to   { opacity: 1; transform: translateY(0); }
         }
-        .hero-content-in {
-          animation: heroIn 0.7s cubic-bezier(0.22,1,0.36,1) both;
+        @keyframes imgFadeIn {
+          from { opacity: 0; }
+          to   { opacity: 1; }
         }
+        .hero-slide-in {
+          animation: slideIn 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+        }
+        .img-fade-in {
+          animation: imgFadeIn 0.6s ease both;
+        }
+        .scrollbar-none::-webkit-scrollbar { display: none; }
+        .scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
-    </div>
+    </section>
   )
 }
