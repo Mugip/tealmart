@@ -175,16 +175,15 @@ function FlashCard({
 /* ═══════════════════════════════════════════
    MARQUEE BANNER  — Interactive Times Square
 ═══════════════════════════════════════════ */
-
-export default function MarqueeBanner({
+function MarqueeBanner({
   stats, countdown,
 }: {
   stats: { totalProducts: number; totalCategories: number; avgRating: number }
   countdown: { h: number; m: number; s: number }
 }) {
-  const [isInteracting, setIsInteracting] = useState(false);
-  const [showTooltip, setShowTooltip] = useState(false);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const [isInteracting, setIsInteracting] = React.useState(false);
+  const [showTooltip, setShowTooltip] = React.useState(false);
+  const timerRef = React.useRef<any>(null);
 
   const timeStr = `${String(countdown.h).padStart(2, '0')}:${String(countdown.m).padStart(2, '0')}:${String(countdown.s).padStart(2, '0')}`;
 
@@ -203,13 +202,10 @@ export default function MarqueeBanner({
     { icon: <Zap size={11} className="text-yellow-400" />, text: 'Lightning Fast Delivery' },
   ];
 
-  // Helper to trigger the "Polite Response"
   const handleInteraction = () => {
     setIsInteracting(true);
     setShowTooltip(true);
-    
     if (timerRef.current) clearTimeout(timerRef.current);
-    
     timerRef.current = setTimeout(() => {
       setShowTooltip(false);
       setIsInteracting(false);
@@ -218,60 +214,48 @@ export default function MarqueeBanner({
 
   return (
     <div className="relative group bg-[#080d14] border-b border-white/5 overflow-hidden h-[36px] flex items-center select-none cursor-grab active:cursor-grabbing">
-      
-      {/* 1. Times Square Glow Masks */}
+      {/* Glow Masks */}
       <div className="absolute left-0 top-0 bottom-0 w-24 z-20 pointer-events-none bg-gradient-to-r from-[#080d14] to-transparent" />
       <div className="absolute right-0 top-0 bottom-0 w-24 z-20 pointer-events-none bg-gradient-to-l from-[#080d14] to-transparent" />
 
-      {/* 2. "Polite Response" Tooltip */}
+      {/* Polite Response Tooltip */}
       <AnimatePresence>
         {showTooltip && (
           <motion.div 
-            initial={{ opacity: 0, y: 10, scale: 0.9 }}
+            initial={{ opacity: 0, y: 5, scale: 0.9 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, scale: 0.9 }}
-            className="absolute left-1/2 -translate-x-1/2 top-full mt-2 z-50 pointer-events-none"
+            className="absolute left-1/2 -translate-x-1/2 top-full mt-1 z-[100] pointer-events-none"
           >
-            <div className="bg-tiffany-600 text-white text-[10px] font-bold px-3 py-1.5 rounded-full shadow-xl flex items-center gap-2 whitespace-nowrap border border-white/20">
-              <SparklesIcon />
-              Take your time! The best deals are worth looking twice. ✨
+            <div className="bg-tiffany-600 text-white text-[10px] font-black px-3 py-1.5 rounded-full shadow-2xl flex items-center gap-2 whitespace-nowrap border border-white/20 uppercase tracking-tighter">
+              <motion.span animate={{ rotate: [0, 20, -20, 0] }} transition={{ repeat: Infinity, duration: 2 }}>🪄</motion.span>
+              Don't rush! Tealy saved the best deals just for you.
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* 3. The Infinite Track */}
+      {/* Infinite Motion Track */}
       <motion.div 
         className="flex items-center whitespace-nowrap"
         drag="x"
         onDragStart={handleInteraction}
-        dragConstraints={{ left: -1000, right: 1000 }} // Soft constraints for a loose feel
+        dragConstraints={{ left: -1500, right: 1500 }}
         animate={isInteracting ? {} : { x: [0, -2000] }}
         transition={{
-          x: {
-            repeat: Infinity,
-            repeatType: "loop",
-            duration: 50, // Higher is slower/more readable
-            ease: "linear",
-          },
+          x: { repeat: Infinity, repeatType: "loop", duration: 60, ease: "linear" },
         }}
       >
-        {/* We map 4 times to ensure no gaps even on ultrawide screens */}
-        {[0, 1, 2, 3].map((setIndex) => (
-          <div key={setIndex} className="flex items-center">
+        {[0, 1, 2, 3].map((set) => (
+          <div key={set} className="flex items-center">
             {items.map((item, i) => (
               <div key={i} className="flex items-center px-6">
                 <span
                   className="flex items-center gap-2 text-[10px] font-black tracking-widest uppercase"
-                  style={{ 
-                    color: item.accent ? '#ff4d4d' : '#8e9aaf',
-                    textShadow: item.glow || 'none'
-                  }}
+                  style={{ color: item.accent ? '#ff4d4d' : '#8e9aaf', textShadow: item.glow || 'none' }}
                 >
                   {item.icon}
-                  <span className={item.accent ? "text-red-200" : "text-gray-400"}>
-                    {item.text}
-                  </span>
+                  <span className={item.accent ? "text-red-200" : "text-gray-400"}>{item.text}</span>
                 </span>
                 <span className="ml-12 text-[#1a2638] font-bold text-xs">//</span>
               </div>
@@ -280,22 +264,11 @@ export default function MarqueeBanner({
         ))}
       </motion.div>
 
-      {/* Decorative Scanline effect for Times Square feel */}
-      <div className="absolute inset-0 pointer-events-none opacity-[0.03] bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] bg-[length:100%_2px,3px_100%]" />
+      {/* Times Square Scanline Effect */}
+      <div className="absolute inset-0 pointer-events-none opacity-[0.04] bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] bg-[length:100%_2px,3px_100%]" />
     </div>
   );
 }
-
-function SparklesIcon() {
-  return (
-    <motion.span
-      animate={{ rotate: [0, 15, -15, 0], scale: [1, 1.2, 1] }}
-      transition={{ repeat: Infinity, duration: 2 }}
-    >
-      🪄
-    </motion.span>
-  );
-      }
 
 /* ═══════════════════════════════════════════
    MAIN HERO
@@ -310,7 +283,8 @@ export default function Hero({ stats, products }: HeroProps) {
   const [touchStart, setTouchStart] = useState<number | null>(null)
   const [touchEnd, setTouchEnd] = useState<number | null>(null)
   const progressStart = useRef(Date.now())
-  const countdown = useCountdown(5, 47, 33)
+  //const countdown = useCountdown(5, 47, 33)
+  const [countdown, setCountdown] = useState({ h: 23, m: 59, s: 59 })
   const DURATION = 7000
 
   const displayItems = products?.slice(0, 5) ?? []
