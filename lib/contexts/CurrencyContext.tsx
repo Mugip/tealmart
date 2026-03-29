@@ -8,7 +8,7 @@ type CurrencyContextType = {
   exchangeRate: number
   symbol: string
   rates: Record<string, number>
-  getFlag: (code: string) => string // ✅ New helper
+  getFlag: (currencyCode: string) => string
   setCurrency: (currency: string) => void
   formatPrice: (priceInUSD: number) => string
   isLoading: boolean
@@ -16,22 +16,21 @@ type CurrencyContextType = {
 
 const CurrencyContext = createContext<CurrencyContextType | undefined>(undefined)
 
-const CURRENCY_FLAGS: Record<string, string> = {
-  USD: '🇺🇸', UGX: '🇺🇬', EUR: '🇪🇺', GBP: '🇬🇧', KES: '🇰🇪', 
-  NGN: '🇳🇬', RWF: '🇷🇼', TZS: '🇹🇿', ZAR: '🇿🇦', GHS: '🇬🇭',
-  INR: '🇮🇳', CAD: '🇨🇦', AUD: '🇦🇺', AED: '🇦🇪', JPY: '🇯🇵',
-  CNY: '🇨🇳',
+// Mapping for regional or non-standard currency-to-country codes
+const CURRENCY_TO_COUNTRY_OVERRIDES: Record<string, string> = {
+  EUR: 'EU', // European Union
+  XAF: 'CM', // Central African CFA (Cameroon)
+  XOF: 'SN', // West African CFA (Senegal)
+  XCD: 'AG', // East Caribbean Dollar
+  ANG: 'CW', // Netherlands Antillean Guilder
+  BTC: '₿',  // Bitcoin
+  ETH: 'Ξ',  // Ethereum
 }
 
 const CURRENCY_SYMBOLS: Record<string, string> = {
   USD: '$', UGX: 'USh ', EUR: '€', GBP: '£', KES: 'KSh ', 
   NGN: '₦', RWF: 'RF ', TZS: 'TSh ', ZAR: 'R ', GHS: 'GH₵',
-  INR: '🇮🇳', CAD: 'C$', AUD: 'A$', AED: 'د.إ'
-}
-
-const COUNTRY_TO_CURRENCY: Record<string, string> = {
-  UG: 'UGX', KE: 'KES', NG: 'NGN', TZ: 'TZS', RW: 'RWF', 
-  ZA: 'ZAR', GH: 'GHS', US: 'USD', GB: 'GBP', EU: 'EUR'
+  INR: '₹', CAD: 'C$', AUD: 'A$', AED: 'د.إ'
 }
 
 export function CurrencyProvider({ children }: { children: React.ReactNode }) {
@@ -58,13 +57,13 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
           return
         }
 
+        // Detect Location via IP
         const geoRes = await fetch('https://ipapi.co/json/')
         const geoData = await geoRes.json()
-        const detected = COUNTRY_TO_CURRENCY[geoData.country_code] || geoData.currency || 'USD'
         
-        if (allRates[detected]) {
-          setCurrencyState(detected)
-          setExchangeRate(allRates[detected])
+        if (geoData.currency && allRates[geoData.currency]) {
+          setCurrencyState(geoData.currency)
+          setExchangeRate(allRates[geoData.currency])
         }
       } catch (error) {
         console.error('Geo-Currency Error:', error)
@@ -75,7 +74,28 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
     initializeGlobal()
   }, [])
 
-  const getFlag = (code: string) => CURRENCY_FLAGS[code] || '🌐'
+  // ✅ Programmatic Flag Logic: Converts "UGX" -> "UG" -> "🇺🇬"
+  const getFlag = (currencyCode: string) => {
+    if (!currencyCode) return '🌐'
+    
+    // Check overrides first (Regional currencies)
+    let countryCode = CURRENCY_TO_COUNTRY_OVERRIDES[currencyCode]
+    
+    // Default: Take first two letters of currency code (ISO Standard)
+    if (!countryCode) {
+      countryCode = currencyCode.substring(0, 2)
+    }
+
+    // If it's a crypto symbol, return it directly
+    if (countryCode.length !== 2) return countryCode
+
+    // Transform country code to Emoji Flag
+    return countryCode
+      .toUpperCase()
+      .replace(/./g, (char) => 
+        String.fromCodePoint(char.charCodeAt(0) + 127397)
+      )
+  }
 
   const setCurrency = (newCurrency: string) => {
     if (rates[newCurrency]) {
@@ -109,4 +129,4 @@ export function useCurrency() {
   const context = useContext(CurrencyContext)
   if (!context) throw new Error('useCurrency must be used within CurrencyProvider')
   return context
-}
+      }
