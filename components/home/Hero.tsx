@@ -1,14 +1,14 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
-import type { TouchEvent } from 'react'
-import Link from 'next/link'
-import Image from 'next/image'
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   ArrowRight, ShieldCheck, Star, ChevronLeft, ChevronRight,
   Truck, RotateCcw, Zap, ShoppingCart, Clock, TrendingUp,
-  BadgeCheck, Flame, Package, Tag, Gift, Percent, Info,
+  BadgeCheck, Flame, Package, Tag, Gift, MessageCircle, X, Sparkles, Percent,
 } from 'lucide-react'
+import Link from 'next/link';
+import Image from 'next/image';
+import type { TouchEvent } from 'react'
 import { useCurrency } from '@/lib/contexts/CurrencyContext'
 import { 
   motion, 
