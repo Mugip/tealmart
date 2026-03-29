@@ -8,6 +8,7 @@ import { CurrencyProvider } from '@/lib/contexts/CurrencyContext'
 import { Toaster } from 'react-hot-toast'
 import CookieConsent from '@/components/CookieConsent'
 import CartDrawer from '@/components/layout/CartDrawer'
+import ChatBot from '@/components/layout/ChatBot'
 
 export default function GlobalProviders({ children }: { children: React.ReactNode }) {
   return (
@@ -28,8 +29,8 @@ export default function GlobalProviders({ children }: { children: React.ReactNod
               }}
             />
             <CookieConsent />
-            {/* The Cart Drawer is placed globally so it can be opened from anywhere */}
             <CartDrawer />
+            <ChatBot />
           </WishlistProvider>
         </CartProvider>
       </CurrencyProvider>
