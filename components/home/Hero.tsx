@@ -7,9 +7,15 @@ import Image from 'next/image'
 import {
   ArrowRight, ShieldCheck, Star, ChevronLeft, ChevronRight,
   Truck, RotateCcw, Zap, ShoppingCart, Clock, TrendingUp,
-  BadgeCheck, Flame, Package, Tag, Gift, Percent,
+  BadgeCheck, Flame, Package, Tag, Gift, Percent, Info,
 } from 'lucide-react'
 import { useCurrency } from '@/lib/contexts/CurrencyContext'
+import { 
+  motion, 
+  useAnimationControls, 
+  AnimatePresence 
+} from 'framer-motion';
+
 
 interface HeroProps {
   stats: {
@@ -165,82 +171,131 @@ function FlashCard({
   )
 }
 
+
 /* ═══════════════════════════════════════════
-   MARQUEE BANNER  — infinite Times Square scroll
+   MARQUEE BANNER  — Interactive Times Square
 ═══════════════════════════════════════════ */
-function MarqueeBanner({
+
+export default function MarqueeBanner({
   stats, countdown,
 }: {
-  stats: HeroProps['stats']
+  stats: { totalProducts: number; totalCategories: number; avgRating: number }
   countdown: { h: number; m: number; s: number }
 }) {
-  const timeStr = `${String(countdown.h).padStart(2, '0')}:${String(countdown.m).padStart(2, '0')}:${String(countdown.s).padStart(2, '0')}`
+  const [isInteracting, setIsInteracting] = useState(false);
+  const [showTooltip, setShowTooltip] = useState(false);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  /* Build a rich set of items — duplicate for seamless loop */
+  const timeStr = `${String(countdown.h).padStart(2, '0')}:${String(countdown.m).padStart(2, '0')}:${String(countdown.s).padStart(2, '0')}`;
+
   const items = [
-    { icon: <Flame size={12} className="text-red-400" />, text: 'FLASH DEALS', accent: true },
+    { icon: <Flame size={12} className="text-red-500" />, text: 'FLASH DEALS', accent: true, glow: '0 0 8px rgba(239,68,68,0.5)' },
     { icon: <Clock size={11} className="text-red-400" />, text: `Ends in ${timeStr}`, accent: true },
-    { icon: <TrendingUp size={11} className="text-teal-500" />, text: `${stats.totalProducts.toLocaleString()}+ Products` },
-    { icon: <Tag size={11} className="text-teal-500" />, text: `${stats.totalCategories}+ Categories` },
-    { icon: <BadgeCheck size={11} className="text-teal-500" />, text: 'Verified Quality' },
-    { icon: <Truck size={11} className="text-teal-500" />, text: 'Free Shipping over $29' },
-    { icon: <ShieldCheck size={11} className="text-teal-500" />, text: 'Buyer Protection' },
+    { icon: <TrendingUp size={11} className="text-tiffany-400" />, text: `${stats.totalProducts.toLocaleString()}+ Products` },
+    { icon: <Tag size={11} className="text-tiffany-400" />, text: `${stats.totalCategories}+ Categories` },
+    { icon: <BadgeCheck size={11} className="text-blue-400" />, text: 'Verified Quality' },
+    { icon: <Truck size={11} className="text-tiffany-400" />, text: 'Free Shipping over $29' },
+    { icon: <ShieldCheck size={11} className="text-green-400" />, text: 'Buyer Protection' },
     { icon: <Gift size={11} className="text-amber-400" />, text: 'New Arrivals Daily' },
     { icon: <Percent size={11} className="text-amber-400" />, text: 'Up to 60% Off Today' },
-    { icon: <RotateCcw size={11} className="text-teal-500" />, text: '30-Day Easy Returns' },
-    { icon: <Star size={11} className="text-amber-400 fill-amber-400" />, text: `${stats.avgRating?.toFixed(1) ?? '4.5'}★ Average Rating` },
+    { icon: <RotateCcw size={11} className="text-tiffany-400" />, text: '30-Day Easy Returns' },
+    { icon: <Star size={11} className="text-amber-400 fill-amber-400" />, text: `${stats.avgRating?.toFixed(1) ?? '4.5'}★ Rating` },
     { icon: <Zap size={11} className="text-yellow-400" />, text: 'Lightning Fast Delivery' },
-  ]
+  ];
 
-  // Separator dot between items
-  const Sep = () => (
-    <span className="mx-4 text-gray-700 select-none">◆</span>
-  )
+  // Helper to trigger the "Polite Response"
+  const handleInteraction = () => {
+    setIsInteracting(true);
+    setShowTooltip(true);
+    
+    if (timerRef.current) clearTimeout(timerRef.current);
+    
+    timerRef.current = setTimeout(() => {
+      setShowTooltip(false);
+      setIsInteracting(false);
+    }, 3000);
+  };
 
   return (
-    <div
-      className="relative overflow-hidden"
-      style={{
-        background: '#0d1520',
-        borderBottom: '1px solid rgba(255,255,255,0.05)',
-        height: 34,
-      }}
-    >
-      {/* Left fade mask */}
-      <div
-        className="absolute left-0 top-0 bottom-0 w-16 z-10 pointer-events-none"
-        style={{ background: 'linear-gradient(90deg, #0d1520 0%, transparent 100%)' }}
-      />
-      {/* Right fade mask */}
-      <div
-        className="absolute right-0 top-0 bottom-0 w-16 z-10 pointer-events-none"
-        style={{ background: 'linear-gradient(270deg, #0d1520 0%, transparent 100%)' }}
-      />
+    <div className="relative group bg-[#080d14] border-b border-white/5 overflow-hidden h-[36px] flex items-center select-none cursor-grab active:cursor-grabbing">
+      
+      {/* 1. Times Square Glow Masks */}
+      <div className="absolute left-0 top-0 bottom-0 w-24 z-20 pointer-events-none bg-gradient-to-r from-[#080d14] to-transparent" />
+      <div className="absolute right-0 top-0 bottom-0 w-24 z-20 pointer-events-none bg-gradient-to-l from-[#080d14] to-transparent" />
 
-      {/* Scrolling track — two identical sets side by side for perfect loop */}
-      <div className="marquee-track flex items-center h-full whitespace-nowrap">
-        {[0, 1].map((copy) => (
-          <span key={copy} className="inline-flex items-center shrink-0">
+      {/* 2. "Polite Response" Tooltip */}
+      <AnimatePresence>
+        {showTooltip && (
+          <motion.div 
+            initial={{ opacity: 0, y: 10, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            className="absolute left-1/2 -translate-x-1/2 top-full mt-2 z-50 pointer-events-none"
+          >
+            <div className="bg-tiffany-600 text-white text-[10px] font-bold px-3 py-1.5 rounded-full shadow-xl flex items-center gap-2 whitespace-nowrap border border-white/20">
+              <SparklesIcon />
+              Take your time! The best deals are worth looking twice. ✨
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 3. The Infinite Track */}
+      <motion.div 
+        className="flex items-center whitespace-nowrap"
+        drag="x"
+        onDragStart={handleInteraction}
+        dragConstraints={{ left: -1000, right: 1000 }} // Soft constraints for a loose feel
+        animate={isInteracting ? {} : { x: [0, -2000] }}
+        transition={{
+          x: {
+            repeat: Infinity,
+            repeatType: "loop",
+            duration: 50, // Higher is slower/more readable
+            ease: "linear",
+          },
+        }}
+      >
+        {/* We map 4 times to ensure no gaps even on ultrawide screens */}
+        {[0, 1, 2, 3].map((setIndex) => (
+          <div key={setIndex} className="flex items-center">
             {items.map((item, i) => (
-              <span key={i} className="inline-flex items-center">
+              <div key={i} className="flex items-center px-6">
                 <span
-                  className="inline-flex items-center gap-1.5 text-[11px] font-bold"
-                  style={{ color: item.accent ? '#f87171' : '#6b7280' }}
+                  className="flex items-center gap-2 text-[10px] font-black tracking-widest uppercase"
+                  style={{ 
+                    color: item.accent ? '#ff4d4d' : '#8e9aaf',
+                    textShadow: item.glow || 'none'
+                  }}
                 >
                   {item.icon}
-                  <span style={{ color: item.accent ? '#fca5a5' : '#9ca3af' }}>
+                  <span className={item.accent ? "text-red-200" : "text-gray-400"}>
                     {item.text}
                   </span>
                 </span>
-                <Sep />
-              </span>
+                <span className="ml-12 text-[#1a2638] font-bold text-xs">//</span>
+              </div>
             ))}
-          </span>
+          </div>
         ))}
-      </div>
+      </motion.div>
+
+      {/* Decorative Scanline effect for Times Square feel */}
+      <div className="absolute inset-0 pointer-events-none opacity-[0.03] bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] bg-[length:100%_2px,3px_100%]" />
     </div>
-  )
+  );
 }
+
+function SparklesIcon() {
+  return (
+    <motion.span
+      animate={{ rotate: [0, 15, -15, 0], scale: [1, 1.2, 1] }}
+      transition={{ repeat: Infinity, duration: 2 }}
+    >
+      🪄
+    </motion.span>
+  );
+      }
 
 /* ═══════════════════════════════════════════
    MAIN HERO
