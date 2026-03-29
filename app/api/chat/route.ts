@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
 
     // 2. Prepare the payload in OpenAI format
     const payload = {
-      model: "mistralai/Mistral-7B-Instruct-v0.3",
+      model: "meta-llama/Llama-3.1-8B-Instruct",
       messages: [
         { role: "system", content: systemPrompt },
         ...messages
