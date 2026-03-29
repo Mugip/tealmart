@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from 'next/server'
 const HUGGINGFACE_API_KEY = process.env.HUGGINGFACE_API_KEY;
 
 // ✅ Using the most stable OpenAI-compatible endpoint for Hugging Face
-const API_URL = "https://api-inference.huggingface.co/v1/chat/completions";
+const API_URL = "https://router.huggingface.co/v1/chat/completions";
 
 export async function POST(req: NextRequest) {
   try {
