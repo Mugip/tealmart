@@ -283,7 +283,7 @@ export default function Hero({ stats, products }: HeroProps) {
   const [touchStart, setTouchStart] = useState<number | null>(null)
   const [touchEnd, setTouchEnd] = useState<number | null>(null)
   const progressStart = useRef(Date.now())
-  //const countdown = useCountdown(5, 47, 33)
+  const countdown = useCountdown(5, 47, 33)
   const [countdown, setCountdown] = useState({ h: 23, m: 59, s: 59 })
   const DURATION = 7000
 
