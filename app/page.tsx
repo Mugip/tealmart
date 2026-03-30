@@ -4,6 +4,7 @@ import { fetchWithCache } from '@/lib/redis'
 import ProductCard from '@/components/products/ProductCard'
 import Hero from '@/components/home/Hero'
 import FeaturedCategories from '@/components/home/FeaturedCategories'
+import NewsletterForm from '@/components/home/NewsletterForm'
 import { TrendingUp, Zap, Star, ArrowRight, Truck, Shield, RotateCcw, Mail, Sparkles } from 'lucide-react'
 import Link from 'next/link'
 
@@ -105,11 +106,11 @@ async function getStats() {
 
 export default async function Home() {
   const [
-    featuredProducts, 
-    latestProducts, 
-    trendingProducts, 
-    recommendedProducts, 
-    categories, 
+    featuredProducts,
+    latestProducts,
+    trendingProducts,
+    recommendedProducts,
+    categories,
     stats
   ] = await Promise.all([
     getFeaturedProducts(),
@@ -122,11 +123,8 @@ export default async function Home() {
 
   return (
     <div className="bg-gray-50">
-      {/* Hero Section - FIXED: Products prop added */}
       <Hero stats={stats} products={featuredProducts} />
 
-      {/* 🛡️ category preview */}
-      
       <FeaturedCategories categories={categories} />
 
       {/* Recommended For You */}
@@ -158,12 +156,12 @@ export default async function Home() {
             <div className="flex items-center justify-between mb-12">
               <div>
                 <h2 className="text-3xl sm:text-4xl font-black text-white tracking-tighter flex items-center gap-3">
-                  <TrendingUp className="text-tiffany-400" />
-                  Trending <span className="text-tiffany-400">Right Now</span>
+                  <TrendingUp className="text-teal-400" />
+                  Trending <span className="text-teal-400">Right Now</span>
                 </h2>
                 <p className="text-gray-400 mt-2 font-medium">Items that are selling out fast across the globe.</p>
               </div>
-              <Link href="/products?sort=popular" className="hidden md:flex items-center gap-2 text-white font-bold hover:text-tiffany-400 transition-colors group">
+              <Link href="/products?sort=popular" className="hidden md:flex items-center gap-2 text-white font-bold hover:text-teal-400 transition-colors group">
                 Shop Trends
                 <ArrowRight className="group-hover:translate-x-1 transition-transform" size={18} />
               </Link>
@@ -194,37 +192,28 @@ export default async function Home() {
           ))}
         </div>
         <div className="mt-12 text-center">
-            <Link href="/products?sort=newest" className="inline-flex items-center gap-2 px-10 py-4 bg-gray-100 hover:bg-gray-200 text-gray-900 font-bold rounded-2xl transition-all">
-                Explore New Drops
-                <ArrowRight size={18} />
-            </Link>
+          <Link href="/products?sort=newest" className="inline-flex items-center gap-2 px-10 py-4 bg-gray-100 hover:bg-gray-200 text-gray-900 font-bold rounded-2xl transition-all">
+            Explore New Drops
+            <ArrowRight size={18} />
+          </Link>
         </div>
       </section>
 
-      {/* ✉️ Newsletter Section */}
-      <section className="bg-tiffany-500 py-20">
+      {/* ✉️ Newsletter Section — wired up */}
+      <section className="bg-teal-500 py-20">
         <div className="max-w-4xl mx-auto px-4 text-center">
           <div className="w-20 h-20 bg-white/20 backdrop-blur-md rounded-3xl flex items-center justify-center mx-auto mb-6">
             <Mail className="text-white" size={32} />
           </div>
-          <h2 className="text-3xl sm:text-5xl font-black text-white mb-4 tracking-tighter">Get 10% Off Your First Order</h2>
-          <p className="text-tiffany-100 text-lg mb-10 font-medium">Join 50,000+ shoppers receiving weekly curated deals and exclusive drops.</p>
-          <form className="flex flex-col sm:flex-row gap-3 max-w-lg mx-auto p-2 bg-white/10 backdrop-blur-xl rounded-[2rem] border border-white/20">
-            <input 
-              type="email" 
-              placeholder="Enter your email" 
-              required
-              className="flex-1 px-6 py-4 rounded-2xl bg-white text-gray-900 placeholder:text-gray-400 focus:ring-0 outline-none font-bold"
-            />
-            <button 
-              type="submit" 
-              className="px-8 py-4 bg-gray-900 hover:bg-black text-white font-black rounded-2xl transition-all"
-            >
-              Join Us
-            </button>
-          </form>
+          <h2 className="text-3xl sm:text-5xl font-black text-white mb-4 tracking-tighter">
+            Get Exclusive Deals First
+          </h2>
+          <p className="text-teal-100 text-lg mb-10 font-medium">
+            Subscribe and be the first to know about new arrivals and special offers.
+          </p>
+          <NewsletterForm />
         </div>
       </section>
     </div>
   )
-      }
+}
