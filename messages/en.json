@@ -1,3 +1,4 @@
+~/tealmart-fixes $ cat messages/en.json
 {
   "HomePage": {
     "title": "Discover Premium Quality Products",
@@ -7,6 +8,56 @@
   "Cart": {
     "header": "Your Shopping Bag",
     "checkout": "Checkout Now",
-    "empty": "Your bag is empty"
+    "empty": "Your bag is empty",
+    "continueShopping": "Continue Shopping",
+    "orderSummary": "Order Summary",
+    "subtotal": "Subtotal",
+    "shipping": "Shipping",
+    "total": "Total",
+    "freeShipping": "Free shipping on orders over $100"
+  },
+  "Product": {
+    "addToCart": "Add to Cart",
+    "buyNow": "Buy Now",
+    "outOfStock": "Out of Stock",
+    "inStock": "In Stock",
+    "reviews": "Reviews",
+    "description": "Description",
+    "relatedProducts": "You May Also Like",
+    "recentlyViewed": "Recently Viewed"
+  },
+  "Auth": {
+    "signIn": "Sign In",
+    "signUp": "Create Account",
+    "signOut": "Sign Out",
+    "forgotPassword": "Forgot Password?",
+    "resetPassword": "Reset Password",
+    "email": "Email Address",
+    "password": "Password",
+    "name": "Full Name"
+  },
+  "Account": {
+    "myOrders": "My Orders",
+    "wishlist": "Wishlist",
+    "addresses": "Saved Addresses",
+    "profile": "Profile Settings"
+  },
+  "Checkout": {
+    "shippingInfo": "Shipping Information",
+    "paymentMethod": "Payment Method",
+    "placeOrder": "Place Order",
+    "discountCode": "Discount Code",
+    "apply": "Apply"
+  },
+  "Common": {
+    "loading": "Loading...",
+    "error": "Something went wrong",
+    "tryAgain": "Try Again",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "search": "Search",
+    "noResults": "No results found"
   }
 }
