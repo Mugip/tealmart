@@ -4,16 +4,17 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   ArrowRight, ShieldCheck, Star, ChevronLeft, ChevronRight,
   Truck, RotateCcw, Zap, ShoppingCart, Clock, TrendingUp,
-  BadgeCheck, Flame, Package, Tag, Gift, MessageCircle, X, Sparkles, Percent,
+  BadgeCheck, Flame, Package, Tag, Gift, Percent,
 } from 'lucide-react'
 import Link from 'next/link';
 import Image from 'next/image';
 import type { TouchEvent } from 'react'
 import { useCurrency } from '@/lib/contexts/CurrencyContext'
-import { 
-  motion, 
-  useAnimationControls, 
-  AnimatePresence 
+import { useCart } from '@/lib/contexts/CartContext'
+import {
+  motion,
+  useAnimationControls,
+  AnimatePresence
 } from 'framer-motion';
 
 
@@ -27,16 +28,37 @@ interface HeroProps {
 }
 
 /* ─────────────────────────────────────────
-   Countdown hook
+   Persistent countdown (survives refresh)
+   Stores end-time in localStorage keyed by
+   a daily campaign ID so it resets once/day.
 ───────────────────────────────────────── */
-function useCountdown(hours = 5, minutes = 47, seconds = 33) {
-  const endRef = useRef<number>(
-    Date.now() + (hours * 3600 + minutes * 60 + seconds) * 1000
-  )
-  const [timeLeft, setTimeLeft] = useState({ h: hours, m: minutes, s: seconds })
+const CAMPAIGN_HOURS = 8 // deals last 8 hours
+
+function usePersistentCountdown() {
+  const [timeLeft, setTimeLeft] = useState({ h: 0, m: 0, s: 0 })
+
   useEffect(() => {
+    const key = 'tealmart_deal_end'
+    const today = new Date().toDateString() // e.g. "Mon Mar 30 2026"
+    const storedRaw = localStorage.getItem(key)
+    let endMs: number
+
+    try {
+      const stored = storedRaw ? JSON.parse(storedRaw) : null
+      if (stored && stored.day === today && stored.end > Date.now()) {
+        endMs = stored.end
+      } else {
+        // New campaign for today
+        endMs = Date.now() + CAMPAIGN_HOURS * 3_600_000
+        localStorage.setItem(key, JSON.stringify({ day: today, end: endMs }))
+      }
+    } catch {
+      endMs = Date.now() + CAMPAIGN_HOURS * 3_600_000
+      localStorage.setItem(key, JSON.stringify({ day: today, end: endMs }))
+    }
+
     const tick = () => {
-      const diff = Math.max(0, endRef.current - Date.now())
+      const diff = Math.max(0, endMs - Date.now())
       setTimeLeft({
         h: Math.floor(diff / 3_600_000),
         m: Math.floor((diff % 3_600_000) / 60_000),
@@ -47,7 +69,30 @@ function useCountdown(hours = 5, minutes = 47, seconds = 33) {
     const id = setInterval(tick, 1000)
     return () => clearInterval(id)
   }, [])
+
   return timeLeft
+}
+
+/* ─────────────────────────────────────────
+   Consistent urgency numbers per product
+   Seeded by product ID so they never change
+   between renders for the same product.
+───────────────────────────────────────── */
+function seededInt(seed: string, min: number, max: number): number {
+  let hash = 0
+  for (let i = 0; i < seed.length; i++) {
+    hash = (hash * 31 + seed.charCodeAt(i)) >>> 0
+  }
+  return min + (hash % (max - min + 1))
+}
+
+function getUrgencyNumbers(product: any) {
+  const id = product?.id ?? 'x'
+  return {
+    viewers: seededInt(id + 'v', 8, 34),
+    bought:  seededInt(id + 'b', 120, 890),
+    stock:   seededInt(id + 's', 4, 22),
+  }
 }
 
 /* ─────────────────────────────────────────
@@ -173,7 +218,7 @@ function FlashCard({
 
 
 /* ═══════════════════════════════════════════
-   MARQUEE BANNER  — Interactive Times Square
+   MARQUEE BANNER
 ═══════════════════════════════════════════ */
 function MarqueeBanner({
   stats, countdown,
@@ -181,70 +226,37 @@ function MarqueeBanner({
   stats: { totalProducts: number; totalCategories: number; avgRating: number }
   countdown: { h: number; m: number; s: number }
 }) {
-  const [isInteracting, setIsInteracting] = React.useState(false);
-  const [showTooltip, setShowTooltip] = React.useState(false);
-  const timerRef = React.useRef<any>(null);
+  const timeStr = `${String(countdown.h).padStart(2, '0')}:${String(countdown.m).padStart(2, '0')}:${String(countdown.s).padStart(2, '0')}`
 
-  const timeStr = `${String(countdown.h).padStart(2, '0')}:${String(countdown.m).padStart(2, '0')}:${String(countdown.s).padStart(2, '0')}`;
+  // Only show discount text if the countdown has real time remaining
+  const hasActiveDeals = countdown.h > 0 || countdown.m > 0 || countdown.s > 0
 
   const items = [
-    { icon: <Flame size={12} className="text-red-500" />, text: 'FLASH DEALS', accent: true, glow: '0 0 8px rgba(239,68,68,0.5)' },
-    { icon: <Clock size={11} className="text-red-400" />, text: `Ends in ${timeStr}`, accent: true },
-    { icon: <TrendingUp size={11} className="text-tiffany-400" />, text: `${stats.totalProducts.toLocaleString()}+ Products` },
-    { icon: <Tag size={11} className="text-tiffany-400" />, text: `${stats.totalCategories}+ Categories` },
+    ...(hasActiveDeals ? [
+      { icon: <Flame size={12} className="text-red-500" />, text: 'FLASH DEALS', accent: true },
+      { icon: <Clock size={11} className="text-red-400" />, text: `Ends in ${timeStr}`, accent: true },
+    ] : []),
+    { icon: <TrendingUp size={11} className="text-teal-400" />, text: `${stats.totalProducts.toLocaleString()}+ Products` },
+    { icon: <Tag size={11} className="text-teal-400" />, text: `${stats.totalCategories}+ Categories` },
     { icon: <BadgeCheck size={11} className="text-blue-400" />, text: 'Verified Quality' },
-    { icon: <Truck size={11} className="text-tiffany-400" />, text: 'Free Shipping over $29' },
+    { icon: <Truck size={11} className="text-teal-400" />, text: 'Free Shipping over $29' },
     { icon: <ShieldCheck size={11} className="text-green-400" />, text: 'Buyer Protection' },
     { icon: <Gift size={11} className="text-amber-400" />, text: 'New Arrivals Daily' },
-    { icon: <Percent size={11} className="text-amber-400" />, text: 'Up to 60% Off Today' },
-    { icon: <RotateCcw size={11} className="text-tiffany-400" />, text: '30-Day Easy Returns' },
-    { icon: <Star size={11} className="text-amber-400 fill-amber-400" />, text: `${stats.avgRating?.toFixed(1) ?? '4.5'}★ Rating` },
-    { icon: <Zap size={11} className="text-yellow-400" />, text: 'Lightning Fast Delivery' },
-  ];
-
-  const handleInteraction = () => {
-    setIsInteracting(true);
-    setShowTooltip(true);
-    if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => {
-      setShowTooltip(false);
-      setIsInteracting(false);
-    }, 3000);
-  };
+    { icon: <RotateCcw size={11} className="text-teal-400" />, text: '30-Day Easy Returns' },
+    { icon: <Star size={11} className="text-amber-400 fill-amber-400" />, text: `${stats.avgRating?.toFixed(1) ?? '4.5'}★ Average Rating` },
+    { icon: <Zap size={11} className="text-yellow-400" />, text: 'New Drops Every Day' },
+  ]
 
   return (
-    <div className="relative group bg-[#080d14] border-b border-white/5 overflow-hidden h-[36px] flex items-center select-none cursor-grab active:cursor-grabbing">
-      {/* Glow Masks */}
-      <div className="absolute left-0 top-0 bottom-0 w-24 z-20 pointer-events-none bg-gradient-to-r from-[#080d14] to-transparent" />
-      <div className="absolute right-0 top-0 bottom-0 w-24 z-20 pointer-events-none bg-gradient-to-l from-[#080d14] to-transparent" />
+    <div className="relative bg-[#080d14] border-b border-white/5 overflow-hidden h-[36px] flex items-center select-none">
+      {/* Fade masks */}
+      <div className="absolute left-0 top-0 bottom-0 w-16 z-20 pointer-events-none bg-gradient-to-r from-[#080d14] to-transparent" />
+      <div className="absolute right-0 top-0 bottom-0 w-16 z-20 pointer-events-none bg-gradient-to-l from-[#080d14] to-transparent" />
 
-      {/* Polite Response Tooltip */}
-      <AnimatePresence>
-        {showTooltip && (
-          <motion.div 
-            initial={{ opacity: 0, y: 5, scale: 0.9 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.9 }}
-            className="absolute left-1/2 -translate-x-1/2 top-full mt-1 z-[100] pointer-events-none"
-          >
-            <div className="bg-tiffany-600 text-white text-[10px] font-black px-3 py-1.5 rounded-full shadow-2xl flex items-center gap-2 whitespace-nowrap border border-white/20 uppercase tracking-tighter">
-              <motion.span animate={{ rotate: [0, 20, -20, 0] }} transition={{ repeat: Infinity, duration: 2 }}>🪄</motion.span>
-              Don't rush! Tealy saved the best deals just for you.
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Infinite Motion Track */}
-      <motion.div 
+      <motion.div
         className="flex items-center whitespace-nowrap"
-        drag="x"
-        onDragStart={handleInteraction}
-        dragConstraints={{ left: -1500, right: 1500 }}
-        animate={isInteracting ? {} : { x: [0, -2000] }}
-        transition={{
-          x: { repeat: Infinity, repeatType: "loop", duration: 60, ease: "linear" },
-        }}
+        animate={{ x: [0, -2000] }}
+        transition={{ x: { repeat: Infinity, repeatType: 'loop', duration: 55, ease: 'linear' } }}
       >
         {[0, 1, 2, 3].map((set) => (
           <div key={set} className="flex items-center">
@@ -252,10 +264,10 @@ function MarqueeBanner({
               <div key={i} className="flex items-center px-6">
                 <span
                   className="flex items-center gap-2 text-[10px] font-black tracking-widest uppercase"
-                  style={{ color: item.accent ? '#ff4d4d' : '#8e9aaf', textShadow: item.glow || 'none' }}
+                  style={{ color: item.accent ? '#ff4d4d' : '#8e9aaf' }}
                 >
                   {item.icon}
-                  <span className={item.accent ? "text-red-200" : "text-gray-400"}>{item.text}</span>
+                  <span className={item.accent ? 'text-red-200' : 'text-gray-400'}>{item.text}</span>
                 </span>
                 <span className="ml-12 text-[#1a2638] font-bold text-xs">//</span>
               </div>
@@ -263,11 +275,8 @@ function MarqueeBanner({
           </div>
         ))}
       </motion.div>
-
-      {/* Times Square Scanline Effect */}
-      <div className="absolute inset-0 pointer-events-none opacity-[0.04] bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] bg-[length:100%_2px,3px_100%]" />
     </div>
-  );
+  )
 }
 
 /* ═══════════════════════════════════════════
@@ -275,6 +284,7 @@ function MarqueeBanner({
 ═══════════════════════════════════════════ */
 export default function Hero({ stats, products }: HeroProps) {
   const { formatPrice } = useCurrency()
+  const { addItem } = useCart()
   const [currentIndex, setCurrentIndex] = useState(0)
   const [progress, setProgress] = useState(0)
   const [isHovered, setIsHovered] = useState(false)
@@ -283,12 +293,12 @@ export default function Hero({ stats, products }: HeroProps) {
   const [touchStart, setTouchStart] = useState<number | null>(null)
   const [touchEnd, setTouchEnd] = useState<number | null>(null)
   const progressStart = useRef(Date.now())
-  const countdown = useCountdown(5, 47, 33)
-  // const [countdown, setCountdown] = useState({ h: 23, m: 59, s: 59 })
+  const countdown = usePersistentCountdown()
   const DURATION = 7000
 
   const displayItems = products?.slice(0, 5) ?? []
   const current = displayItems[currentIndex]
+  const urgency = getUrgencyNumbers(current)
 
   const goTo = useCallback((idx: number) => {
     setCurrentIndex(idx)
@@ -326,9 +336,17 @@ export default function Hero({ stats, products }: HeroProps) {
     setTouchStart(null); setTouchEnd(null)
   }
 
-  const viewers = current ? 18 + (current.id?.charCodeAt(0) ?? 4) % 55 : 0
-  const bought  = current ? 1200 + (current.id?.charCodeAt(1) ?? 3) % 3000 : 0
-  const stock   = current ? 5 + (current.id?.charCodeAt(2) ?? 2) % 18 : 0
+  const handleAddToCart = () => {
+    if (!current) return
+    addItem({
+      id: current.id,
+      title: current.title,
+      price: current.price,
+      image: current.images?.[0] || '',
+    })
+    setAddedToCart(true)
+    setTimeout(() => setAddedToCart(false), 2000)
+  }
 
   if (!displayItems.length || !current) return null
 
@@ -353,7 +371,7 @@ export default function Hero({ stats, products }: HeroProps) {
         />
       </div>
 
-      {/* ── Times Square marquee banner ── */}
+      {/* ── Marquee banner ── */}
       <MarqueeBanner stats={stats} countdown={countdown} />
 
       {/* ── Main grid ── */}
@@ -362,7 +380,6 @@ export default function Hero({ stats, products }: HeroProps) {
 
           {/* ══════════════════════════════
               MOBILE: side-by-side card
-              (replaces the stacked layout)
           ══════════════════════════════ */}
           <div
             className="lg:hidden rounded-2xl overflow-hidden"
@@ -383,12 +400,10 @@ export default function Hero({ stats, products }: HeroProps) {
                   priority
                   className="object-cover"
                 />
-                {/* subtle teal gradient overlay on right edge to blend into info */}
                 <div
                   className="absolute inset-y-0 right-0 w-8 pointer-events-none"
                   style={{ background: 'linear-gradient(90deg, transparent, #0d1520)' }}
                 />
-                {/* Discount badge pinned top-left */}
                 {current.compareAtPrice && current.compareAtPrice > current.price && (
                   <div className="absolute top-2 left-2">
                     <Savings price={current.price} compareAtPrice={current.compareAtPrice} />
@@ -399,13 +414,11 @@ export default function Hero({ stats, products }: HeroProps) {
               {/* Info pane — right side */}
               <div className="flex-1 flex flex-col justify-between p-3 min-w-0">
                 <div className="space-y-1.5">
-                  {/* Badge */}
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-teal-500/10 text-teal-400 border border-teal-500/20">
                     <Zap size={9} />
-                    {(current.reviewCount ?? 0) > 100 ? "Best Deal" : 'Featured'}
+                    {(current.reviewCount ?? 0) > 100 ? 'Best Deal' : 'Featured'}
                   </span>
 
-                  {/* Title */}
                   <div key={`mob-t-${currentIndex}`} className="hero-slide-in">
                     <h1
                       className="text-sm font-black text-white leading-snug"
@@ -419,7 +432,6 @@ export default function Hero({ stats, products }: HeroProps) {
 
                   <Stars rating={current.avgRating ?? 4.5} count={current.reviewCount ?? 0} />
 
-                  {/* Price */}
                   <div>
                     <div className="text-xl font-black text-white leading-none">
                       {formatPrice(current.price)}
@@ -436,14 +448,13 @@ export default function Hero({ stats, products }: HeroProps) {
                     )}
                   </div>
 
-                  {/* Urgency */}
                   <div className="flex flex-wrap gap-x-3 gap-y-1">
                     <span className="flex items-center gap-1 text-[10px] text-orange-400 font-semibold">
                       <span className="w-1.5 h-1.5 rounded-full bg-orange-400 animate-pulse inline-block" />
-                      {viewers} viewing
+                      {urgency.viewers} viewing
                     </span>
                     <span className="flex items-center gap-1 text-[10px] text-red-400 font-semibold">
-                      <Package size={10} /> {stock} left
+                      <Package size={10} /> {urgency.stock} left
                     </span>
                   </div>
                 </div>
@@ -457,10 +468,7 @@ export default function Hero({ stats, products }: HeroProps) {
                     Buy Now <ArrowRight size={12} />
                   </Link>
                   <button
-                    onClick={() => {
-                      setAddedToCart(true)
-                      setTimeout(() => setAddedToCart(false), 2000)
-                    }}
+                    onClick={handleAddToCart}
                     className="flex-1 flex items-center justify-center gap-1 py-2.5 rounded-xl font-bold text-xs transition-all"
                     style={{
                       background: addedToCart ? 'rgba(20,184,166,0.15)' : 'rgba(255,255,255,0.05)',
@@ -480,7 +488,6 @@ export default function Hero({ stats, products }: HeroProps) {
               className="flex items-center justify-between px-3 py-2.5 gap-3"
               style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}
             >
-              {/* Mini countdown */}
               <div className="flex items-center gap-2">
                 <Clock size={11} className="text-red-400 flex-shrink-0" />
                 <span className="text-[10px] text-gray-500">Ends</span>
@@ -488,11 +495,9 @@ export default function Hero({ stats, products }: HeroProps) {
                   {String(countdown.h).padStart(2, '0')}:{String(countdown.m).padStart(2, '0')}:{String(countdown.s).padStart(2, '0')}
                 </span>
               </div>
-              {/* Bought */}
               <span className="text-[10px] text-gray-500">
-                <span className="text-teal-400 font-bold">{bought.toLocaleString()}</span> bought this week
+                <span className="text-teal-400 font-bold">{urgency.bought.toLocaleString()}</span> bought this week
               </span>
-              {/* Dots + arrows */}
               <div className="flex items-center gap-1.5">
                 {displayItems.map((_, i) => (
                   <button
@@ -596,7 +601,7 @@ export default function Hero({ stats, products }: HeroProps) {
                 <Stars rating={current.avgRating ?? 4.5} count={current.reviewCount ?? 0} />
                 <span className="text-gray-700 text-xs">·</span>
                 <span className="text-xs text-gray-400">
-                  <span className="text-teal-400 font-bold">{bought.toLocaleString()}</span> bought this week
+                  <span className="text-teal-400 font-bold">{urgency.bought.toLocaleString()}</span> bought this week
                 </span>
               </div>
 
@@ -626,30 +631,32 @@ export default function Hero({ stats, products }: HeroProps) {
               <div className="flex flex-wrap items-center gap-4">
                 <div className="flex items-center gap-1.5 text-xs text-orange-400 font-semibold">
                   <div className="w-1.5 h-1.5 rounded-full bg-orange-400 animate-pulse" />
-                  {viewers} people viewing now
+                  {urgency.viewers} people viewing now
                 </div>
                 <div className="flex items-center gap-1.5 text-xs text-red-400 font-semibold">
-                  <Package size={12} /> Only {stock} left
+                  <Package size={12} /> Only {urgency.stock} left in stock
                 </div>
               </div>
 
-              {/* Countdown */}
-              <div
-                className="inline-flex items-center gap-3 px-4 py-3 rounded-xl"
-                style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}
-              >
-                <div className="flex items-center gap-1.5 text-[11px] text-gray-400 font-bold uppercase tracking-widest">
-                  <Clock size={12} className="text-red-400" />
-                  Deal ends in
+              {/* Countdown — only show if time remains */}
+              {(countdown.h > 0 || countdown.m > 0 || countdown.s > 0) && (
+                <div
+                  className="inline-flex items-center gap-3 px-4 py-3 rounded-xl"
+                  style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}
+                >
+                  <div className="flex items-center gap-1.5 text-[11px] text-gray-400 font-bold uppercase tracking-widest">
+                    <Clock size={12} className="text-red-400" />
+                    Deal ends in
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <TimeCell value={countdown.h} label="hrs" />
+                    <span className="text-gray-600 font-black text-lg pb-4">:</span>
+                    <TimeCell value={countdown.m} label="min" />
+                    <span className="text-gray-600 font-black text-lg pb-4">:</span>
+                    <TimeCell value={countdown.s} label="sec" />
+                  </div>
                 </div>
-                <div className="flex items-center gap-1">
-                  <TimeCell value={countdown.h} label="hrs" />
-                  <span className="text-gray-600 font-black text-lg pb-4">:</span>
-                  <TimeCell value={countdown.m} label="min" />
-                  <span className="text-gray-600 font-black text-lg pb-4">:</span>
-                  <TimeCell value={countdown.s} label="sec" />
-                </div>
-              </div>
+              )}
             </div>
 
             {/* CTAs */}
@@ -661,11 +668,7 @@ export default function Hero({ stats, products }: HeroProps) {
                 Buy Now <ArrowRight size={16} />
               </Link>
               <button
-                onClick={() => {
-                  setAddedToCart(true)
-                  setTimeout(() => setAddedToCart(false), 2000)
-                  // addToCart({ productId: current.id, quantity: 1 })
-                }}
+                onClick={handleAddToCart}
                 className="flex-1 flex items-center justify-center gap-2 py-4 rounded-xl font-bold text-sm transition-all hover:-translate-y-0.5"
                 style={{
                   background: addedToCart ? 'rgba(20,184,166,0.15)' : 'rgba(255,255,255,0.05)',
@@ -727,7 +730,7 @@ export default function Hero({ stats, products }: HeroProps) {
           </div>
 
           {/* ══════════════════════════════
-              DESKTOP COL 2: Product image — full bleed, no white box
+              DESKTOP COL 2: Product image
           ══════════════════════════════ */}
           <div
             className="hidden lg:block rounded-2xl overflow-hidden relative"
@@ -737,7 +740,6 @@ export default function Hero({ stats, products }: HeroProps) {
               minHeight: 540,
             }}
           >
-            {/* Teal ambient glow behind product */}
             <div
               className="absolute inset-0 pointer-events-none z-0"
               style={{
@@ -745,7 +747,6 @@ export default function Hero({ stats, products }: HeroProps) {
               }}
             />
 
-            {/* Category chip */}
             <div className="absolute top-4 left-4 z-20">
               <span
                 className="text-[10px] text-gray-500 font-bold uppercase tracking-widest px-2 py-1 rounded-md"
@@ -755,8 +756,6 @@ export default function Hero({ stats, products }: HeroProps) {
               </span>
             </div>
 
-            {/* The image — object-cover so it fills edge-to-edge on shorter products,
-                but falls back to object-contain with generous padding for tall products */}
             <div
               key={`dimg-${currentIndex}`}
               className="absolute inset-0 img-fade-in z-10"
@@ -776,13 +775,11 @@ export default function Hero({ stats, products }: HeroProps) {
               />
             </div>
 
-            {/* Bottom gradient so photo count badge is readable */}
             <div
               className="absolute bottom-0 left-0 right-0 h-16 z-20 pointer-events-none"
               style={{ background: 'linear-gradient(0deg, rgba(13,21,32,0.7) 0%, transparent 100%)' }}
             />
 
-            {/* Photo count */}
             {current.images?.length > 1 && (
               <div
                 className="absolute bottom-3 right-3 z-30 text-[11px] text-gray-400 font-semibold px-2 py-1 rounded-md"
@@ -813,16 +810,18 @@ export default function Hero({ stats, products }: HeroProps) {
               </Link>
             </div>
 
-            <div
-              className="flex items-center justify-center gap-2 py-2 rounded-xl"
-              style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.12)' }}
-            >
-              <Clock size={10} className="text-red-400" />
-              <span className="text-red-400 font-black text-xs tabular-nums">
-                {String(countdown.h).padStart(2, '0')}:{String(countdown.m).padStart(2, '0')}:{String(countdown.s).padStart(2, '0')}
-              </span>
-              <span className="text-gray-600 text-[10px]">remaining</span>
-            </div>
+            {(countdown.h > 0 || countdown.m > 0 || countdown.s > 0) && (
+              <div
+                className="flex items-center justify-center gap-2 py-2 rounded-xl"
+                style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.12)' }}
+              >
+                <Clock size={10} className="text-red-400" />
+                <span className="text-red-400 font-black text-xs tabular-nums">
+                  {String(countdown.h).padStart(2, '0')}:{String(countdown.m).padStart(2, '0')}:{String(countdown.s).padStart(2, '0')}
+                </span>
+                <span className="text-gray-600 text-[10px]">remaining</span>
+              </div>
+            )}
 
             <div className="flex flex-col gap-1">
               {displayItems.map((product, idx) => (
@@ -868,20 +867,13 @@ export default function Hero({ stats, products }: HeroProps) {
         </div>
       </div>
 
-      <style jsx>{`
-        /* ── Marquee ── */
-        .marquee-track {
-          animation: marquee 28s linear infinite;
-        }
-        .marquee-track:hover {
-          animation-play-state: paused;
-        }
-        @keyframes marquee {
-          0%   { transform: translateX(0); }
-          100% { transform: translateX(-50%); }
-        }
+      {/* ── Gradient bridge: dark hero → light page body ── */}
+      <div
+        className="h-10 w-full pointer-events-none"
+        style={{ background: 'linear-gradient(to bottom, #080d13, #f9fafb)' }}
+      />
 
-        /* ── Slide animations ── */
+      <style jsx>{`
         @keyframes slideIn {
           from { opacity: 0; transform: translateY(14px); }
           to   { opacity: 1; transform: translateY(0); }
@@ -892,8 +884,6 @@ export default function Hero({ stats, products }: HeroProps) {
         }
         .hero-slide-in { animation: slideIn 0.5s cubic-bezier(0.22,1,0.36,1) both; }
         .img-fade-in   { animation: imgFadeIn 0.55s ease both; }
-
-        /* ── Scrollbar hide ── */
         .scrollbar-none::-webkit-scrollbar { display: none; }
         .scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
