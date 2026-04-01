@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
     }
 
     // =============================
-    // FETCH PRODUCTS
+    // FETCH PRODUCTS & CALCULATE TOTALS
     // =============================
 
     const productIds = items.map((i: any) => i.id.split('-')[0])
@@ -78,19 +78,33 @@ export async function POST(req: NextRequest) {
     const validatedItems: any[] = []
 
     for (const item of items) {
-      const id = item.id.split('-')[0]
-      const product = productMap.get(id)
+      const baseProductId = item.id.split('-')[0]
+      const variantId = item.id.includes('-') ? item.id.split('-')[1] : null
+      
+      const product = productMap.get(baseProductId)
       if (!product) continue
 
-      const price = product.price
-      const qty = item.quantity || 1
+      // Use database price, NOT the client's requested price
+      let dbPrice = product.price
 
-      subtotal += price * qty
+      // If a variant was selected, check if the variant has a different price
+      if (variantId && product.variants && typeof product.variants === 'object') {
+        const variantsData = product.variants as any
+        if (variantsData.items && Array.isArray(variantsData.items)) {
+          const variant = variantsData.items.find((v: any) => v.id === variantId)
+          if (variant && variant.price) {
+            dbPrice = variant.price
+          }
+        }
+      }
+
+      const qty = item.quantity || 1
+      subtotal += dbPrice * qty
 
       validatedItems.push({
         productId: product.id,
         quantity: qty,
-        price,
+        price: dbPrice,
       })
     }
 
@@ -103,13 +117,21 @@ export async function POST(req: NextRequest) {
     // =============================
 
     const shipping = subtotal >= 50 ? 0 : 9.99
-    const total = subtotal + shipping - (discountAmount || 0)
+    
+    let finalDiscountAmount = discountAmount || 0
+    if (finalDiscountAmount > subtotal) finalDiscountAmount = subtotal
+    
+    const total = subtotal + shipping - finalDiscountAmount
+
+    if (total <= 0) {
+      return NextResponse.json({ error: "Order total must be greater than 0" }, { status: 400 })
+    }
 
     // =============================
     // CREATE ORDER
     // =============================
 
-    const orderNumber = `ORD-${Date.now()}`
+    const orderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`
 
     const order = await prisma.order.create({
       data: {
@@ -118,18 +140,24 @@ export async function POST(req: NextRequest) {
         shippingName: shippingAddress.name,
         shippingAddress: shippingAddress.address1,
         shippingCity: shippingAddress.city,
+        shippingState: shippingAddress.state || "", // ✅ FIXED: Added missing field
         shippingZip: shippingAddress.zip,
-        shippingCountry: shippingAddress.country || "US",
+        shippingCountry: shippingAddress.country || "UG",
         shippingPhone: shippingAddress.phone,
         paymentMethod: "flutterwave",
         status: "PENDING",
         subtotal,
+        tax: 0, // ✅ FIXED: Added missing field
         shipping,
         total,
         discountCode: discountCode || null,
-        discountAmount: discountAmount || 0,
+        discountAmount: finalDiscountAmount,
         items: {
-          create: validatedItems
+          create: validatedItems.map(item => ({
+            productId: item.productId,
+            quantity: item.quantity,
+            price: item.price,
+          }))
         }
       }
     })
@@ -138,10 +166,9 @@ export async function POST(req: NextRequest) {
     // 🌍 GLOBAL CURRENCY LOGIC
     // =============================
 
-    const countryCode = (shippingAddress.country || 'US').toUpperCase()
+    const countryCode = (shippingAddress.country || 'UG').toUpperCase()
 
-    let currency =
-      COUNTRY_CURRENCY_MAP[countryCode] || 'USD'
+    let currency = COUNTRY_CURRENCY_MAP[countryCode] || 'USD'
 
     // fallback if unsupported
     if (!SUPPORTED_CURRENCIES.includes(currency)) {
@@ -159,7 +186,8 @@ export async function POST(req: NextRequest) {
     // PAYMENT REQUEST
     // =============================
 
-    const redirectUrl = `${process.env.NEXT_PUBLIC_APP_URL}/checkout/success?order=${order.orderNumber}`
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_URL || 'http://localhost:3000'
+    const redirectUrl = `${baseUrl}/checkout/success?order=${order.orderNumber}`
 
     const fwRes = await fetch("https://api.flutterwave.com/v3/payments", {
       method: "POST",
@@ -171,8 +199,7 @@ export async function POST(req: NextRequest) {
         tx_ref: order.orderNumber,
         amount: chargeAmount,
         currency,
-        payment_options:
-          "card, mobilemoneyuganda, mobilemoneyghana, mobilemoneyrwanda, mpesa, ussd",
+        payment_options: "card, mobilemoneyuganda, mobilemoneyghana, mobilemoneyrwanda, mobilemoneyzambia, mobilemoneyfranco, mpesa, ussd",
         redirect_url: redirectUrl,
         customer: {
           email,
@@ -188,11 +215,12 @@ export async function POST(req: NextRequest) {
 
     const fwData = await fwRes.json()
 
-    if (fwData?.data?.link) {
+    if (fwData?.status === 'success' && fwData?.data?.link) {
       return NextResponse.json({ url: fwData.data.link })
     }
 
-    throw new Error("Failed to create payment link")
+    console.error("❌ Flutterwave Error:", fwData)
+    throw new Error(fwData.message || "Failed to create payment link")
 
   } catch (err: any) {
     console.error(err)
@@ -203,4 +231,4 @@ export async function POST(req: NextRequest) {
   } finally {
     await prisma.$disconnect()
   }
-                                  }
+        }
