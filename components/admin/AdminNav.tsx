@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, ShoppingCart, Package, BarChart3,
-  Boxes, Settings, Tag, ExternalLink,
+  Boxes, Settings, Tag, ExternalLink, Users
 } from 'lucide-react'
 
 const navItems = [
@@ -16,6 +16,7 @@ const navItems = [
   { href: '/admin/analytics', icon: BarChart3, label: 'Analytics' },
   { href: '/admin/inventory', icon: Boxes, label: 'Inventory' },
   { href: '/admin/discounts', icon: Tag, label: 'Discounts' },
+  { href: '/admin/subscribers', icon: Users, label: 'Subscribers' },
   { href: '/admin/settings', icon: Settings, label: 'Settings' },
 ]
 
