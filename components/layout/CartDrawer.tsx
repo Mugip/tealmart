@@ -100,7 +100,7 @@ export default function CartDrawer() {
                     
                     <div className="flex items-center justify-between mt-2">
                       <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden h-8 bg-gray-50">
-                        <button onClick={() => updateQuantity(item.id, item.quantity - 1)} className="px-2 hover:bg-white text-gray-500"><Minus size={12}/></button>
+                        <button onClick={() => updateQuantity(item.id, item.quantity - 1)} className="px-2 hover:bg-white text-gray-500"> {item.quantity === 1 ? <Trash2 size={12} className="text-red-400" /> : <Minus size={12}/>} </button>
                         <span className="w-8 text-center text-xs font-bold text-gray-700">{item.quantity}</span>
                         <button onClick={() => updateQuantity(item.id, item.quantity + 1)} className="px-2 hover:bg-white text-gray-500"><Plus size={12}/></button>
                       </div>
