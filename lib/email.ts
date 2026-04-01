@@ -1,9 +1,30 @@
 // lib/email.ts
+
 import { Resend } from 'resend'
 import { OrderConfirmationEmail } from '@/emails/OrderConfirmation'
 import { ShippingConfirmationEmail } from '@/emails/ShippingConfirmation'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
+
+// ✅ Single env (required)
+const BASE_FROM_EMAIL =
+  process.env.RESEND_FROM_EMAIL || 'TealMart <onboarding@resend.dev>'
+
+// ✅ Extract email address only (noreply@tealmart.com)
+function extractEmail(from: string) {
+  const match = from.match(/<(.+)>/)
+  return match ? match[1] : from
+}
+
+// ✅ Dynamic sender generator
+function getFrom(name: string) {
+  const email = extractEmail(BASE_FROM_EMAIL)
+  return `${name} <${email}>`
+}
+
+// ============================================
+// ORDER CONFIRMATION
+// ============================================
 
 export async function sendOrderConfirmationEmail(data: {
   to: string
@@ -31,34 +52,29 @@ export async function sendOrderConfirmationEmail(data: {
 }) {
   try {
     const { data: emailData, error } = await resend.emails.send({
-      from: 'TealMart <orders@tealmart.com>',
+      from: getFrom('TealMart Orders'),
       to: data.to,
       subject: `Order Confirmation - #${data.orderNumber}`,
       react: OrderConfirmationEmail({
-        orderNumber: data.orderNumber,
-        customerName: data.customerName,
-        orderDate: data.orderDate,
-        items: data.items,
-        subtotal: data.subtotal,
-        shipping: data.shipping,
-        tax: data.tax,
-        total: data.total,
-        shippingAddress: data.shippingAddress,
+        ...data,
       }),
     })
 
     if (error) {
-      console.error('Failed to send order confirmation email:', error)
+      console.error('[EMAIL_ORDER_ERROR]', error)
       return { success: false, error }
     }
 
-    console.log('Order confirmation email sent:', emailData?.id)
     return { success: true, id: emailData?.id }
   } catch (error) {
-    console.error('Email sending error:', error)
+    console.error('[EMAIL_ORDER_EXCEPTION]', error)
     return { success: false, error }
   }
 }
+
+// ============================================
+// SHIPPING CONFIRMATION
+// ============================================
 
 export async function sendShippingConfirmationEmail(data: {
   to: string
@@ -82,40 +98,43 @@ export async function sendShippingConfirmationEmail(data: {
 }) {
   try {
     const { data: emailData, error } = await resend.emails.send({
-      from: 'TealMart <shipping@tealmart.com>',
+      from: getFrom('TealMart Shipping'),
       to: data.to,
       subject: `Your Order #${data.orderNumber} Has Shipped!`,
       react: ShippingConfirmationEmail({
-        orderNumber: data.orderNumber,
-        customerName: data.customerName,
-        trackingNumber: data.trackingNumber,
-        carrier: data.carrier,
-        estimatedDelivery: data.estimatedDelivery,
-        items: data.items,
-        shippingAddress: data.shippingAddress,
+        ...data,
       }),
     })
 
     if (error) {
-      console.error('Failed to send shipping confirmation email:', error)
+      console.error('[EMAIL_SHIPPING_ERROR]', error)
       return { success: false, error }
     }
 
-    console.log('Shipping confirmation email sent:', emailData?.id)
     return { success: true, id: emailData?.id }
   } catch (error) {
-    console.error('Email sending error:', error)
+    console.error('[EMAIL_SHIPPING_EXCEPTION]', error)
     return { success: false, error }
   }
 }
+
+// ============================================
+// WELCOME EMAIL
+// ============================================
 
 export async function sendWelcomeEmail(data: {
   to: string
   name: string
 }) {
   try {
+    const appUrl =
+      process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+
+    const supportEmail =
+      process.env.SUPPORT_EMAIL || extractEmail(BASE_FROM_EMAIL)
+
     const { data: emailData, error } = await resend.emails.send({
-      from: 'TealMart <hello@tealmart.com>',
+      from: getFrom('TealMart'),
       to: data.to,
       subject: 'Welcome to TealMart! 🎉',
       html: `
@@ -123,27 +142,30 @@ export async function sendWelcomeEmail(data: {
           <div style="background: linear-gradient(135deg, #0d9488 0%, #14b8a6 100%); padding: 40px; text-align: center; color: white;">
             <h1 style="margin: 0; font-size: 32px;">Welcome to TealMart!</h1>
           </div>
+
           <div style="padding: 40px; background: #f9fafb;">
             <p style="font-size: 18px; color: #1a1a1a;">Hi ${data.name},</p>
-            <p style="font-size: 16px; color: #666; line-height: 1.6;">
-              Thank you for joining TealMart! We're excited to have you as part of our community.
+
+            <p style="font-size: 16px; color: #666;">
+              Thank you for joining TealMart! We're excited to have you.
             </p>
-            <p style="font-size: 16px; color: #666; line-height: 1.6;">
-              Explore our curated collection of quality products and enjoy:
-            </p>
-            <ul style="font-size: 16px; color: #666; line-height: 1.8;">
+
+            <ul style="font-size: 16px; color: #666;">
               <li>Free shipping on orders over $50</li>
-              <li>30-day hassle-free returns</li>
-              <li>Exclusive member discounts</li>
-              <li>Fast, reliable delivery</li>
+              <li>30-day returns</li>
+              <li>Exclusive discounts</li>
             </ul>
+
             <div style="text-align: center; margin: 32px 0;">
-              <a href="${process.env.NEXT_PUBLIC_APP_URL}/products" style="background: #0d9488; color: white; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">
+              <a href="${appUrl}/products"
+                style="background:#0d9488;color:white;padding:14px 32px;border-radius:8px;text-decoration:none;">
                 Start Shopping
               </a>
             </div>
-            <p style="font-size: 14px; color: #999; text-align: center; margin-top: 32px;">
-              Need help? Contact us at <a href="mailto:support@tealmart.com" style="color: #0d9488;">support@tealmart.com</a>
+
+            <p style="text-align:center;font-size:14px;color:#999;">
+              Need help? Contact
+              <a href="mailto:${supportEmail}">${supportEmail}</a>
             </p>
           </div>
         </div>
@@ -151,14 +173,13 @@ export async function sendWelcomeEmail(data: {
     })
 
     if (error) {
-      console.error('Failed to send welcome email:', error)
+      console.error('[EMAIL_WELCOME_ERROR]', error)
       return { success: false, error }
     }
 
-    console.log('Welcome email sent:', emailData?.id)
     return { success: true, id: emailData?.id }
   } catch (error) {
-    console.error('Email sending error:', error)
+    console.error('[EMAIL_WELCOME_EXCEPTION]', error)
     return { success: false, error }
   }
 }
