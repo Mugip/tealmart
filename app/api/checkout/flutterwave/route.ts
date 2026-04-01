@@ -1,95 +1,116 @@
 // app/api/checkout/flutterwave/route.ts
+
 import { NextRequest, NextResponse } from "next/server"
 import { PrismaClient } from "@prisma/client"
 
 const prisma = new PrismaClient()
 
-// Standard exchange rate to convert USD base prices to UGX for Flutterwave
-const USD_TO_UGX_RATE = 3800;
+// 🌍 Supported Flutterwave currencies
+const SUPPORTED_CURRENCIES = [
+  'USD', 'UGX', 'KES', 'NGN', 'GHS', 'ZAR', 'TZS', 'RWF', 'ZMW'
+]
+
+// 🌍 Country → Currency map
+const COUNTRY_CURRENCY_MAP: Record<string, string> = {
+  UG: 'UGX',
+  KE: 'KES',
+  NG: 'NGN',
+  GH: 'GHS',
+  ZA: 'ZAR',
+  TZ: 'TZS',
+  RW: 'RWF',
+  ZM: 'ZMW'
+}
 
 export async function POST(req: NextRequest) {
   try {
     if (!process.env.FLUTTERWAVE_SECRET_KEY) {
-      return NextResponse.json({ error: "Payment gateway is currently misconfigured." }, { status: 500 })
+      return NextResponse.json(
+        { error: "Payment gateway misconfigured" },
+        { status: 500 }
+      )
+    }
+
+    // 🌍 Fetch FX rates (ALL currencies)
+    let rates: Record<string, number> = {}
+    try {
+      const fxRes = await fetch('https://open.er-api.com/v6/latest/USD', {
+        next: { revalidate: 3600 },
+      })
+      const fxData = await fxRes.json()
+      rates = fxData?.rates || {}
+    } catch {
+      console.warn("⚠️ FX fetch failed, fallback to USD")
     }
 
     const body = await req.json()
     const { items, email, shippingAddress, discountAmount, discountCode } = body
 
-    if (!email || typeof email !== 'string' || !email.includes('@')) {
-      return NextResponse.json({ error: "Valid email is required" }, { status: 400 })
+    // =============================
+    // VALIDATION
+    // =============================
+
+    if (!email || !email.includes('@')) {
+      return NextResponse.json({ error: "Valid email required" }, { status: 400 })
     }
 
-    if (!shippingAddress || typeof shippingAddress !== 'object') {
-      return NextResponse.json({ error: "Shipping address is required" }, { status: 400 })
+    if (!shippingAddress) {
+      return NextResponse.json({ error: "Shipping required" }, { status: 400 })
     }
 
-    const requiredFields = ['name', 'address1', 'city', 'zip', 'phone']
-    for (const field of requiredFields) {
-      if (!shippingAddress[field]) {
-        return NextResponse.json({ error: `${field} is required in shipping address` }, { status: 400 })
-      }
+    if (!items?.length) {
+      return NextResponse.json({ error: "Cart empty" }, { status: 400 })
     }
 
-    if (!items || !Array.isArray(items) || items.length === 0) {
-      return NextResponse.json({ error: "Cart is empty" }, { status: 400 })
-    }
+    // =============================
+    // FETCH PRODUCTS
+    // =============================
 
-    const productIds = items.map(item => item.id.split('-')[0])
+    const productIds = items.map((i: any) => i.id.split('-')[0])
+
     const products = await prisma.product.findMany({
       where: { id: { in: productIds } }
     })
 
-    if (products.length === 0) {
-      return NextResponse.json({ error: "No valid products found" }, { status: 400 })
-    }
-
     const productMap = new Map(products.map(p => [p.id, p]))
-    const validatedItems: any[] =[]
+
     let subtotal = 0
+    const validatedItems: any[] = []
 
     for (const item of items) {
-      const baseProductId = item.id.split('-')[0]
-      const variantId = item.id.includes('-') ? item.id.split('-')[1] : null
-      const product = productMap.get(baseProductId)
-      
+      const id = item.id.split('-')[0]
+      const product = productMap.get(id)
       if (!product) continue
 
-      let dbPrice = product.price
-      if (variantId && product.variants && typeof product.variants === 'object') {
-        const variantsData = product.variants as any
-        if (variantsData.items && Array.isArray(variantsData.items)) {
-          const variant = variantsData.items.find((v: any) => v.id === variantId)
-          if (variant && variant.price) {
-            dbPrice = variant.price
-          }
-        }
-      }
+      const price = product.price
+      const qty = item.quantity || 1
 
-      const quantity = item.quantity || 1
+      subtotal += price * qty
+
       validatedItems.push({
         productId: product.id,
-        quantity,
-        price: dbPrice,
-        title: item.title || product.title,
+        quantity: qty,
+        price,
       })
-      subtotal += dbPrice * quantity
     }
 
-    let finalDiscountAmount = discountAmount || 0;
-    if (finalDiscountAmount > subtotal) finalDiscountAmount = subtotal; 
-    
+    if (subtotal <= 0) {
+      return NextResponse.json({ error: "Invalid total" }, { status: 400 })
+    }
+
+    // =============================
+    // TOTAL CALCULATION
+    // =============================
+
     const shipping = subtotal >= 50 ? 0 : 9.99
-    const tax = 0 
-    const total = subtotal + shipping + tax - finalDiscountAmount
+    const total = subtotal + shipping - (discountAmount || 0)
 
-    if (total <= 0) {
-      return NextResponse.json({ error: "Order total must be greater than 0" }, { status: 400 })
-    }
+    // =============================
+    // CREATE ORDER
+    // =============================
 
-    const orderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`
+    const orderNumber = `ORD-${Date.now()}`
 
-    // Create Order
     const order = await prisma.order.create({
       data: {
         orderNumber,
@@ -97,38 +118,50 @@ export async function POST(req: NextRequest) {
         shippingName: shippingAddress.name,
         shippingAddress: shippingAddress.address1,
         shippingCity: shippingAddress.city,
-        shippingState: shippingAddress.state || "",
         shippingZip: shippingAddress.zip,
-        shippingCountry: shippingAddress.country || "UG",
+        shippingCountry: shippingAddress.country || "US",
         shippingPhone: shippingAddress.phone,
         paymentMethod: "flutterwave",
         status: "PENDING",
         subtotal,
-        tax,
         shipping,
         total,
         discountCode: discountCode || null,
-        discountAmount: finalDiscountAmount,
+        discountAmount: discountAmount || 0,
         items: {
-          create: validatedItems.map(item => ({
-            productId: item.productId,
-            quantity: item.quantity,
-            price: item.price,
-          })),
-        },
+          create: validatedItems
+        }
       }
     })
 
-    // FLUTTERWAVE LOCALIZATION FIX:
-    // If the country is Uganda (UG), pass UGX and convert the total. This forces Mobile Money options to appear.
-    const isUganda = shippingAddress.country === 'UG' || shippingAddress.country === 'Uganda';
-    const chargeCurrency = isUganda ? 'UGX' : 'USD';
-    const chargeAmount = isUganda ? Math.round(order.total * USD_TO_UGX_RATE) : Number(order.total.toFixed(2));
+    // =============================
+    // 🌍 GLOBAL CURRENCY LOGIC
+    // =============================
 
-    // IMPORTANT: Redirect to the unified Checkout Success page
-    const redirectUrl = `${process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_URL || 'http://localhost:3000'}/checkout/success?order=${order.orderNumber}`
+    const countryCode = (shippingAddress.country || 'US').toUpperCase()
 
-    const flutterwaveResponse = await fetch("https://api.flutterwave.com/v3/payments", {
+    let currency =
+      COUNTRY_CURRENCY_MAP[countryCode] || 'USD'
+
+    // fallback if unsupported
+    if (!SUPPORTED_CURRENCIES.includes(currency)) {
+      currency = 'USD'
+    }
+
+    // convert amount if needed
+    let chargeAmount = Number(order.total.toFixed(2))
+
+    if (currency !== 'USD' && rates[currency]) {
+      chargeAmount = Math.round(order.total * rates[currency])
+    }
+
+    // =============================
+    // PAYMENT REQUEST
+    // =============================
+
+    const redirectUrl = `${process.env.NEXT_PUBLIC_APP_URL}/checkout/success?order=${order.orderNumber}`
+
+    const fwRes = await fetch("https://api.flutterwave.com/v3/payments", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${process.env.FLUTTERWAVE_SECRET_KEY}`,
@@ -137,12 +170,12 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify({
         tx_ref: order.orderNumber,
         amount: chargeAmount,
-        currency: chargeCurrency,
-        // Explicitly request all African payment forms
-        payment_options: "card, mobilemoneyuganda, mobilemoneyghana, mobilemoneyrwanda, mobilemoneyzambia, mobilemoneyfranco, mpesa, ussd",
+        currency,
+        payment_options:
+          "card, mobilemoneyuganda, mobilemoneyghana, mobilemoneyrwanda, mpesa, ussd",
         redirect_url: redirectUrl,
         customer: {
-          email: email,
+          email,
           phonenumber: shippingAddress.phone,
           name: shippingAddress.name
         },
@@ -153,18 +186,21 @@ export async function POST(req: NextRequest) {
       })
     })
 
-    const fwData = await flutterwaveResponse.json()
+    const fwData = await fwRes.json()
 
-    if (fwData.status === 'success' && fwData.data && fwData.data.link) {
+    if (fwData?.data?.link) {
       return NextResponse.json({ url: fwData.data.link })
-    } else {
-      console.error("❌ Flutterwave API Error:", fwData)
-      throw new Error(fwData.message || "Failed to generate payment link")
     }
 
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message || "Checkout failed" }, { status: 500 })
+    throw new Error("Failed to create payment link")
+
+  } catch (err: any) {
+    console.error(err)
+    return NextResponse.json(
+      { error: err.message || "Checkout failed" },
+      { status: 500 }
+    )
   } finally {
     await prisma.$disconnect()
   }
-}
+                                  }
