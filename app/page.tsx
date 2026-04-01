@@ -5,17 +5,29 @@ import ProductCard from '@/components/products/ProductCard'
 import Hero from '@/components/home/Hero'
 import FeaturedCategories from '@/components/home/FeaturedCategories'
 import NewsletterForm from '@/components/home/NewsletterForm'
-import { TrendingUp, Zap, Star, ArrowRight, Truck, Shield, RotateCcw, Mail, Sparkles } from 'lucide-react'
+import { TrendingUp, Zap, ArrowRight, Sparkles, Mail } from 'lucide-react'
 import Link from 'next/link'
 import RecentlyViewed from '@/components/products/RecentlyViewed'
 
-export const revalidate = 3600 // 1 hour static revalidation
+// ✅ Force page to render dynamically per user so randomization works
+export const dynamic = 'force-dynamic'
 
+// 🔀 Helper to randomly shuffle an array
+function shuffleArray<T>(array: T[]): T[] {
+  const shuffled = [...array]
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+  }
+  return shuffled
+}
+
+// 📦 Fetch large pools of products (Cached in Redis to protect the database)
 async function getFeaturedProducts() {
-  return fetchWithCache('home:featured', async () => {
+  return fetchWithCache('home:featured-pool', async () => {
     const manuallyFeatured = await prisma.product.findMany({
       where: { isActive: true, isFeatured: true },
-      take: 8,
+      take: 40, // Fetch a larger pool
       orderBy: { createdAt: 'desc' },
     })
 
@@ -23,37 +35,37 @@ async function getFeaturedProducts() {
 
     return await prisma.product.findMany({
       where: { isActive: true },
-      take: 8,
-      orderBy: [{ isFeatured: 'desc' }, { views: 'desc' }, { createdAt: 'desc' }],
+      take: 40,
+      orderBy: [{ isFeatured: 'desc' }, { views: 'desc' }],
     })
-  }, 3600)
+  }, 3600) // Cache pool for 1 hour
 }
 
 async function getLatestProducts() {
-  return fetchWithCache('home:latest', async () => {
+  return fetchWithCache('home:latest-pool', async () => {
     return await prisma.product.findMany({
       where: { isActive: true },
-      take: 12,
+      take: 40, // Fetch top 40 latest
       orderBy: { createdAt: 'desc' },
     })
   }, 3600)
 }
 
 async function getTrendingProducts() {
-  return fetchWithCache('home:trending', async () => {
+  return fetchWithCache('home:trending-pool', async () => {
     return await prisma.product.findMany({
       where: { isActive: true },
-      take: 8,
+      take: 40, // Fetch top 40 most viewed
       orderBy: { views: 'desc' },
     })
   }, 1800)
 }
 
 async function getRecommendedProducts() {
-  return fetchWithCache('home:recommended', async () => {
+  return fetchWithCache('home:recommended-pool', async () => {
     return await prisma.product.findMany({
       where: { isActive: true, conversions: { gt: 0 } },
-      take: 4,
+      take: 20,
       orderBy: { rating: 'desc' },
     })
   }, 7200)
@@ -107,10 +119,10 @@ async function getStats() {
 
 export default async function Home() {
   const [
-    featuredProducts,
-    latestProducts,
-    trendingProducts,
-    recommendedProducts,
+    featuredPool,
+    latestPool,
+    trendingPool,
+    recommendedPool,
     categories,
     stats
   ] = await Promise.all([
@@ -121,6 +133,12 @@ export default async function Home() {
     getCategories(),
     getStats(),
   ])
+
+  // 🔀 DYNAMICALLY SHUFFLE THE POOLS ON EVERY RENDER
+  const featuredProducts = shuffleArray(featuredPool).slice(0, 8)
+  const latestProducts = shuffleArray(latestPool).slice(0, 8)
+  const trendingProducts = shuffleArray(trendingPool).slice(0, 8)
+  const recommendedProducts = shuffleArray(recommendedPool).slice(0, 4)
 
   return (
     <div className="bg-gray-50">
@@ -205,7 +223,7 @@ export default async function Home() {
         <RecentlyViewed />
       </section>
 
-      {/* ✉️ Newsletter Section — wired up */}
+      {/* ✉️ Newsletter Section */}
       <section className="bg-teal-500 py-20">
         <div className="max-w-4xl mx-auto px-4 text-center">
           <div className="w-20 h-20 bg-white/20 backdrop-blur-md rounded-3xl flex items-center justify-center mx-auto mb-6">
