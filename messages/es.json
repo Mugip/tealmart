@@ -1,41 +1,62 @@
 {
-  "Navigation": {
-    "products": "Productos",
-    "categories": "Categorías",
-    "about": "Nosotros",
-    "contact": "Contacto",
-    "signIn": "Iniciar Sesión",
-    "myProfile": "Mi Perfil",
-    "orderHistory": "Mis Pedidos",
-    "signOut": "Cerrar Sesión"
-  },
   "HomePage": {
     "title": "Descubre Productos de Calidad Superior",
     "subtitle": "Calificado con 4.8/5 por clientes en todo el mundo",
-    "cta": "Comprar Ahora",
-    "trending": "Tendencias Actuales",
-    "newArrivals": "Recién Llegados"
+    "cta": "Comprar Ahora"
   },
   "Cart": {
     "header": "Tu Bolsa de Compras",
     "checkout": "Pagar Ahora",
-    "viewCart": "Ver Carrito",
     "empty": "Tu bolsa está vacía",
-    "total": "Total Estimado",
-    "items": "artículos",
-    "pairsWell": "Combina bien con..."
-  },
-  "TrustBadges": {
-    "freeShipping": "Envío Gratis",
-    "securePayment": "Pago Seguro",
-    "easyReturns": "Devoluciones Fáciles",
-    "fastDelivery": "Entrega Rápida"
+    "continueShopping": "Continuar Comprando",
+    "orderSummary": "Resumen del Pedido",
+    "subtotal": "Subtotal",
+    "shipping": "Envío",
+    "total": "Total",
+    "freeShipping": "Envío gratis en pedidos superiores a $100"
   },
   "Product": {
     "addToCart": "Añadir al Carrito",
     "buyNow": "Comprar Ya",
-    "description": "Descripción",
+    "outOfStock": "Agotado",
+    "inStock": "En Stock",
     "reviews": "Reseñas",
-    "relatedProducts": "Productos Relacionados"
+    "description": "Descripción",
+    "relatedProducts": "También te podría gustar",
+    "recentlyViewed": "Vistos Recientemente"
+  },
+  "Auth": {
+    "signIn": "Iniciar Sesión",
+    "signUp": "Crear Cuenta",
+    "signOut": "Cerrar Sesión",
+    "forgotPassword": "¿Olvidaste tu contraseña?",
+    "resetPassword": "Restablecer Contraseña",
+    "email": "Correo Electrónico",
+    "password": "Contraseña",
+    "name": "Nombre Completo"
+  },
+  "Account": {
+    "myOrders": "Mis Pedidos",
+    "wishlist": "Lista de Deseos",
+    "addresses": "Direcciones Guardadas",
+    "profile": "Ajustes de Perfil"
+  },
+  "Checkout": {
+    "shippingInfo": "Información de Envío",
+    "paymentMethod": "Método de Pago",
+    "placeOrder": "Realizar Pedido",
+    "discountCode": "Código de Descuento",
+    "apply": "Aplicar"
+  },
+  "Common": {
+    "loading": "Cargando...",
+    "error": "Algo salió mal",
+    "tryAgain": "Intentar de nuevo",
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "delete": "Eliminar",
+    "edit": "Editar",
+    "search": "Buscar",
+    "noResults": "No se encontraron resultados"
   }
-  }
+}
