@@ -1,13 +1,13 @@
 // app/api/settings/public/route.ts
-// Kept for backwards compatibility — the banner and middleware now read the
-// tealmart-maintenance cookie directly and no longer need this endpoint.
-// Safe to leave in place; it does no harm.
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 
+// ✅ Force dynamic so Next.js never caches this response!
+export const dynamic = 'force-dynamic'
+
 export async function GET() {
   try {
-    const settings = await (prisma as any).adminSettings.findFirst({
+    const settings = await prisma.adminSettings.findFirst({
       select: { maintenanceMode: true },
     })
     return NextResponse.json({ maintenanceMode: settings?.maintenanceMode ?? false })
