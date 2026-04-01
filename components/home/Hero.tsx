@@ -348,7 +348,19 @@ export default function Hero({ stats, products }: HeroProps) {
     setTimeout(() => setAddedToCart(false), 2000)
   }
 
-  if (!displayItems.length || !current) return null
+  if (!displayItems.length || !current) {
+    return (
+      <section className="w-full bg-[#0a0f14] min-h-[500px] flex items-center justify-center border-b border-white/5">
+        <div className="text-center space-y-4 animate-pulse">
+           <div className="w-16 h-16 bg-teal-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
+              <Package className="text-teal-500 w-8 h-8" />
+           </div>
+           <h2 className="text-2xl font-bold text-white">Updating Catalog</h2>
+           <p className="text-gray-400">We are currently fetching the latest products for you...</p>
+        </div>
+      </section>
+    )
+  }
 
   return (
     <section
