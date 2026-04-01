@@ -68,8 +68,15 @@ export async function POST(
   try {
     const { rating, title, comment, images } = await req.json()
 
-    if (isLikelyFakeReview(title || '') || isLikelyFakeReview(comment || '')) {
-      return NextResponse.json({ error: 'Your review was flagged by our spam filter.' }, { status: 400 })
+    // ✅ NEW: Combine title and comment and run them through the AI Filter
+    const combinedReviewText = `${title || ''}. ${comment || ''}`.trim();
+    const isFake = await isLikelyFakeReview(combinedReviewText);
+
+    if (isFake) {
+      return NextResponse.json(
+        { error: 'Your review was flagged by our automated spam filter. Please remove any links or promotional text.' }, 
+        { status: 400 }
+      )
     }
 
     if (!rating || rating < 1 || rating > 5) {
@@ -87,6 +94,7 @@ export async function POST(
       return NextResponse.json({ error: 'You have already reviewed this product' }, { status: 400 })
     }
 
+    // Image Upload Logic
     const uploadedImages: string[] = []
     if (Array.isArray(images)) {
       for (const base64 of images) {
@@ -136,4 +144,4 @@ export async function POST(
     console.error('[REVIEW_POST_ERROR]', error)
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
   }
-          }
+      }
