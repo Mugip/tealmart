@@ -1,85 +1,81 @@
 // middleware.ts
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { verifyAdminToken } from '@/lib/adminAuth'
+import { getAdminSession } from '@/lib/adminAuth' // ✅ Changed to getAdminSession
 
 let _maintenanceCache: boolean = false
 let _maintenanceCacheExpiry: number = 0
 
-// Supported languages
 const locales = ['en', 'fr', 'es', 'sw']
 
 async function getMaintenanceMode(request: NextRequest): Promise<boolean> {
-  // 1. ⚡ FAST CHECK: Check for the maintenance cookie first (Set by your settings API)
   const maintenanceCookie = request.cookies.get('tealmart-maintenance')?.value
   if (maintenanceCookie === '1') return true
 
-  // 2. 🧠 CACHED CHECK: Check local memory cache
   const now = Date.now()
   if (now < _maintenanceCacheExpiry) return _maintenanceCache
 
-  // 3. 🗄️ DB FALLBACK: Fetch from Supabase
   try {
     const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
     
     if (!supabaseUrl || !supabaseKey) return false
     
-    // Note: We use AdminSettings (PascalCase) to match your Prisma schema
     const url = `${supabaseUrl}/rest/v1/AdminSettings?select=maintenanceMode&limit=1`
     const res = await fetch(url, {
-      headers: { 
-        apikey: supabaseKey, 
-        Authorization: `Bearer ${supabaseKey}`, 
-        Accept: 'application/json' 
-      },
-      next: { revalidate: 0 } // Ensure we don't cache stale "OFF" states
+      headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}`, Accept: 'application/json' },
+      next: { revalidate: 0 }
     })
     
     if (res.ok) {
       const rows = await res.json()
-      // Strict check: ensures we actually got a row back
       if (rows && rows.length > 0) {
         _maintenanceCache = rows[0].maintenanceMode === true
       }
     }
-  } catch (err) { 
-    console.error('CRITICAL: Middleware maintenance fetch failed', err) 
-  }
+  } catch (err) { }
 
-  _maintenanceCacheExpiry = now + 10000 // 10s TTL
+  _maintenanceCacheExpiry = now + 10000
   return _maintenanceCache
 }
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
   const requestHeaders = new Headers(request.headers)
-  
-  // Set pathname header for Server Components
   requestHeaders.set('x-pathname', pathname)
 
-  // ── 1. 🔐 ADMIN CHECK (Priority) ──
+  // ── 1. 🔐 ADMIN & RBAC CHECK ──
   const adminToken = request.cookies.get('admin-auth')?.value
-  const isAdmin = adminToken ? await verifyAdminToken(adminToken) : false
+  const adminSession = adminToken ? await getAdminSession(adminToken) : null
+  const isAdmin = !!adminSession
 
-  // If trying to access /admin
   if (pathname.startsWith('/admin')) {
     if (!isAdmin && pathname !== '/admin/login') {
       return NextResponse.redirect(new URL('/admin/login', request.url))
     }
-    const response = NextResponse.next({ request: { headers: requestHeaders } })
-    return response
+
+    // ✅ NEW: Strict Role-Based Access Control (RBAC) Enforced on URLs
+    if (isAdmin && pathname !== '/admin' && pathname !== '/admin/login') {
+      const requiredPermission = pathname.replace('/admin/', '').split('/')[0] // e.g., 'orders' from '/admin/orders/123'
+      
+      const hasAccess = 
+        adminSession.permissions.includes('all') || 
+        adminSession.permissions.includes(requiredPermission)
+
+      if (!hasAccess) {
+        // Redirect unauthorized staff back to the main admin dashboard
+        return NextResponse.redirect(new URL('/admin', request.url))
+      }
+    }
+
+    return NextResponse.next({ request: { headers: requestHeaders } })
   }
 
   // ── 2. 🏗️ MAINTENANCE MODE ──
-  // Rule: If Maintenance is ON and user is NOT an Admin and path is NOT exempt
   const isExempt = 
-    pathname.startsWith('/api/') || 
-    pathname.startsWith('/maintenance') || 
-    pathname.startsWith('/auth/') ||
-    pathname.includes('_next') ||
-    pathname.includes('favicon.ico') ||
-    pathname.includes('logo.svg')
+    pathname.startsWith('/api/') || pathname.startsWith('/maintenance') || 
+    pathname.startsWith('/auth/') || pathname.includes('_next') ||
+    pathname.includes('favicon.ico') || pathname.includes('logo.svg')
 
   if (!isExempt && !isAdmin) {
     const maintenance = await getMaintenanceMode(request)
@@ -88,9 +84,8 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // ── 3. 🌍 i18n DETECTION (Passive) ──
+  // ── 3. 🌍 i18n DETECTION ──
   let locale = request.cookies.get('NEXT_LOCALE')?.value
-
   if (!locale) {
     const acceptLang = request.headers.get('accept-language')
     if (acceptLang) {
@@ -101,12 +96,7 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // Final Response logic
-  const response = NextResponse.next({
-    request: { headers: requestHeaders }
-  })
-
-  // Set locale cookie if missing
+  const response = NextResponse.next({ request: { headers: requestHeaders } })
   if (!request.cookies.get('NEXT_LOCALE')) {
     response.cookies.set('NEXT_LOCALE', locale, { path: '/', maxAge: 31536000 })
   }
@@ -115,14 +105,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - logo.svg
-     */
-    '/((?!_next/static|_next/image|favicon.ico|logo.svg).*)',
-  ],
-    }
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|logo.svg).*)'],
+}
