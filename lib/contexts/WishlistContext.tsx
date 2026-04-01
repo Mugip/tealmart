@@ -32,7 +32,7 @@ export function WishlistProvider({ children }: { children: ReactNode }) {
     } catch {}
   }, [])
 
-  // Sync with DB when session available
+  // Sync with DB when session available and merge local items
   useEffect(() => {
     if (!session?.user?.id) return
     setLoading(true)
@@ -66,6 +66,35 @@ export function WishlistProvider({ children }: { children: ReactNode }) {
       .finally(() => setLoading(false))
   }, [session?.user?.id])
 
+  const toggle = useCallback(async (productId: string, productTitle?: string) => {
+    const isCurrentlyWishlisted = wishlistIds.has(productId)
+
+    // Optimistic update
+    setWishlistIds(prev => {
+      const next = new Set(prev)
+      if (isCurrentlyWishlisted) {
+        next.delete(productId)
+        toast('Removed from wishlist', { icon: '💔' })
+      } else {
+        next.add(productId)
+        toast.success('Added to wishlist! ❤️')
+      }
+      localStorage.setItem(STORAGE_KEY, JSON.stringify([...next]))
+      return next
+    })
+
+    // Sync with DB if logged in
+    if (session?.user?.id) {
+      try {
+        await fetch('/api/wishlist', {
+          method: isCurrentlyWishlisted ? 'DELETE' : 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ productId }),
+        })
+      } catch {}
+    }
+  }, [wishlistIds, session?.user?.id])
+
   const isWishlisted = useCallback((productId: string) => wishlistIds.has(productId), [wishlistIds])
 
   return (
@@ -79,4 +108,4 @@ export function useWishlist() {
   const context = useContext(WishlistContext)
   if (!context) throw new Error('useWishlist must be used within WishlistProvider')
   return context
-}
+        }
