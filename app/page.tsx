@@ -7,6 +7,7 @@ import FeaturedCategories from '@/components/home/FeaturedCategories'
 import NewsletterForm from '@/components/home/NewsletterForm'
 import { TrendingUp, Zap, Star, ArrowRight, Truck, Shield, RotateCcw, Mail, Sparkles } from 'lucide-react'
 import Link from 'next/link'
+import RecentlyViewed from '@/components/products/RecentlyViewed'
 
 export const revalidate = 3600 // 1 hour static revalidation
 
@@ -197,6 +198,11 @@ export default async function Home() {
             <ArrowRight size={18} />
           </Link>
         </div>
+      </section>
+
+      {/* Recently Viewed on Homepage */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-20">
+        <RecentlyViewed />
       </section>
 
       {/* ✉️ Newsletter Section — wired up */}
