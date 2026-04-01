@@ -1,6 +1,6 @@
 // components/layout/Footer.tsx
 import Link from 'next/link'
-import { Facebook, Twitter, Instagram, ShieldCheck } from 'lucide-react'
+import { Facebook, Twitter, Instagram, Tiktok, ShieldCheck } from 'lucide-react'
 import { prisma } from '@/lib/db'
 import { fetchWithCache } from '@/lib/redis'
 import { formatCategoryName } from '@/lib/productClassifier'
@@ -43,6 +43,7 @@ export default async function Footer() {
               <a href="#" className="text-gray-400 hover:text-tiffany-400 transition-colors"><Facebook size={20} /></a>
               <a href="#" className="text-gray-400 hover:text-tiffany-400 transition-colors"><Instagram size={20} /></a>
               <a href="#" className="text-gray-400 hover:text-tiffany-400 transition-colors"><Twitter size={20} /></a>
+              <a href="#" className="text-gray-400 hover:text-tiffany-400 transition-colors"><Tiktok size={20} /></a>
             </div>
           </div>
 
@@ -94,8 +95,9 @@ export default async function Footer() {
             <div className="flex flex-wrap justify-center gap-2">
               <div className="px-2 py-1 bg-gray-800 rounded text-xs font-bold border border-gray-700">STRIPE</div>
               <div className="px-2 py-1 bg-gray-800 rounded text-xs font-bold border border-gray-700">VISA</div>
-              <div className="px-2 py-1 bg-gray-800 rounded text-xs font-bold border border-gray-700">MASTERCARD</div>
+              <div className="px-2 py-1 bg-gray-800 rounded text-xs font-bold border border-red-700">MASTERCARD</div>
               <div className="px-2 py-1 bg-gray-800 rounded text-xs font-bold border border-gray-700">AMEX</div>
+              <div className="px-2 py-1 bg-gray-800 rounded text-xs font-bold border border-yellow-700">Mobile Money</div>
             </div>
           </div>
         </div>
