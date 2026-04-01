@@ -1,12 +1,62 @@
 {
   "HomePage": {
-    "title": "Découvrez des produits de qualité supérieure",
-    "subtitle": "Noté 4,8/5 par les clients du monde entier",
-    "cta": "Achetez maintenant"
+    "title": "Découvrez des Produits de Qualité Supérieure",
+    "subtitle": "Noté 4,8/5 par des clients du monde entier",
+    "cta": "Acheter Maintenant"
   },
   "Cart": {
-    "header": "Votre panier",
-    "checkout": "Passer à la caisse",
-    "empty": "Votre panier est vide"
+    "header": "Votre Panier",
+    "checkout": "Passer à la Caisse",
+    "empty": "Votre panier est vide",
+    "continueShopping": "Continuer les Achats",
+    "orderSummary": "Résumé de la Commande",
+    "subtotal": "Sous-total",
+    "shipping": "Livraison",
+    "total": "Total",
+    "freeShipping": "Livraison gratuite pour les commandes supérieures à 100 $"
+  },
+  "Product": {
+    "addToCart": "Ajouter au Panier",
+    "buyNow": "Acheter Maintenant",
+    "outOfStock": "Rupture de Stock",
+    "inStock": "En Stock",
+    "reviews": "Avis",
+    "description": "Description",
+    "relatedProducts": "Vous pourriez aussi aimer",
+    "recentlyViewed": "Récemment consultés"
+  },
+  "Auth": {
+    "signIn": "Se Connecter",
+    "signUp": "Créer un Compte",
+    "signOut": "Se Déconnecter",
+    "forgotPassword": "Mot de passe oublié ?",
+    "resetPassword": "Réinitialiser le mot de passe",
+    "email": "Adresse e-mail",
+    "password": "Mot de passe",
+    "name": "Nom complet"
+  },
+  "Account": {
+    "myOrders": "Mes Commandes",
+    "wishlist": "Liste de Souhaits",
+    "addresses": "Adresses Enregistrées",
+    "profile": "Paramètres du Profil"
+  },
+  "Checkout": {
+    "shippingInfo": "Informations de Livraison",
+    "paymentMethod": "Méthode de Paiement",
+    "placeOrder": "Passer la Commande",
+    "discountCode": "Code de Réduction",
+    "apply": "Appliquer"
+  },
+  "Common": {
+    "loading": "Chargement...",
+    "error": "Une erreur s'est produite",
+    "tryAgain": "Réessayer",
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "delete": "Supprimer",
+    "edit": "Modifier",
+    "search": "Rechercher",
+    "noResults": "Aucun résultat trouvé"
   }
 }
