@@ -1,105 +1,113 @@
 // components/admin/AdminNav.tsx
-
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import {
   LayoutDashboard, ShoppingCart, Package, BarChart3,
-  Boxes, Settings, Tag, ExternalLink, Users, Activity, DollarSign
+  Boxes, Settings, Tag, ExternalLink, Users, DollarSign, Activity, ShieldCheck, LogOut
 } from 'lucide-react'
+import type { AdminSession } from '@/lib/adminAuth'
 
-const navItems = [
-  { href: '/admin', icon: LayoutDashboard, label: 'Dashboard', exact: true },
-  { href: '/admin/orders', icon: ShoppingCart, label: 'Orders' },
-  { href: '/admin/products', icon: Package, label: 'Products' },
-  { href: '/admin/analytics', icon: BarChart3, label: 'Analytics' },
-  { href: '/admin/inventory', icon: Boxes, label: 'Inventory' },
-  { href: '/admin/discounts', icon: Tag, label: 'Discounts' },
-  { href: '/admin/subscribers', icon: Users, label: 'Subscribers' },
-  { href: '/admin/pricing', icon: DollarSign, label: 'Pricing Rules' },
-  { href: '/admin/logs', icon: Activity, label: 'Ingest Logs' },
-  { href: '/admin/settings', icon: Settings, label: 'Settings' },
+const ALL_NAV_ITEMS = [
+  { href: '/admin', icon: LayoutDashboard, label: 'Dashboard', id: 'dashboard', exact: true },
+  { href: '/admin/orders', icon: ShoppingCart, label: 'Orders', id: 'orders' },
+  { href: '/admin/products', icon: Package, label: 'Products', id: 'products' },
+  { href: '/admin/inventory', icon: Boxes, label: 'Inventory', id: 'inventory' },
+  { href: '/admin/discounts', icon: Tag, label: 'Discounts', id: 'discounts' },
+  { href: '/admin/subscribers', icon: Users, label: 'Subscribers', id: 'subscribers' },
+  { href: '/admin/pricing', icon: DollarSign, label: 'Pricing Rules', id: 'pricing' },
+  { href: '/admin/logs', icon: Activity, label: 'Ingest Logs', id: 'logs' },
+  { href: '/admin/analytics', icon: BarChart3, label: 'Analytics', id: 'analytics' },
+  { href: '/admin/staff', icon: ShieldCheck, label: 'Staff Access', id: 'staff' }, // ✅ New Staff Link
+  { href: '/admin/settings', icon: Settings, label: 'Settings', id: 'settings' },
 ]
 
-export default function AdminNav() {
+export default function AdminNav({ session }: { session: AdminSession | null }) {
   const pathname = usePathname()
+  const router = useRouter()
 
   const isActive = (href: string, exact = false) =>
     exact ? pathname === href : pathname.startsWith(href)
 
+  // ✅ Filter items based on permissions
+  const navItems = ALL_NAV_ITEMS.filter(item => {
+    if (session?.permissions.includes('all')) return true; // Super Admin sees all
+    if (item.id === 'dashboard') return true; // Everyone sees Dashboard
+    return session?.permissions.includes(item.id);
+  })
+
+  const handleLogout = async () => {
+    await fetch('/api/admin/logout', { method: 'POST' })
+    router.push('/admin/login')
+  }
+
   return (
     <>
       {/* Desktop sidebar */}
-      <aside className="hidden lg:flex flex-col w-56 min-h-screen bg-white border-r border-gray-100 fixed top-0 left-0 z-40">
-        <div className="px-5 py-5 border-b border-gray-100">
-          <Link href="/admin" className="flex items-center gap-2">
-            <img src="/logo.svg" alt="TealMart" className="h-7 w-auto" />
+      <aside className="hidden lg:flex flex-col w-64 min-h-screen bg-white border-r border-gray-100 fixed top-0 left-0 z-40">
+        <div className="px-6 py-6 border-b border-gray-100">
+          <Link href="/admin" className="flex items-center gap-3">
+            <img src="/logo.svg" alt="TealMart" className="h-8 w-auto" />
             <div>
-              <p className="font-black text-gray-900 text-sm leading-none">TealMart</p>
-              <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-widest leading-none mt-0.5">Admin</p>
+              <p className="font-black text-gray-900 text-base leading-none">TealMart</p>
+              <p className="text-[10px] text-tiffany-600 font-bold uppercase tracking-widest leading-none mt-1">
+                {session?.role === 'admin' ? 'Super Admin' : 'Staff Member'}
+              </p>
             </div>
           </Link>
         </div>
 
-        <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
+        <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto custom-scrollbar">
           {navItems.map((item) => {
             const active = isActive(item.href, item.exact)
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all ${
+                className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all ${
                   active
-                    ? 'bg-teal-50 text-teal-700'
+                    ? 'bg-tiffany-50 text-tiffany-700 shadow-sm'
                     : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'
                 }`}
               >
-                <item.icon size={17} className={active ? 'text-teal-600' : ''} />
+                <item.icon size={18} className={active ? 'text-tiffany-600' : ''} />
                 {item.label}
               </Link>
             )
           })}
         </nav>
 
-        <div className="px-4 py-4 border-t border-gray-100">
-          <Link
-            href="/"
-            className="flex items-center gap-2 text-sm text-teal-600 hover:text-teal-700 font-semibold transition-colors"
-          >
-            <ExternalLink size={14} />
-            View Storefront
+        <div className="px-4 py-4 border-t border-gray-100 space-y-2">
+          <Link href="/" className="flex items-center gap-3 px-4 py-2 text-sm text-gray-500 hover:text-tiffany-600 font-semibold transition-colors">
+            <ExternalLink size={16} /> View Storefront
           </Link>
+          <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-2 text-sm text-red-500 hover:bg-red-50 rounded-xl font-semibold transition-colors">
+            <LogOut size={16} /> Sign Out
+          </button>
         </div>
       </aside>
 
       {/* Mobile top bar */}
-      <header className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-white border-b border-gray-100 px-4 h-14 flex items-center justify-between">
+      <header className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-white border-b border-gray-100 px-4 h-16 flex items-center justify-between">
         <Link href="/admin" className="flex items-center gap-2">
           <img src="/logo.svg" alt="TealMart" className="h-7 w-auto" />
           <span className="font-black text-gray-900">Admin</span>
         </Link>
+        <button onClick={handleLogout} className="text-red-500 p-2"><LogOut size={20}/></button>
+      </header>
 
-        <nav className="flex items-center gap-1 overflow-x-auto">
-          {navItems.map((item) => {
+      {/* Mobile Scrollable Nav */}
+      <div className="lg:hidden fixed top-16 left-0 right-0 bg-white border-b border-gray-100 z-30 px-2 py-2 flex items-center gap-2 overflow-x-auto scrollbar-hide">
+         {navItems.map((item) => {
             const active = isActive(item.href, item.exact)
             return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all ${
-                  active
-                    ? 'bg-teal-50 text-teal-700'
-                    : 'text-gray-500 hover:bg-gray-50 hover:text-gray-800'
-                }`}
-              >
-                <item.icon size={14} />
-                <span className="hidden sm:inline">{item.label}</span>
+              <Link key={item.href} href={item.href} className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold whitespace-nowrap transition-all ${active ? 'bg-tiffany-50 text-tiffany-700' : 'text-gray-500 bg-gray-50'}`}>
+                <item.icon size={14} /> {item.label}
               </Link>
             )
           })}
-        </nav>
-      </header>
+      </div>
     </>
   )
-}
+          }
