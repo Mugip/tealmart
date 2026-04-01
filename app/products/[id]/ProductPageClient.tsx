@@ -1,7 +1,7 @@
 // app/products/[id]/ProductPageClient.tsx
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import Image from 'next/image'
 import { 
   Star, ShoppingCart, Truck, Shield, ArrowLeft, ChevronLeft, 
@@ -34,7 +34,7 @@ export default function ProductPageClient({ initialProduct }: { initialProduct: 
   const [quantity, setQuantity] = useState(1)
   const [addedToCart, setAddedToCart] = useState(false)
 
-  // ✅ NEW: Image Hover Zoom state
+  // Zoom State
   const [zoomPos, setZoomPos] = useState({ x: 50, y: 50 })
   const [isHoveringImage, setIsHoveringImage] = useState(false)
 
@@ -54,11 +54,20 @@ export default function ProductPageClient({ initialProduct }: { initialProduct: 
   const activeImage = allImages[selectedImage] || product.images[0]
   const isInStock = activeStock > 0
 
-  // ✅ NEW: Video detection
   const isVideo = (url: string) => url?.match(/\.(mp4|webm|mov)$/i)
 
   const nextImage = () => setSelectedImage(prev => (prev + 1) % allImages.length)
   const prevImage = () => setSelectedImage(prev => (prev - 1 + allImages.length) % allImages.length)
+
+  // ✅ Fix: Sync Thumbnail Clicks with Variants
+  const handleThumbnailClick = (index: number) => {
+    setSelectedImage(index)
+    const clickedImg = allImages[index]
+    const matchingVariant = product.variants?.items?.find((v: Variant) => v.image === clickedImg)
+    if (matchingVariant) {
+      setSelectedVariant(matchingVariant)
+    }
+  }
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     const { left, top, width, height } = e.currentTarget.getBoundingClientRect()
@@ -102,9 +111,9 @@ export default function ProductPageClient({ initialProduct }: { initialProduct: 
           <div className="space-y-4">
             <div className="bg-white rounded-2xl shadow-lg overflow-hidden sticky top-4">
               
-              {/* ✅ NEW: Zoomable Hover Area & Video Support */}
+              {/* ✅ Fix: Proper Zoom Implementation */}
               <div 
-                className="relative aspect-square group overflow-hidden"
+                className="relative aspect-square group overflow-hidden cursor-crosshair"
                 onMouseMove={handleMouseMove}
                 onMouseEnter={() => setIsHoveringImage(true)}
                 onMouseLeave={() => setIsHoveringImage(false)}
@@ -112,18 +121,24 @@ export default function ProductPageClient({ initialProduct }: { initialProduct: 
                 {isVideo(activeImage) ? (
                   <video src={activeImage} controls autoPlay loop muted className="w-full h-full object-cover" />
                 ) : (
-                  <>
+                  <div 
+                    className="absolute inset-0 w-full h-full transition-transform duration-200 ease-out"
+                    style={{
+                      transform: isHoveringImage ? 'scale(2.2)' : 'scale(1)',
+                      transformOrigin: `${zoomPos.x}% ${zoomPos.y}%`
+                    }}
+                  >
                     <Image 
                       src={activeImage || '/placeholder.png'} 
                       alt={product.title} 
                       fill 
                       priority 
-                      className={`object-cover transition-transform duration-200 ${isHoveringImage ? 'scale-[2]' : 'scale-100'}`}
-                      style={isHoveringImage ? { transformOrigin: `${zoomPos.x}% ${zoomPos.y}%` } : {}}
+                      className="object-cover"
                     />
-                  </>
+                  </div>
                 )}
 
+                {/* Overlays (Arrows & Badges) */}
                 {allImages.length > 1 && (
                   <>
                     <button onClick={prevImage} className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white p-3 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity">
@@ -135,7 +150,7 @@ export default function ProductPageClient({ initialProduct }: { initialProduct: 
                   </>
                 )}
 
-                <div className="absolute top-4 left-4 flex flex-col gap-2">
+                <div className="absolute top-4 left-4 flex flex-col gap-2 pointer-events-none">
                   {discount > 0 && <div className="bg-red-500 text-white text-sm font-bold px-4 py-2 rounded-full shadow-lg">-{discount}% OFF</div>}
                   {!isInStock && <div className="bg-gray-800 text-white text-sm font-bold px-4 py-2 rounded-full shadow-lg">Out of Stock</div>}
                 </div>
@@ -147,7 +162,11 @@ export default function ProductPageClient({ initialProduct }: { initialProduct: 
               <div className="overflow-x-auto pb-2 scrollbar-hide">
                 <div className="flex gap-2" style={{ minWidth: 'min-content' }}>
                   {allImages.map((image, index) => (
-                    <button key={index} onClick={() => setSelectedImage(index)} className={`flex-shrink-0 w-20 h-20 relative bg-white rounded-lg overflow-hidden transition-all ${selectedImage === index ? 'ring-4 ring-tiffany-500 shadow-lg scale-105' : 'ring-1 ring-gray-200 hover:ring-2 hover:ring-tiffany-300'}`}>
+                    <button 
+                      key={index} 
+                      onClick={() => handleThumbnailClick(index)} // ✅ Fix: Synchronize variant
+                      className={`flex-shrink-0 w-20 h-20 relative bg-white rounded-lg overflow-hidden transition-all ${selectedImage === index ? 'ring-4 ring-tiffany-500 shadow-lg scale-105' : 'ring-1 ring-gray-200 hover:ring-2 hover:ring-tiffany-300'}`}
+                    >
                       {isVideo(image) ? (
                         <div className="w-full h-full flex items-center justify-center bg-gray-100"><PlayCircle className="text-gray-400" /></div>
                       ) : (
@@ -198,6 +217,7 @@ export default function ProductPageClient({ initialProduct }: { initialProduct: 
               {discount > 0 && <p className="text-green-700 font-medium mt-2">You save ${(product.compareAtPrice! - activePrice).toFixed(2)}!</p>}
             </div>
 
+            {/* Variants */}
             {product.variants?.items && product.variants.items.length > 0 && (
               <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-gray-200">
                 <h3 className="font-bold text-gray-900 text-base sm:text-lg mb-4 break-words">Select Variant {selectedVariant && `(${selectedVariant.name})`}</h3>
@@ -235,6 +255,7 @@ export default function ProductPageClient({ initialProduct }: { initialProduct: 
               </div>
             )}
 
+            {/* Quantity */}
             {isInStock && (
               <div className="flex flex-wrap items-center gap-4">
                 <label className="font-semibold text-gray-900">Quantity:</label>
@@ -246,6 +267,7 @@ export default function ProductPageClient({ initialProduct }: { initialProduct: 
               </div>
             )}
 
+            {/* CTAs */}
             <div className="hidden lg:flex gap-3">
               <button
                 onClick={handleAddToCart}
@@ -256,7 +278,6 @@ export default function ProductPageClient({ initialProduct }: { initialProduct: 
                 {addedToCart ? '✓ Added to Cart!' : isInStock ? `Add to Cart` : 'Out of Stock'}
               </button>
 
-              {/* ✅ NEW: Visible Share Button next to Add to Cart */}
               <button 
                 onClick={handleShare}
                 className="px-6 py-4 rounded-xl font-bold flex items-center justify-center gap-2 bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
@@ -265,6 +286,7 @@ export default function ProductPageClient({ initialProduct }: { initialProduct: 
               </button>
             </div>
 
+            {/* Trust Badges */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-4 border-t border-gray-200">
               {[{ icon: <Truck size={20} />, title: 'Free Shipping', sub: 'On orders over $50' }, { icon: <Shield size={20} />, title: 'Secure Payment', sub: '100% safe checkout' }, { icon: <RotateCcw size={20} />, title: 'Easy Returns', sub: '30-day return policy' }].map(({ icon, title, sub }) => (
                 <div key={title} className="flex items-start gap-3 bg-white p-3 rounded-xl shadow-sm border border-gray-200">
@@ -277,6 +299,7 @@ export default function ProductPageClient({ initialProduct }: { initialProduct: 
               ))}
             </div>
 
+            {/* Description */}
             <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-gray-200 overflow-hidden">
               <h3 className="font-bold text-gray-900 text-base sm:text-lg mb-4">Product Details</h3>
               <div className="product-description prose prose-sm max-w-none text-gray-700" dangerouslySetInnerHTML={{ __html: product.description }} />
@@ -309,4 +332,4 @@ export default function ProductPageClient({ initialProduct }: { initialProduct: 
       </div>
     </div>
   )
-                  }
+                }
