@@ -2,16 +2,25 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 
-// ✅ Force dynamic so Next.js never caches this response!
 export const dynamic = 'force-dynamic'
 
 export async function GET() {
   try {
     const settings = await prisma.adminSettings.findFirst({
-      select: { maintenanceMode: true },
+      select: { 
+        maintenanceMode: true,
+        allowGuestCheckout: true
+      },
     })
-    return NextResponse.json({ maintenanceMode: settings?.maintenanceMode ?? false })
+    
+    return NextResponse.json({ 
+      maintenanceMode: settings?.maintenanceMode ?? false,
+      allowGuestCheckout: settings?.allowGuestCheckout ?? true // Defaults to true if missing
+    })
   } catch {
-    return NextResponse.json({ maintenanceMode: false })
+    return NextResponse.json({ 
+      maintenanceMode: false, 
+      allowGuestCheckout: true 
+    })
   }
 }
