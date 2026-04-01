@@ -12,20 +12,19 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     return <div className="min-h-screen bg-gray-50">{children}</div>
   }
 
-  // ✅ Fetch session on the server
   const token = cookies().get('admin-auth')?.value
   const session = token ? await getAdminSession(token) : null
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
       <MaintenanceBanner />
-      {/* Pass session to the Nav */}
       <AdminNav session={session} />
 
-      <main className="lg:ml-64 min-h-screen">
+      <main className="flex-1 lg:ml-64 relative">
         <div
-          className="lg:pt-0"
-          style={{ paddingTop: 'calc(var(--banner-h, 0px) + 64px)' } as React.CSSProperties}
+          // ✅ FIXED: Uses 130px on mobile to clear the double-stacked header, 32px (pt-8) on desktop
+          className="pt-[130px] lg:pt-8 px-0 sm:px-6 lg:px-8 pb-12"
+          style={{ marginTop: 'var(--banner-h, 0px)' }}
         >
           {children}
         </div>
