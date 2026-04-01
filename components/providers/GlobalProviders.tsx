@@ -9,6 +9,7 @@ import { Toaster } from 'react-hot-toast'
 import CookieConsent from '@/components/CookieConsent'
 import CartDrawer from '@/components/layout/CartDrawer'
 import ChatBot from '@/components/layout/ChatBot'
+import MaintenanceWatcher from '@/components/layout/MaintenanceWatcher' // ✅ Import Watcher
 
 export default function GlobalProviders({ children }: { children: React.ReactNode }) {
   return (
@@ -31,6 +32,7 @@ export default function GlobalProviders({ children }: { children: React.ReactNod
             <CookieConsent />
             <CartDrawer />
             <ChatBot />
+            <MaintenanceWatcher />
           </WishlistProvider>
         </CartProvider>
       </CurrencyProvider>
