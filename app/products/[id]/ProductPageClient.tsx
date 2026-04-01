@@ -34,9 +34,9 @@ export default function ProductPageClient({ initialProduct }: { initialProduct: 
   const [quantity, setQuantity] = useState(1)
   const [addedToCart, setAddedToCart] = useState(false)
 
-  // Zoom State
+  // Zoom & Lightbox State
   const [zoomPos, setZoomPos] = useState({ x: 50, y: 50 })
-  const [isHoveringImage, setIsHoveringImage] = useState(false)
+  const [isLightboxOpen, setIsLightboxOpen] = useState(false)
 
   const productImages = product.images || []
   const variantImages = product.variants?.items?.map((v: Variant) => v.image)?.filter((img: string) => img && !productImages.includes(img)) || []
@@ -56,19 +56,27 @@ export default function ProductPageClient({ initialProduct }: { initialProduct: 
 
   const isVideo = (url: string) => url?.match(/\.(mp4|webm|mov)$/i)
 
-  const nextImage = () => setSelectedImage(prev => (prev + 1) % allImages.length)
-  const prevImage = () => setSelectedImage(prev => (prev - 1 + allImages.length) % allImages.length)
-
-  // ✅ Fix: Sync Thumbnail Clicks with Variants
-  const handleThumbnailClick = (index: number) => {
+  // ✅ FIXED: Sync variants on ANY image change (thumbnails or arrows)
+  const syncVariantWithImage = (index: number) => {
     setSelectedImage(index)
-    const clickedImg = allImages[index]
-    const matchingVariant = product.variants?.items?.find((v: Variant) => v.image === clickedImg)
+    const imgUrl = allImages[index]
+    const matchingVariant = product.variants?.items?.find((v: Variant) => v.image === imgUrl)
     if (matchingVariant) {
       setSelectedVariant(matchingVariant)
     }
   }
 
+  const nextImage = (e?: React.MouseEvent) => {
+    e?.stopPropagation()
+    syncVariantWithImage((selectedImage + 1) % allImages.length)
+  }
+  
+  const prevImage = (e?: React.MouseEvent) => {
+    e?.stopPropagation()
+    syncVariantWithImage((selectedImage - 1 + allImages.length) % allImages.length)
+  }
+
+  // Handle Desktop Hover Zoom Coordinates
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     const { left, top, width, height } = e.currentTarget.getBoundingClientRect()
     setZoomPos({
@@ -111,22 +119,19 @@ export default function ProductPageClient({ initialProduct }: { initialProduct: 
           <div className="space-y-4">
             <div className="bg-white rounded-2xl shadow-lg overflow-hidden sticky top-4">
               
-              {/* ✅ Fix: Proper Zoom Implementation */}
+              {/* ✅ FIXED: Mobile tap opens lightbox, Desktop hover zooms image */}
               <div 
-                className="relative aspect-square group overflow-hidden cursor-crosshair"
+                className="relative aspect-square group overflow-hidden md:cursor-crosshair cursor-zoom-in"
                 onMouseMove={handleMouseMove}
-                onMouseEnter={() => setIsHoveringImage(true)}
-                onMouseLeave={() => setIsHoveringImage(false)}
+                onClick={() => setIsLightboxOpen(true)}
               >
                 {isVideo(activeImage) ? (
                   <video src={activeImage} controls autoPlay loop muted className="w-full h-full object-cover" />
                 ) : (
                   <div 
-                    className="absolute inset-0 w-full h-full transition-transform duration-200 ease-out"
-                    style={{
-                      transform: isHoveringImage ? 'scale(2.2)' : 'scale(1)',
-                      transformOrigin: `${zoomPos.x}% ${zoomPos.y}%`
-                    }}
+                    // Using Tailwind's md: prefix to ensure the scale effect ONLY happens on desktop!
+                    className="absolute inset-0 w-full h-full transition-transform duration-150 ease-out md:group-hover:scale-[2.2]"
+                    style={{ transformOrigin: `${zoomPos.x}% ${zoomPos.y}%` }}
                   >
                     <Image 
                       src={activeImage || '/placeholder.png'} 
@@ -138,7 +143,7 @@ export default function ProductPageClient({ initialProduct }: { initialProduct: 
                   </div>
                 )}
 
-                {/* Overlays (Arrows & Badges) */}
+                {/* Arrows */}
                 {allImages.length > 1 && (
                   <>
                     <button onClick={prevImage} className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white p-3 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity">
@@ -164,7 +169,7 @@ export default function ProductPageClient({ initialProduct }: { initialProduct: 
                   {allImages.map((image, index) => (
                     <button 
                       key={index} 
-                      onClick={() => handleThumbnailClick(index)} // ✅ Fix: Synchronize variant
+                      onClick={() => syncVariantWithImage(index)}
                       className={`flex-shrink-0 w-20 h-20 relative bg-white rounded-lg overflow-hidden transition-all ${selectedImage === index ? 'ring-4 ring-tiffany-500 shadow-lg scale-105' : 'ring-1 ring-gray-200 hover:ring-2 hover:ring-tiffany-300'}`}
                     >
                       {isVideo(image) ? (
@@ -330,6 +335,22 @@ export default function ProductPageClient({ initialProduct }: { initialProduct: 
           </button>
         </div>
       </div>
+
+      {/* ✅ NEW: Lightbox Modal for Mobile/Click */}
+      {isLightboxOpen && (
+        <div className="fixed inset-0 bg-black/95 z-[100] flex items-center justify-center p-4" onClick={() => setIsLightboxOpen(false)}>
+          <button onClick={() => setIsLightboxOpen(false)} className="absolute top-4 right-4 bg-white/10 hover:bg-white/20 p-3 rounded-full transition-all z-10">
+            <X size={24} className="text-white" />
+          </button>
+          <div className="relative max-w-4xl max-h-[85vh] w-full h-full">
+            {isVideo(activeImage) ? (
+               <video src={activeImage} controls autoPlay loop className="w-full h-full object-contain" onClick={e => e.stopPropagation()} />
+            ) : (
+               <Image src={activeImage || '/placeholder.png'} alt={product.title} fill className="object-contain" onClick={e => e.stopPropagation()} />
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
-                }
+                      }
