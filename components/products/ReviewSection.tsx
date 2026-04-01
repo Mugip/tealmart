@@ -2,36 +2,23 @@
 'use client'
 
 import { useEffect, useState, useRef } from 'react'
-import { Star, ThumbsUp, User, Loader2, Camera, X, CheckCircle } from 'lucide-react'
+import { Star, ThumbsUp, User, Loader2, Camera, X, CheckCircle, Trash2 } from 'lucide-react' // ✅ Added Trash2
 import { useSession } from 'next-auth/react'
 import toast from 'react-hot-toast'
 import Image from 'next/image'
 
 interface Review {
-  id: string
-  rating: number
-  title?: string | null
-  comment?: string | null
-  images?: string[]
-  verified: boolean
-  helpful: number
-  helpfulUsers: string[]
-  createdAt: string
-  user: { name?: string | null; image?: string | null }
+  id: string; rating: number; title?: string | null; comment?: string | null;
+  images?: string[]; verified: boolean; helpful: number; helpfulUsers: string[];
+  createdAt: string; user: { name?: string | null; image?: string | null }
 }
 
 interface ReviewData {
-  reviews: Review[]
-  total: number
-  pages: number
-  page: number
-  ratingBreakdown: Record<number, number>
+  reviews: Review[]; total: number; pages: number; page: number; ratingBreakdown: Record<number, number>
 }
 
 interface Props {
-  productId: string
-  productRating?: number | null
-  reviewCount: number
+  productId: string; productRating?: number | null; reviewCount: number
 }
 
 function StarRating({ value, onChange }: { value: number; onChange: (v: number) => void }) {
@@ -40,11 +27,8 @@ function StarRating({ value, onChange }: { value: number; onChange: (v: number) 
     <div className="flex gap-1">
       {[1, 2, 3, 4, 5].map(i => (
         <button
-          key={i}
-          type="button"
-          onClick={() => onChange(i)}
-          onMouseEnter={() => setHovered(i)}
-          onMouseLeave={() => setHovered(0)}
+          key={i} type="button" onClick={() => onChange(i)}
+          onMouseEnter={() => setHovered(i)} onMouseLeave={() => setHovered(0)}
           className="transition-transform hover:scale-110"
         >
           <Star size={28} className={i <= (hovered || value) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'} />
@@ -78,7 +62,9 @@ export default function ReviewSection({ productId, productRating, reviewCount }:
   const [comment, setComment] = useState('')
   const [images, setImages] = useState<string[]>([])
   const [submitting, setSubmitting] = useState(false)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  
+  // ✅ NEW: Admin State
+  const [isAdmin, setIsAdmin] = useState(false)
 
   const fetchReviews = async (p = 1) => {
     setLoading(true)
@@ -91,7 +77,14 @@ export default function ReviewSection({ productId, productRating, reviewCount }:
     }
   }
 
-  useEffect(() => { fetchReviews(page) }, [productId, page])
+  useEffect(() => { 
+    fetchReviews(page) 
+    
+    // ✅ NEW: Check if the user is an Admin
+    fetch('/api/admin/me')
+      .then(res => { if (res.ok) setIsAdmin(true) })
+      .catch(() => {})
+  }, [productId, page])
 
   const handleHelpful = async (reviewId: string) => {
     if (!session) return toast.error('Sign in to vote')
@@ -105,6 +98,24 @@ export default function ReviewSection({ productId, productRating, reviewCount }:
         toast.error(err.error || 'Failed to vote')
       }
     } catch { toast.error('Connection error') }
+  }
+
+  // ✅ NEW: Admin Delete Function
+  const handleDeleteReview = async (reviewId: string) => {
+    if (!confirm('Are you sure you want to permanently delete this review?')) return;
+    
+    try {
+      const res = await fetch(`/api/admin/reviews/${reviewId}`, { method: 'DELETE' })
+      if (res.ok) {
+        toast.success('Review deleted successfully')
+        fetchReviews(page) // Refresh the list
+      } else {
+        const err = await res.json()
+        toast.error(err.error || 'Failed to delete review')
+      }
+    } catch { 
+      toast.error('Connection error') 
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -181,11 +192,11 @@ export default function ReviewSection({ productId, productRating, reviewCount }:
             <div className="text-center py-10 text-gray-500">No reviews yet. Be the first to review!</div>
           ) : (
             data?.reviews.map(r => (
-              <div key={r.id} className="border-b border-gray-100 pb-8 last:border-0">
+              <div key={r.id} className="border-b border-gray-100 pb-8 last:border-0 relative">
                 <div className="flex justify-between items-start mb-3">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-tiffany-100 flex items-center justify-center text-tiffany-700 font-bold uppercase">
-                      {r.user.image ? <img src={r.user.image} className="rounded-full" /> : r.user.name?.[0]}
+                      {r.user.image ? <img src={r.user.image} className="rounded-full" alt="User" /> : r.user.name?.[0]}
                     </div>
                     <div>
                       <div className="font-bold text-gray-900">{r.user.name}</div>
@@ -201,10 +212,21 @@ export default function ReviewSection({ productId, productRating, reviewCount }:
                 </div>
                 {r.title && <h4 className="font-bold text-gray-900 mb-1">{r.title}</h4>}
                 <p className="text-gray-600 leading-relaxed text-sm">{r.comment}</p>
-                <div className="flex gap-4 mt-4">
+                
+                <div className="flex items-center gap-4 mt-4">
                   <button onClick={() => handleHelpful(r.id)} className={`flex items-center gap-1.5 text-xs transition-colors ${r.helpfulUsers.includes(session?.user?.id || '') ? 'text-tiffany-600 font-bold' : 'text-gray-400 hover:text-tiffany-600'}`}>
                     <ThumbsUp size={14} /> Helpful ({r.helpful})
                   </button>
+
+                  {/* ✅ NEW: Admin Delete Button */}
+                  {isAdmin && (
+                    <button 
+                      onClick={() => handleDeleteReview(r.id)}
+                      className="flex items-center gap-1.5 text-xs text-red-500 hover:text-red-700 font-semibold transition-colors ml-auto bg-red-50 px-3 py-1.5 rounded-lg"
+                    >
+                      <Trash2 size={14} /> Delete as Admin
+                    </button>
+                  )}
                 </div>
               </div>
             ))
@@ -213,4 +235,4 @@ export default function ReviewSection({ productId, productRating, reviewCount }:
       </div>
     </section>
   )
-                  }
+    }
