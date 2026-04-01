@@ -1,7 +1,7 @@
 // middleware.ts
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { getAdminSession } from '@/lib/adminAuth' // ✅ Changed to getAdminSession
+import { getAdminSession } from '@/lib/adminAuth'
 
 let _maintenanceCache: boolean = false
 let _maintenanceCacheExpiry: number = 0
@@ -9,33 +9,28 @@ let _maintenanceCacheExpiry: number = 0
 const locales = ['en', 'fr', 'es', 'sw']
 
 async function getMaintenanceMode(request: NextRequest): Promise<boolean> {
+  // 1. Admin Override Cookie (Fast path for admins)
   const maintenanceCookie = request.cookies.get('tealmart-maintenance')?.value
   if (maintenanceCookie === '1') return true
 
+  // 2. Memory Cache (Prevents spamming the DB on every single image/page load)
   const now = Date.now()
   if (now < _maintenanceCacheExpiry) return _maintenanceCache
 
+  // 3. ✅ FIXED: Universal Database Fallback for Visitors
   try {
-    const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
-    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-    
-    if (!supabaseUrl || !supabaseKey) return false
-    
-    const url = `${supabaseUrl}/rest/v1/AdminSettings?select=maintenanceMode&limit=1`
-    const res = await fetch(url, {
-      headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}`, Accept: 'application/json' },
-      next: { revalidate: 0 }
-    })
+    const url = new URL('/api/settings/public', request.url)
+    const res = await fetch(url, { next: { revalidate: 0 } })
     
     if (res.ok) {
-      const rows = await res.json()
-      if (rows && rows.length > 0) {
-        _maintenanceCache = rows[0].maintenanceMode === true
-      }
+      const data = await res.json()
+      _maintenanceCache = data.maintenanceMode === true
     }
-  } catch (err) { }
+  } catch (err) {
+    // Silent fail, keep previous cache state
+  }
 
-  _maintenanceCacheExpiry = now + 10000
+  _maintenanceCacheExpiry = now + 10000 // Cache for 10 seconds
   return _maintenanceCache
 }
 
@@ -54,16 +49,14 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL('/admin/login', request.url))
     }
 
-    // ✅ NEW: Strict Role-Based Access Control (RBAC) Enforced on URLs
+    // Strict Role-Based Access Control (RBAC) Enforced on URLs
     if (isAdmin && pathname !== '/admin' && pathname !== '/admin/login') {
-      const requiredPermission = pathname.replace('/admin/', '').split('/')[0] // e.g., 'orders' from '/admin/orders/123'
-      
+      const requiredPermission = pathname.replace('/admin/', '').split('/')[0]
       const hasAccess = 
         adminSession.permissions.includes('all') || 
         adminSession.permissions.includes(requiredPermission)
 
       if (!hasAccess) {
-        // Redirect unauthorized staff back to the main admin dashboard
         return NextResponse.redirect(new URL('/admin', request.url))
       }
     }
