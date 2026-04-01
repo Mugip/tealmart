@@ -21,21 +21,63 @@
     "checkout": "Lipa Sasa",
     "viewCart": "Angalia Mfuko",
     "empty": "Mfuko wako ni tupu",
-    "total": "Jumla Inayokadiriwa",
+    "continueShopping": "Endelea Kununua",
+    "orderSummary": "Muhtasari wa Agizo",
+    "subtotal": "Jumla Ndogo",
+    "shipping": "Usafirishaji",
+    "total": "Jumla",
     "items": "bidhaa",
-    "pairsWell": "Inaenda vizuri na..."
+    "pairsWell": "Inaendana vizuri na...",
+    "freeShipping": "Usafirishaji wa bure kwa oda zaidi ya $100"
   },
   "TrustBadges": {
     "freeShipping": "Usafirishaji wa Bure",
     "securePayment": "Malipo Salama",
-    "easyReturns": "Kurudisha kwa Urahisi",
+    "easyReturns": "Urejeshaji Rahisi",
     "fastDelivery": "Uwasilishaji wa Haraka"
   },
   "Product": {
     "addToCart": "Weka Kwenye Mfuko",
-    "buyNow": "Nunua Sasa hivi",
+    "buyNow": "Nunua Sasa",
+    "outOfStock": "Imeisha Stoo",
+    "inStock": "Ipo Stoo",
     "description": "Maelezo ya Bidhaa",
     "reviews": "Maoni ya Wateja",
-    "relatedProducts": "Bidhaa Zinazofanana"
+    "relatedProducts": "Bidhaa Zinazofanana",
+    "recentlyViewed": "Uliyotazama Hivi Karibuni"
+  },
+  "Auth": {
+    "signIn": "Ingia",
+    "signUp": "Jisajili",
+    "signOut": "Ondoka",
+    "forgotPassword": "Umesahau nenosiri?",
+    "resetPassword": "Weka Upya Nenosiri",
+    "email": "Barua Pepe",
+    "password": "Nenosiri",
+    "name": "Jina Kamili"
+  },
+  "Account": {
+    "myOrders": "Maagizo Yangu",
+    "wishlist": "Orodha ya Matamanio",
+    "addresses": "Anwani Zilizohifadhiwa",
+    "profile": "Mipangilio ya Akaunti"
+  },
+  "Checkout": {
+    "shippingInfo": "Maelezo ya Usafirishaji",
+    "paymentMethod": "Njia ya Malipo",
+    "placeOrder": "Weka Oda",
+    "discountCode": "Msimbo wa Punguzo",
+    "apply": "Tumia"
+  },
+  "Common": {
+    "loading": "Inapakia...",
+    "error": "Kuna hitilafu imetokea",
+    "tryAgain": "Jaribu tena",
+    "save": "Hifadhi",
+    "cancel": "Ghairi",
+    "delete": "Futa",
+    "edit": "Hariri",
+    "search": "Tafuta",
+    "noResults": "Hakuna matokeo yaliyopatikana"
   }
 }
