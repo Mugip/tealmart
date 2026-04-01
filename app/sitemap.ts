@@ -3,7 +3,7 @@ import { prisma } from '@/lib/db'
 import { MetadataRoute } from 'next'
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = 'https://tealmart.vercel.app'
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://tealmart.vercel.app'
 
   // 1. Get Categories
   const categories = await prisma.product.groupBy({
