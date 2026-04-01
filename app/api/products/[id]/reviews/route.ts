@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { uploadToR2 } from '@/lib/r2'
+import { isLikelyFakeReview } from '@/lib/fakeReview'
 
 // GET: Fetch reviews with pagination and rating summary
 export async function GET(
@@ -66,6 +67,10 @@ export async function POST(
 
   try {
     const { rating, title, comment, images } = await req.json()
+
+    if (isLikelyFakeReview(title || '') || isLikelyFakeReview(comment || '')) {
+      return NextResponse.json({ error: 'Your review was flagged by our spam filter.' }, { status: 400 })
+    }
 
     if (!rating || rating < 1 || rating > 5) {
       return NextResponse.json({ error: 'Rating must be between 1 and 5' }, { status: 400 })
