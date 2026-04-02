@@ -16,17 +16,17 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}))
   const dryRun = body.dryRun !== false
 
-  // ✅ ALWAYS revive the AI before processing a manual batch
+  // Revive AI before processing
   resetAIHealth();
 
   try {
-    // ✅ Reduced to 25 to ensure Vercel Serverless Functions don't time out
+    // ✅ Reduced batch size to 15 to stay far away from Free Tier abuse limits
     const products = await prisma.product.findMany({
       where: {
         category: { in: ['General', 'general', 'Uncategorized', ''] }
       },
       select: { id: true, title: true, description: true, category: true },
-      take: 25 
+      take: 15 
     })
 
     if (products.length === 0) {
@@ -53,9 +53,9 @@ export async function POST(req: NextRequest) {
         skipped++
       }
 
-      // ✅ Increased delay to 800ms to completely avoid Hugging Face rate limits (Status 429)
+      // ✅ Increased delay to 1200ms (1.2s) between AI calls
       if (process.env.HUGGINGFACE_API_KEY) {
-        await new Promise(r => setTimeout(r, 800))
+        await new Promise(r => setTimeout(r, 1200))
       }
     }
 
