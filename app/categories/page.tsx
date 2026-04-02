@@ -4,11 +4,11 @@ import { formatCategoryName, getCategoryIcon } from '@/lib/productClassifier'
 import Link from 'next/link'
 import { ArrowRight, ShoppingBag, Zap, Star, LayoutGrid } from 'lucide-react'
 import Image from 'next/image'
+import { getSecureImageUrl } from '@/lib/imageUrl' // ✅ Imported
 
 export const revalidate = 3600 // Cache for 1 hour
 
 async function getCategoriesWithData() {
-  // 1. Get all unique categories that have active products
   const categories = await prisma.product.groupBy({
     by: ['category'],
     where: { isActive: true },
@@ -16,7 +16,6 @@ async function getCategoriesWithData() {
     orderBy: { _count: { category: 'desc' } },
   })
 
-  // 2. Fetch a premium sample image for each category to make the UI pop
   const categoriesWithImages = await Promise.all(
     categories.map(async (cat) => {
       const sample = await prisma.product.findFirst({
@@ -40,7 +39,7 @@ export default async function CategoriesPage() {
 
   return (
     <div className="min-h-screen bg-white">
-      {/* 1. High-Conversion Hero Section */}
+      {/* Hero Section */}
       <section className="relative py-20 bg-gray-900 overflow-hidden">
         <div className="absolute inset-0 opacity-20">
           <Image 
@@ -67,7 +66,7 @@ export default async function CategoriesPage() {
         </div>
       </section>
 
-      {/* 2. Stats Bar */}
+      {/* Stats Bar */}
       <div className="bg-white border-b">
         <div className="max-w-7xl mx-auto px-4 py-4 flex flex-wrap justify-center gap-8 md:gap-16 text-sm font-bold text-gray-500 uppercase tracking-widest">
           <div className="flex items-center gap-2">
@@ -85,7 +84,7 @@ export default async function CategoriesPage() {
         </div>
       </div>
 
-      {/* 3. Category Grid */}
+      {/* Category Grid */}
       <section className="py-16 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -95,11 +94,10 @@ export default async function CategoriesPage() {
                 href={`/products?category=${encodeURIComponent(category.name)}`}
                 className="group relative h-80 rounded-[2.5rem] overflow-hidden shadow-sm hover:shadow-2xl hover:-translate-y-2 transition-all duration-500 bg-white border border-gray-100"
               >
-                {/* Background Image (Sample Product) */}
                 <div className="absolute inset-0">
                   {category.image ? (
                     <Image
-                      src={category.image}
+                      src={getSecureImageUrl(category.image)} // ✅ Secured
                       alt={category.name}
                       fill
                       className="object-cover opacity-60 group-hover:opacity-100 group-hover:scale-110 transition-all duration-700"
@@ -110,7 +108,6 @@ export default async function CategoriesPage() {
                   <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent opacity-80 group-hover:opacity-60 transition-opacity" />
                 </div>
 
-                {/* Card Content */}
                 <div className="absolute inset-0 p-8 flex flex-col justify-end">
                   <div className="flex items-center justify-between items-end">
                     <div>
@@ -136,7 +133,7 @@ export default async function CategoriesPage() {
         </div>
       </section>
 
-      {/* 4. Help Section */}
+      {/* Help Section */}
       <section className="py-20 bg-white">
         <div className="max-w-4xl mx-auto px-4 text-center">
           <h2 className="text-3xl font-black text-gray-900 mb-6">Didn't find what you were looking for?</h2>
