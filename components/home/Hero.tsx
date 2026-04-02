@@ -298,12 +298,12 @@ export default function Hero({ stats, products }: HeroProps) {
   const DURATION = 7000
 
   const displayItems = products?.slice(0, 5) ?? []
+  const current = displayItems[currentIndex]
 
   const activeImage = getSecureImageUrl(
-    current.images?.[0] || '/placeholder.png'
+    current?.images?.[0] || '/placeholder.png'
   )
-  
-  const current = displayItems[currentIndex]
+
   const urgency = getUrgencyNumbers(current)
 
   const goTo = useCallback((idx: number) => {
@@ -907,4 +907,4 @@ export default function Hero({ stats, products }: HeroProps) {
       `}</style>
     </section>
   )
-}
+              }
