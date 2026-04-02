@@ -71,7 +71,7 @@ let hfEnabled = true;
 let hfConsecutiveFailures = 0;
 const MAX_CONSECUTIVE_FAILURES = 5;
 const MODEL_ID = "meta-llama/Llama-3.1-8B-Instruct";
-const API_URL = "https://api-inference.huggingface.co/v1/chat/completions";
+const API_URL = "https://router.huggingface.co/v1/chat/completions";
 
 // ✅ NEW: Function to manually revive the AI if it crashed previously
 export function resetAIHealth() {
