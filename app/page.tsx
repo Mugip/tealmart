@@ -219,8 +219,10 @@ export default async function Home() {
       </section>
 
       {/* Recently Viewed on Homepage */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-20">
-        <RecentlyViewed />
+      <section className="bg-gray-900 py-16 border-t border-white/5">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <RecentlyViewed />
+        </div>
       </section>
 
       {/* ✉️ Newsletter Section */}
