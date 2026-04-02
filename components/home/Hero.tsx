@@ -11,6 +11,7 @@ import Image from 'next/image';
 import type { TouchEvent } from 'react'
 import { useCurrency } from '@/lib/contexts/CurrencyContext'
 import { useCart } from '@/lib/contexts/CartContext'
+import { getSecureImageUrl } from '@/lib/imageUrl'
 import {
   motion,
   useAnimationControls,
@@ -295,6 +296,7 @@ export default function Hero({ stats, products }: HeroProps) {
   const progressStart = useRef(Date.now())
   const countdown = usePersistentCountdown()
   const DURATION = 7000
+  const activeImage = getSecureImageUrl(allImages[selectedImage] || product.images[0])
 
   const displayItems = products?.slice(0, 5) ?? []
   const current = displayItems[currentIndex]
@@ -565,7 +567,7 @@ export default function Hero({ stats, products }: HeroProps) {
                   }}
                 >
                   <div className="relative w-full h-full">
-                    <Image src={product.images?.[0]} alt={product.title} fill className="object-cover" />
+                    ‎<Image src={getSecureImageUrl(image)} alt={`${product.title} - ${index + 1}`} fill className="object-cover" />
                   </div>
                 </button>
               ))}
@@ -773,7 +775,7 @@ export default function Hero({ stats, products }: HeroProps) {
               className="absolute inset-0 img-fade-in z-10"
             >
               <Image
-                src={current.images?.[0]}
+                src={activeImage}
                 alt={current.title}
                 fill
                 priority
@@ -784,7 +786,7 @@ export default function Hero({ stats, products }: HeroProps) {
                   transition: 'transform 0.7s cubic-bezier(0.22,1,0.36,1)',
                 }}
                 onLoad={() => setImgLoaded(true)}
-              />
+                />
             </div>
 
             <div
