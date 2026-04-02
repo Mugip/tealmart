@@ -18,7 +18,6 @@ export async function POST(req: NextRequest) {
   const dryRun = body.dryRun !== false
 
   try {
-    // 2. Fetch up to 50 "General" products to prevent Vercel Server timeouts
     const products = await prisma.product.findMany({
       where: {
         category: { in: ['General', 'general', 'Uncategorized', ''] }
@@ -35,11 +34,11 @@ export async function POST(req: NextRequest) {
     let skipped = 0
     const changes: Array<{ title: string; from: string; to: string }> = []
 
-    // 3. Process the batch
     for (const product of products) {
       const newCategory = await classifyProduct(product.title, product.description, product.category)
 
-      if (newCategory !== 'General' && newCategory !== 'general' && newCategory !== product.category) {
+      // ✅ FIXED: Removed the lowercase 'general' check to satisfy TypeScript
+      if (newCategory !== 'General' && newCategory !== product.category) {
         if (!dryRun) {
           await prisma.product.update({
             where: { id: product.id },
@@ -52,13 +51,11 @@ export async function POST(req: NextRequest) {
         skipped++
       }
 
-      // Small delay to respect Hugging Face free tier limits
       if (process.env.HUGGINGFACE_API_KEY) {
         await new Promise(r => setTimeout(r, 200))
       }
     }
 
-    // 4. Check how many are left in total
     const remaining = await prisma.product.count({
       where: { category: { in: ['General', 'general', 'Uncategorized', ''] } }
     })
