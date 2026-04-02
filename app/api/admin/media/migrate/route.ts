@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
       SELECT id, title, images FROM "Product" 
       WHERE array_to_string(images, ',') LIKE '%cjdrop%' 
          OR array_to_string(images, ',') LIKE '%aliexpress%'
-      LIMIT 500
+      LIMIT 300
     `
 
     if (productsToMigrate.length === 0) {
