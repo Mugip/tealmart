@@ -8,6 +8,7 @@ import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
+import { getSecureImageUrl } from '@/lib/imageUrl'
 
 interface UpsellProduct {
   id: string
@@ -24,6 +25,7 @@ export default function CartDrawer() {
   const [upsells, setUpsells] = useState<UpsellProduct[]>([])
   const [loadingUpsells, setLoadingUpsells] = useState(false)
   const [loadingCheckout, setLoadingCheckout] = useState(false)
+  const activeImage = getSecureImageUrl(allImages[selectedImage] || product.images[0])
 
   // Fetch upsells
   useEffect(() => {
@@ -105,7 +107,7 @@ export default function CartDrawer() {
             items.map(item => (
               <div key={item.id} className="flex gap-4">
                 <div className="relative w-20 h-20">
-                  <Image src={item.image} alt={item.title} fill className="object-cover rounded" />
+                  <Image src={getSecureImageUrl(image)} alt={`${product.title} - ${index + 1}`} fill className="object-cover rounded" />
                 </div>
 
                 <div className="flex-1">
@@ -143,7 +145,7 @@ export default function CartDrawer() {
                 {upsells.map(product => (
                   <div key={product.id} className="w-28">
                     <div className="relative h-24">
-                      <Image src={product.images[0]} alt={product.title} fill className="object-cover rounded" />
+                      <Image src={getSecureImageUrl(image)} alt={`${product.title} - ${index + 1}`} fill className="object-cover rounded" />
                     </div>
 
                     <p className="text-xs truncate">{product.title}</p>
