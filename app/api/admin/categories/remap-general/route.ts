@@ -1,12 +1,11 @@
 // app/api/admin/categories/remap-general/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
-import { classifyProduct } from '@/lib/productClassifier'
+import { classifyProduct, resetAIHealth } from '@/lib/productClassifier'
 import { cookies } from 'next/headers'
 import { getAdminSession } from '@/lib/adminAuth'
 
 export async function POST(req: NextRequest) {
-  // 1. Verify Admin Auth
   const token = cookies().get('admin-auth')?.value
   const session = token ? await getAdminSession(token) : null
   
@@ -17,13 +16,17 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}))
   const dryRun = body.dryRun !== false
 
+  // ✅ ALWAYS revive the AI before processing a manual batch
+  resetAIHealth();
+
   try {
+    // ✅ Reduced to 25 to ensure Vercel Serverless Functions don't time out
     const products = await prisma.product.findMany({
       where: {
         category: { in: ['General', 'general', 'Uncategorized', ''] }
       },
       select: { id: true, title: true, description: true, category: true },
-      take: 50 
+      take: 25 
     })
 
     if (products.length === 0) {
@@ -37,7 +40,6 @@ export async function POST(req: NextRequest) {
     for (const product of products) {
       const newCategory = await classifyProduct(product.title, product.description, product.category)
 
-      // ✅ FIXED: Removed the lowercase 'general' check to satisfy TypeScript
       if (newCategory !== 'General' && newCategory !== product.category) {
         if (!dryRun) {
           await prisma.product.update({
@@ -51,8 +53,9 @@ export async function POST(req: NextRequest) {
         skipped++
       }
 
+      // ✅ Increased delay to 800ms to completely avoid Hugging Face rate limits (Status 429)
       if (process.env.HUGGINGFACE_API_KEY) {
-        await new Promise(r => setTimeout(r, 200))
+        await new Promise(r => setTimeout(r, 800))
       }
     }
 
@@ -75,4 +78,4 @@ export async function POST(req: NextRequest) {
     console.error('[REMAP_GENERAL_ERROR]', error)
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
-}
+      }
