@@ -296,12 +296,13 @@ export default function Hero({ stats, products }: HeroProps) {
   const progressStart = useRef(Date.now())
   const countdown = usePersistentCountdown()
   const DURATION = 7000
-  
+
+  const displayItems = products?.slice(0, 5) ?? []
+
   const activeImage = getSecureImageUrl(
     current.images?.[0] || '/placeholder.png'
   )
-
-  const displayItems = products?.slice(0, 5) ?? []
+  
   const current = displayItems[currentIndex]
   const urgency = getUrgencyNumbers(current)
 
@@ -411,7 +412,7 @@ export default function Hero({ stats, products }: HeroProps) {
                 style={{ width: '42%' }}
               >
                 <Image
-                  src={current.images?.[0]}
+                  src={getSecureImageUrl(current.images?.[0])}
                   alt={current.title}
                   fill
                   priority
