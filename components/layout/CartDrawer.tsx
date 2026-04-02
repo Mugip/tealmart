@@ -25,8 +25,7 @@ export default function CartDrawer() {
   const [upsells, setUpsells] = useState<UpsellProduct[]>([])
   const [loadingUpsells, setLoadingUpsells] = useState(false)
   const [loadingCheckout, setLoadingCheckout] = useState(false)
-  const activeImage = getSecureImageUrl(allImages[selectedImage] || product.images[0])
-
+  
   // Fetch upsells
   useEffect(() => {
     if (isDrawerOpen) {
@@ -72,6 +71,9 @@ export default function CartDrawer() {
   }
 
   if (!isDrawerOpen) return null
+
+  const activeImage = getSecureImageUrl(allImages[selectedImage] || product.images[0])
+  
 
   return (
     <>
