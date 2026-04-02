@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
   LayoutDashboard, ShoppingCart, Package, BarChart3,
-  Boxes, Settings, Tag, ExternalLink, Users, DollarSign, Activity, ShieldCheck, LogOut
+  Boxes, Settings, Tag, ExternalLink, Users, DollarSign, Activity, ShieldCheck, LogOut, Image as ImageIcon
 } from 'lucide-react'
 import type { AdminSession } from '@/lib/adminAuth'
 
@@ -18,6 +18,7 @@ const ALL_NAV_ITEMS = [
   { href: '/admin/subscribers', icon: Users, label: 'Subscribers', id: 'subscribers' },
   { href: '/admin/pricing', icon: DollarSign, label: 'Pricing Rules', id: 'pricing' },
   { href: '/admin/logs', icon: Activity, label: 'Ingest Logs', id: 'logs' },
+  { href: '/admin/media', icon: ImageIcon, label: 'Media & CDN', id: 'settings' },
   { href: '/admin/analytics', icon: BarChart3, label: 'Analytics', id: 'analytics' },
   { href: '/admin/staff', icon: ShieldCheck, label: 'Staff Access', id: 'staff' },
   { href: '/admin/settings', icon: Settings, label: 'Settings', id: 'settings' },
