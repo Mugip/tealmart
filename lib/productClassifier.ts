@@ -55,7 +55,7 @@ const RULES: CategoryRule[] = [
   { category: "Automotive", weight: 15, pattern: /\b(car|cars|auto|vehicle|motorcycle|windshield|tires?|tyres?|obd|gauge|steering)\b/gi },
   { category: "Toys, Kids & Baby", weight: 15, pattern: /\b(toy|toys|plush|lego|puzzle|doll|baby|infant|toddler|stroller|diaper|kids?|childrens?|boys?|girls?)\b/gi },
   { category: "Consumer Electronics", weight: 15, pattern: /\b(smartphone|phones?|usb|bluetooth|wireless|earbuds?|earphones?|headphones?|speakers?|laptop|tablet|charger|drone|camera|webcam|monitor|keyboard|mouse|electronics?)\b/gi },
-  { category: "Tools & Hardware", weight: 15, pattern: /\b(drill|wrench|screwdriver|soldering|multimeter|pliers|toolbox|hardware|caliper|saw|screws|nails)\b/gi },
+  { category: "Tools & Hardware", weight: 15, pattern: /\b(drill|wrench|screwdriver|soldering|multimeter|pliers|toolbox|hardware|caliper|saw|screws|tools|tool|nails)\b/gi },
   { category: "Health & Beauty", weight: 15, pattern: /\b(makeup|cosmetics?|skincare|serum|moisturizer|perfume|mascara|lipstick|nails?|shampoo|trimmer|shaver|acne|beauty|hair|teeth|massager)\b/gi },
   { category: "Sports & Outdoors", weight: 15, pattern: /\b(sports?|outdoors?|fitness|yoga|dumbbell|cycling|bicycle|camping|hiking|fishing|treadmill|swim|running)\b/gi },
   { category: "Office & Stationery", weight: 15, pattern: /\b(office|stationery|notebooks?|pens?|pencils?|stapler|journal|diary|planners?|ink|paper|folder|watercolor|stickers|tape)\b/gi },
