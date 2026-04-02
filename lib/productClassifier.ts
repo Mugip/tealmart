@@ -26,40 +26,41 @@ interface CategoryRule {
 }
 
 /**
- * 1. ADVANCED HEURISTIC ENGINE RULES
+ * 1. SUPERCHARGED OFFLINE HEURISTIC ENGINE
+ * Since the AI is out of credits, this offline dictionary does all the heavy lifting.
  */
 const RULES: CategoryRule[] = [
   // ── HIGH PRIORITY EXACT MATCHES (Weight: 80) ──
-  { category: "Women's Clothing", weight: 80, pattern: /\b(womens?|ladies|dress|skirt|blouse|bra|lingerie|camisole|swimsuit|bikini|gown|sleepwear|lace|satin|romper|jumpsuit|womenswear)\b/gi },
+  { category: "Women's Clothing", weight: 80, pattern: /\b(womens?|ladies|dress|skirt|blouse|bra|lingerie|camisole|swimsuit|bikini|gown|sleepwear|lace|satin|romper|jumpsuit|womenswear|leggings|panties)\b/gi },
   { category: "Men's Clothing", weight: 80, pattern: /\b(mens?|male|suit|tuxedo|menswear)\b/gi },
-  
-  { category: "Office & Stationery", weight: 80, pattern: /\b(gel pen|fountain pen|ballpoint|ink pen|sticky note|desk organizer|memo pad|pencil case|notebook planner)\b/gi },
-  { category: "Health & Beauty", weight: 80, pattern: /\b(nail polish|gel nail|phototherapy pen|nail art|face cream|skin care|essential oil|hair dryer|hair clipper|makeup brush)\b/gi },
+  { category: "Health & Beauty", weight: 80, pattern: /\b(nail polish|gel nail|phototherapy pen|nail art|face cream|skin care|essential oil|hair dryer|hair clipper|makeup brush|facial|cleanser|cleansing|wash|mask|ultrasonic|pore|sonic)\b/gi },
+  { category: "Home & Garden", weight: 80, pattern: /\b(bedding set|bed sheet|wall sticker|storage box|storage rack|kitchen cabinet|cake decorating|floor mat|stickers|spoon|freshener|aromatherapy|temperature)\b/gi },
+  { category: "Tools & Hardware", weight: 80, pattern: /\b(screwdriver set|electric drill|hand tool kit|impact drill|torque|socket set|laser level|measuring|tape|protective|velcro)\b/gi },
+  { category: "Consumer Electronics", weight: 80, pattern: /\b(mobile phone holder|laptop stand|smart ring|power bank|smart watch|usb cable|tablet holder|cleaning kit|cable|organizer|management|wire)\b/gi },
+  { category: "Sports & Outdoors", weight: 80, pattern: /\b(resistance|band|training|lift|riding|tactical|gym|workout)\b/gi },
+  { category: "Pet Supplies", weight: 80, pattern: /\b(fish tank|aquarium|bird cage|leash|harness|litter)\b/gi },
   { category: "Automotive", weight: 80, pattern: /\b(car bracket|car mount|car phone|car charger|steering wheel|dash cam|dashcam|car seat|tire pressure|car air freshener|car organizer|car decor)\b/gi },
   { category: "Toys, Kids & Baby", weight: 80, pattern: /\b(baby shoes|toddler shoes|educational toy|remote control car|action figure|mummy bag)\b/gi },
-  { category: "Tools & Hardware", weight: 80, pattern: /\b(screwdriver set|electric drill|hand tool kit|impact drill|torque|socket set)\b/gi },
-  { category: "Home & Garden", weight: 80, pattern: /\b(bedding set|bed sheet|wall sticker|storage box|storage rack|kitchen cabinet|cake decorating)\b/gi },
-  { category: "Consumer Electronics", weight: 80, pattern: /\b(mobile phone holder|laptop stand|smart ring|power bank|smart watch|usb cable|tablet holder|cleaning kit)\b/gi },
-  { category: "Bags & Shoes", weight: 80, pattern: /\b(canvas shoes|running shoes|leather shoes|sports shoes|messenger bag|shoulder bag|tote bag|bucket bag|daddy shoes|pea shoes)\b/gi },
 
   // ── STRONG GENERIC MATCHES (Weight: 35) ──
-  { category: "Bags & Shoes", weight: 35, pattern: /\b(shoes?|sneakers?|boots?|sandals?|slippers?|backpacks?|handbags?|purse|wallet|luggage)\b/gi },
+  { category: "Bags & Shoes", weight: 35, pattern: /\b(shoes?|sneakers?|boots?|sandals?|slippers?|backpacks?|handbags?|purse|wallet|luggage|crossbody|tote|bag)\b/gi },
   { category: "Jewelry & Watches", weight: 35, pattern: /\b(jewelry|jewellery|necklace|bracelet|earrings?|rings?|pendant|watches|wristwatch|silver|gold|diamond|gemstone)\b/gi },
   
   // ── GENERIC CLOTHING FALLBACKS (Weight: 20) ──
-  { category: "Men's Clothing", weight: 20, pattern: /\b(shirt|polo|blazer|hoodie|t-shirt|tshirt|trousers?|jeans|jacket|puffer|tracksuit|coat|shorts?|pants?|vest|sweatshirt|sweater)\b/gi },
+  // If it's a generic jacket/tracksuit/pants without "women" in the title, default to Men's.
+  { category: "Men's Clothing", weight: 20, pattern: /\b(shirts?|polo|blazer|hoodie|t-?shirts?|trousers?|jeans|jackets?|puffer|tracksuits?|coats?|shorts?|pants?|vest|sweatshirts?|sweaters?|joggers?)\b/gi },
 
-  // ── STANDARD SINGLE WORDS (Weight: 20) ──
-  { category: "Pet Supplies", weight: 20, pattern: /\b(pet|pets|dogs?|cats?|puppy|kitten|aquarium|bird cage|leash|harness|litter)\b/gi },
-  { category: "Automotive", weight: 20, pattern: /\b(car|cars|auto|vehicle|motorcycle|windshield|tires?|tyres?|obd)\b/gi },
-  { category: "Toys, Kids & Baby", weight: 20, pattern: /\b(toy|toys|plush|lego|puzzle|doll|baby|infant|toddler|stroller|diaper|kids?|childrens?|boys?|girls?)\b/gi },
-  { category: "Consumer Electronics", weight: 20, pattern: /\b(smartphone|phones?|usb|bluetooth|wireless|earbuds?|earphones?|headphones?|speakers?|laptop|tablet|charger|drone|camera|webcam|monitor|keyboard|mouse|electronics?)\b/gi },
-  { category: "Tools & Hardware", weight: 20, pattern: /\b(drill|wrench|screwdriver|soldering|multimeter|pliers|toolbox|hardware|caliper|saw|screws|nails)\b/gi },
-  { category: "Health & Beauty", weight: 20, pattern: /\b(makeup|cosmetics?|skincare|serum|moisturizer|perfume|mascara|lipstick|nails?|shampoo|trimmer|shaver|acne|beauty|hair|teeth|massager)\b/gi },
-  { category: "Sports & Outdoors", weight: 20, pattern: /\b(sports?|outdoors?|fitness|gym|yoga|dumbbell|cycling|bicycle|camping|hiking|fishing|treadmill|swim|tactical|running)\b/gi },
-  { category: "Office & Stationery", weight: 20, pattern: /\b(office|stationery|notebooks?|pens?|pencils?|stapler|journal|diary|planners?|ink|paper|folder)\b/gi },
+  // ── STANDARD SINGLE WORDS (Weight: 15) ──
+  { category: "Pet Supplies", weight: 15, pattern: /\b(pet|pets|dogs?|cats?|puppy|kitten)\b/gi },
+  { category: "Automotive", weight: 15, pattern: /\b(car|cars|auto|vehicle|motorcycle|windshield|tires?|tyres?|obd|gauge|steering)\b/gi },
+  { category: "Toys, Kids & Baby", weight: 15, pattern: /\b(toy|toys|plush|lego|puzzle|doll|baby|infant|toddler|stroller|diaper|kids?|childrens?|boys?|girls?)\b/gi },
+  { category: "Consumer Electronics", weight: 15, pattern: /\b(smartphone|phones?|usb|bluetooth|wireless|earbuds?|earphones?|headphones?|speakers?|laptop|tablet|charger|drone|camera|webcam|monitor|keyboard|mouse|electronics?)\b/gi },
+  { category: "Tools & Hardware", weight: 15, pattern: /\b(drill|wrench|screwdriver|soldering|multimeter|pliers|toolbox|hardware|caliper|saw|screws|nails)\b/gi },
+  { category: "Health & Beauty", weight: 15, pattern: /\b(makeup|cosmetics?|skincare|serum|moisturizer|perfume|mascara|lipstick|nails?|shampoo|trimmer|shaver|acne|beauty|hair|teeth|massager)\b/gi },
+  { category: "Sports & Outdoors", weight: 15, pattern: /\b(sports?|outdoors?|fitness|yoga|dumbbell|cycling|bicycle|camping|hiking|fishing|treadmill|swim|running)\b/gi },
+  { category: "Office & Stationery", weight: 15, pattern: /\b(office|stationery|notebooks?|pens?|pencils?|stapler|journal|diary|planners?|ink|paper|folder|watercolor|stickers|tape)\b/gi },
   { category: "Home & Garden", weight: 15, pattern: /\b(home|garden|furniture|sofa|bedding|pillows?|blankets?|rugs?|lamps?|decor|kitchen|utensils?|cookware|mugs?|curtains?|towels?|storage)\b/gi },
-  { category: "Food & Grocery", weight: 20, pattern: /\b(food|grocery|snacks?|coffee|tea|chocolate|candy|spice|seasoning)\b/gi },
+  { category: "Food & Grocery", weight: 15, pattern: /\b(food|grocery|snacks?|coffee|tea|chocolate|candy|spice|seasoning)\b/gi },
 ];
 
 /**
@@ -69,8 +70,6 @@ let hfEnabled = true;
 let hfConsecutiveFailures = 0;
 const MAX_CONSECUTIVE_FAILURES = 5;
 const MODEL_ID = "meta-llama/Llama-3.1-8B-Instruct";
-
-// ✅ FIXED: Changed to the newer, more stable Router endpoint
 const API_URL = "https://router.huggingface.co/v1/chat/completions";
 
 export function resetAIHealth() {
@@ -116,7 +115,6 @@ async function classifyWithLlama(
 
     const contentType = response.headers.get("content-type");
     if (!contentType || !contentType.includes("application/json")) {
-      console.warn(`⚠️ HF returned HTML instead of JSON. Rate limit possible.`);
       throw new Error("Invalid non-JSON response from AI provider");
     }
 
@@ -167,7 +165,9 @@ function classifyWithHeuristics(title?: string, description?: string, hint?: str
   }
 
   const sorted = Object.entries(scores).sort((a, b) => b[1] - a[1]);
-  if (sorted.length > 0 && sorted[0][1] >= 20) return sorted[0][0] as Category;
+  
+  // ✅ FIXED: Lowered threshold to 10 so even a single weak word match rescues it from "General"
+  if (sorted.length > 0 && sorted[0][1] >= 10) return sorted[0][0] as Category;
   
   return "General";
 }
@@ -229,4 +229,4 @@ export function getCategoryIcon(category: string): string {
   if (lower.includes("office") || lower.includes("stationery") || lower.includes("pen")) return "✒️";
   if (lower.includes("food") || lower.includes("grocery") || lower.includes("snack")) return "🛒";
   return "🛍️";
-}
+                                             }
