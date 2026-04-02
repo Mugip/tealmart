@@ -79,6 +79,7 @@ export function resetAIHealth() {
   hfConsecutiveFailures = 0;
 }
 
+
 async function classifyWithLlama(
   title: string,
   description: string,
@@ -115,6 +116,14 @@ async function classifyWithLlama(
       }),
     });
 
+    // ✅ FIXED: Check if the response is actually JSON before parsing!
+    const contentType = response.headers.get("content-type");
+    if (!contentType || !contentType.includes("application/json")) {
+      const errorText = await response.text();
+      console.warn(`⚠️ HF returned HTML instead of JSON (Status ${response.status}). Model overloaded.`);
+      throw new Error("Invalid non-JSON response from AI provider");
+    }
+
     const result = await response.json();
 
     if (!response.ok) {
@@ -134,7 +143,10 @@ async function classifyWithLlama(
   } catch (error) {
     hfConsecutiveFailures++;
     console.error("❌ AI Classification Failure:", error);
-    if (hfConsecutiveFailures >= MAX_CONSECUTIVE_FAILURES) hfEnabled = false;
+    if (hfConsecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+      console.warn("⚠️ AI disabled temporarily due to consecutive failures.");
+      hfEnabled = false;
+    }
     return null;
   }
 }
