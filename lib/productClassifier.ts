@@ -27,7 +27,6 @@ interface CategoryRule {
 
 /**
  * 1. ADVANCED HEURISTIC ENGINE RULES
- * Now highly upgraded to catch generic clothing items natively.
  */
 const RULES: CategoryRule[] = [
   // ── HIGH PRIORITY EXACT MATCHES (Weight: 80) ──
@@ -48,7 +47,6 @@ const RULES: CategoryRule[] = [
   { category: "Jewelry & Watches", weight: 35, pattern: /\b(jewelry|jewellery|necklace|bracelet|earrings?|rings?|pendant|watches|wristwatch|silver|gold|diamond|gemstone)\b/gi },
   
   // ── GENERIC CLOTHING FALLBACKS (Weight: 20) ──
-  // If it's a generic jacket/tracksuit/pants without "women" in the title, default to Men's.
   { category: "Men's Clothing", weight: 20, pattern: /\b(shirt|polo|blazer|hoodie|t-shirt|tshirt|trousers?|jeans|jacket|puffer|tracksuit|coat|shorts?|pants?|vest|sweatshirt|sweater)\b/gi },
 
   // ── STANDARD SINGLE WORDS (Weight: 20) ──
@@ -71,14 +69,14 @@ let hfEnabled = true;
 let hfConsecutiveFailures = 0;
 const MAX_CONSECUTIVE_FAILURES = 5;
 const MODEL_ID = "meta-llama/Llama-3.1-8B-Instruct";
+
+// ✅ FIXED: Changed to the newer, more stable Router endpoint
 const API_URL = "https://router.huggingface.co/v1/chat/completions";
 
-// ✅ NEW: Function to manually revive the AI if it crashed previously
 export function resetAIHealth() {
   hfEnabled = true;
   hfConsecutiveFailures = 0;
 }
-
 
 async function classifyWithLlama(
   title: string,
@@ -116,11 +114,9 @@ async function classifyWithLlama(
       }),
     });
 
-    // ✅ FIXED: Check if the response is actually JSON before parsing!
     const contentType = response.headers.get("content-type");
     if (!contentType || !contentType.includes("application/json")) {
-      const errorText = await response.text();
-      console.warn(`⚠️ HF returned HTML instead of JSON (Status ${response.status}). Model overloaded.`);
+      console.warn(`⚠️ HF returned HTML instead of JSON. Rate limit possible.`);
       throw new Error("Invalid non-JSON response from AI provider");
     }
 
@@ -128,6 +124,11 @@ async function classifyWithLlama(
 
     if (!response.ok) {
       if (result.error?.includes("loading")) return null;
+      if (result.error?.includes("depleted")) {
+        console.warn("⚠️ Hugging Face credits depleted. Disabling AI.");
+        hfEnabled = false; // Disable instantly if out of credits
+        return null;
+      }
       throw new Error(result.error || "API Error");
     }
 
@@ -174,7 +175,6 @@ function classifyWithHeuristics(title?: string, description?: string, hint?: str
 /**
  * 4. PUBLIC INTERFACE
  */
-
 export function classifyProductSync(
   title?: string, 
   description?: string, 
@@ -188,13 +188,9 @@ export async function classifyProduct(
   description?: string,
   cjCategoryHint?: string
 ): Promise<Category> {
-  // Try Heuristics first (Fast & Free)
   const heuristicResult = classifyWithHeuristics(title, description, cjCategoryHint);
-  
-  // If heuristics found a specific department, return it immediately
   if (heuristicResult !== "General") return heuristicResult;
 
-  // Fallback to Llama 3.1 if title exists
   if (title && hfEnabled) {
     const aiResult = await classifyWithLlama(title, description || "", cjCategoryHint);
     if (aiResult) return aiResult;
@@ -207,7 +203,7 @@ export function getClassifierHealth() {
   return {
     aiEnabled: hfEnabled,
     consecutiveFailures: hfConsecutiveFailures,
-    status: hfEnabled ? 'healthy' : 'disabled (too many failures)',
+    status: hfEnabled ? 'healthy' : 'disabled (too many failures or out of credits)',
   };
 }
 
@@ -233,4 +229,4 @@ export function getCategoryIcon(category: string): string {
   if (lower.includes("office") || lower.includes("stationery") || lower.includes("pen")) return "✒️";
   if (lower.includes("food") || lower.includes("grocery") || lower.includes("snack")) return "🛒";
   return "🛍️";
-           }
+}
