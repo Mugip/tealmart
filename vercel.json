@@ -12,7 +12,7 @@
     },
     {
       "path": "/api/cron/migrate-media",
-      "schedule": "*/10 * * * *"
+      "schedule": "*0 1 * * * *"
     }
   ]
 }
