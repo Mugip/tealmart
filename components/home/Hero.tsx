@@ -296,7 +296,10 @@ export default function Hero({ stats, products }: HeroProps) {
   const progressStart = useRef(Date.now())
   const countdown = usePersistentCountdown()
   const DURATION = 7000
-  const activeImage = getSecureImageUrl(allImages[selectedImage] || product.images[0])
+  
+  const activeImage = getSecureImageUrl(
+    current.images?.[0] || '/placeholder.png'
+  )
 
   const displayItems = products?.slice(0, 5) ?? []
   const current = displayItems[currentIndex]
