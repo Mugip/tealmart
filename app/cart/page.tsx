@@ -1,14 +1,14 @@
 // app/cart/page.tsx
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useCart } from '@/lib/contexts/CartContext'
 import Image from 'next/image'
 import Link from 'next/link'
-import { Trash2, Plus, Minus, Loader2 } from 'lucide-react'
+import { Trash2, Loader2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
-import { getSecureImageUrl } from '@/lib/imageUrl'
+import { getSecureImageUrl } from '@/lib/imageUrl' // ✅ Imported
 
 export default function CartPage() {
   const { items, removeItem, updateQuantity, total } = useCart()
@@ -33,33 +33,27 @@ export default function CartPage() {
 
   const handleCheckout = async () => {
     setLoadingCheckout(true)
-    
-    // If logged in, go straight to checkout
     if (session?.user) {
       router.push('/checkout')
       return
     }
 
-    // If not logged in, check if Guest Checkout is allowed
     try {
       const res = await fetch('/api/settings/public', { cache: 'no-store' })
       const data = await res.json()
-
       if (data.allowGuestCheckout) {
         router.push('/checkout')
       } else {
         router.push('/auth/signin?callbackUrl=/checkout')
       }
     } catch {
-      // Fallback: If fetch fails, force login just to be safe
       router.push('/auth/signin?callbackUrl=/checkout')
     }
   }
 
   const shipping = total >= 50 ? 0 : 9.99
-  const tax = 0 // Using API calculation
+  const tax = 0 
   const grandTotal = total + shipping + tax
-  const activeImage = getSecureImageUrl(allImages[selectedImage] || product.images[0])
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -72,7 +66,8 @@ export default function CartPage() {
               {items.map((item) => (
                 <div key={item.id} className="flex gap-4 p-5 sm:p-6 border-b border-gray-100 last:border-b-0">
                   <div className="relative w-20 h-20 sm:w-24 sm:h-24 bg-gray-100 rounded-xl overflow-hidden flex-shrink-0">
-                    ‎<Image src={getSecureImageUrl(image)} alt={`${product.title} - ${index + 1}`} fill className="object-cover" />
+                    {/* ✅ Corrected Image Source */}
+                    <Image src={getSecureImageUrl(item.image)} alt={item.title} fill className="object-cover" />
                   </div>
 
                   <div className="flex-1 min-w-0">
@@ -103,6 +98,7 @@ export default function CartPage() {
             </div>
           </div>
 
+          {/* ... Rest of Order Summary is exactly the same */}
           <div className="lg:col-span-1">
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 sticky top-24">
               <h2 className="text-xl font-bold text-gray-900 mb-6">Order Summary</h2>
