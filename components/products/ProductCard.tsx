@@ -7,6 +7,7 @@ import { ShoppingCart, Star, Heart } from 'lucide-react'
 import { useCart } from '@/lib/contexts/CartContext'
 import { useWishlist } from '@/lib/contexts/WishlistContext'
 import { useCurrency } from '@/lib/contexts/CurrencyContext'
+import { getSecureImageUrl } from '@/lib/imageUrl'
 
 type Product = {
   id: string
@@ -47,12 +48,12 @@ export default function ProductCard({ product }: { product: Product }) {
     <Link href={`/products/${product.id}`} className="card group relative overflow-hidden bg-white">
       <div className="relative aspect-square overflow-hidden bg-gray-100">
         <Image
-          src={product.images[0] || '/placeholder.png'}
+          src={getSecureImageUrl(product.images[0])}
           alt={product.title}
           fill
           className="object-cover group-hover:scale-105 transition-transform duration-300"
           sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
-        />
+          />
 
         {/* Discount badge */}
         {discount > 0 && (
