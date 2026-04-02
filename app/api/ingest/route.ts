@@ -4,6 +4,10 @@ import { PrismaClient, Prisma } from "@prisma/client"
 import { getCJToken } from "@/lib/cjToken"
 import { classifyProduct } from "@/lib/productClassifier"
 
+// ✅ Tell Vercel to allow max execution time and prevent caching
+export const maxDuration = 300; 
+export const dynamic = 'force-dynamic';
+
 const globalForPrisma = global as unknown as { prisma: PrismaClient }
 
 const prisma = globalForPrisma.prisma || new PrismaClient({
@@ -120,7 +124,7 @@ async function cjFetch(url: string, retries = 3): Promise<any> {
 
 async function fetchCJProducts(keyword?: string, count = 10) {
   const allProducts: any[] = []
-  const targetPages = Math.ceil(count / MAX_BATCH) * 5 // Fetch more pages to account for filtering
+  const targetPages = Math.ceil(count / MAX_BATCH) * 5 
   
   for (let page = 1; page <= targetPages && page <= 20; page++) {
     const params = new URLSearchParams({
@@ -157,8 +161,6 @@ async function fetchCJProducts(keyword?: string, count = 10) {
       unique.push(p)
     }
   }
-
-  console.log(`✨ Deduped: ${allProducts.length} total → ${unique.length} unique`)
   
   // FILTER: Only keep UUID products
   const uuidProducts = unique.filter(p => {
@@ -166,60 +168,35 @@ async function fetchCJProducts(keyword?: string, count = 10) {
     return isUUID(pid)
   })
   
-  console.log(`🔑 UUID filter: ${unique.length} total → ${uuidProducts.length} UUID products (orderable)`)
-  console.log(`❌ Filtered out ${unique.length - uuidProducts.length} non-UUID products`)
-  
   return uuidProducts.slice(0, count)
 }
 
-// CACHED product detail fetch - Only for UUID products
 async function fetchProductDetail(pid: string) {
   const now = Date.now()
   const cached = productDetailCache.get(pid)
   
-  // Return cached if valid
   if (cached && (now - cached.timestamp) < CACHE_TTL) {
-    console.log(`💾 Memory cache hit for product ${pid}`)
     return cached.data
   }
 
-  // Check database for existing UUID product
   const existing = await prisma.product.findUnique({
     where: { externalId: pid },
     select: {
-      description: true,
-      variants: true,
-      images: true,
-      title: true,
-      category: true,
-      price: true,
-      costPrice: true,
+      description: true, variants: true, images: true, title: true, category: true, price: true, costPrice: true,
     }
   })
 
   if (existing) {
-    console.log(`🗄️ DB cache hit for product ${pid}`)
     const dbData = {
-      productNameEn: existing.title,
-      description: existing.description,
-      variants: existing.variants,
-      productImageList: existing.images,
-      sellPrice: existing.price,
-      categoryName: existing.category,
+      productNameEn: existing.title, description: existing.description, variants: existing.variants,
+      productImageList: existing.images, sellPrice: existing.price, categoryName: existing.category,
     }
-    
-    // Cache it in memory
     productDetailCache.set(pid, { data: dbData, timestamp: now })
     return dbData
   }
 
-  // Fetch from CJ API as last resort
-  console.log(`🌐 Fetching from CJ API for UUID product ${pid}`)
   const data = await cjFetch(`${CJ_API_URL}/product/query?pid=${pid}`)
-  
-  // Cache the result
   productDetailCache.set(pid, { data: data.data, timestamp: now })
-  
   return data.data
 }
 
@@ -236,43 +213,24 @@ function parsePrice(value: any): number {
 
 function extractImages(product: any, detail?: any): string[] {
   const images: string[] = []
-  
   if (detail?.productImage) images.push(detail.productImage)
   if (Array.isArray(detail?.productImageList)) images.push(...detail.productImageList)
   if (product?.bigImage) images.push(product.bigImage)
   if (Array.isArray(product?.productImageList)) images.push(...product.productImageList)
 
-  return images
-    .filter((img) => typeof img === "string" && img.startsWith("http"))
-    .slice(0, 5)
+  return images.filter((img) => typeof img === "string" && img.startsWith("http")).slice(0, 5)
 }
 
 function extractVariants(detail: any, productPid: string) {
-  if (!detail?.variants) {
-    console.log(`ℹ️ Product ${productPid} has no variants`)
-    return { variants: null, totalStock: randomStock(), skipped: false }
-  }
+  if (!detail?.variants) return { variants: null, totalStock: randomStock(), skipped: false }
 
   let raw = detail.variants
   if (typeof raw === "string") {
-    try {
-      raw = JSON.parse(raw)
-    } catch {
-      return { variants: null, totalStock: randomStock(), skipped: false }
-    }
+    try { raw = JSON.parse(raw) } catch { return { variants: null, totalStock: randomStock(), skipped: false } }
   }
 
-  if (!Array.isArray(raw) || raw.length === 0) {
-    console.log(`ℹ️ Product ${productPid} variants is not an array or empty`)
-    return { variants: null, totalStock: randomStock(), skipped: false }
-  }
-
-  console.log(`📦 Product ${productPid} has ${raw.length} variants`)
-
-  if (allVariantsAreSkus(raw)) {
-    console.log(`⚠️ Product ${productPid} has SKU-only variants, skipping`)
-    return { variants: null, totalStock: 0, skipped: true }
-  }
+  if (!Array.isArray(raw) || raw.length === 0) return { variants: null, totalStock: randomStock(), skipped: false }
+  if (allVariantsAreSkus(raw)) return { variants: null, totalStock: 0, skipped: true }
 
   const variants: any[] = []
   const optionNames: Set<string> = new Set()
@@ -286,7 +244,6 @@ function extractVariants(detail: any, productPid: string) {
     const costPrice = sellPrice * 0.7
     const price = applyMarkup(costPrice)
     const stock = Number(v.variantStock) > 0 ? Number(v.variantStock) : randomStock()
-    
     totalStock += stock
 
     const options: Record<string, string> = {}
@@ -295,26 +252,15 @@ function extractVariants(detail: any, productPid: string) {
     if (v.variantKey) {
       v.variantKey.split(";").forEach((part: string) => {
         const [name, value] = part.split("-").map((s: string) => s.trim())
-        if (name && value) {
-          options[name] = value
-          optionNames.add(name)
-        }
+        if (name && value) { options[name] = value; optionNames.add(name) }
       })
     }
     
     if (Object.keys(options).length === 0 && v.variantName) {
       if (isObviousSkuCode(v.variantName)) continue
-
       const parts = v.variantName.split("-").map((s: string) => s.trim())
-      if (parts.length === 2) {
-        options["Color"] = parts[0]
-        options["Size"] = parts[1]
-        optionNames.add("Color")
-        optionNames.add("Size")
-      } else if (parts.length === 1 && parts[0]) {
-        options["Style"] = parts[0]
-        optionNames.add("Style")
-      }
+      if (parts.length === 2) { options["Color"] = parts[0]; options["Size"] = parts[1]; optionNames.add("Color"); optionNames.add("Size"); } 
+      else if (parts.length === 1 && parts[0]) { options["Style"] = parts[0]; optionNames.add("Style"); }
     }
 
     if (Object.keys(options).length > 0) {
@@ -327,48 +273,19 @@ function extractVariants(detail: any, productPid: string) {
     }
 
     const variantId = v.vid || v.variantId || v.id || v.vId
-    
-    if (!variantId) {
-      console.warn(`⚠️ Variant has no ID in product ${productPid}`)
-      continue
-    }
-
-    console.log(`✅ Storing variant ${variantId} for product ${productPid}`)
+    if (!variantId) continue
 
     variants.push({
-      id: String(variantId),
-      sku: v.variantSku || String(variantId),
-      name: variantLabel,
-      price,
-      costPrice,
-      stock,
-      image: v.variantImage,
-      options,
+      id: String(variantId), sku: v.variantSku || String(variantId), name: variantLabel,
+      price, costPrice, stock, image: v.variantImage, options,
     })
   }
 
-  if (variants.length === 0) {
-    console.log(`⚠️ Product ${productPid} ended up with 0 valid variants`)
-    return { variants: null, totalStock: 0, skipped: true }
-  }
-
-  if (hasGenericLabels && variants.every(v => v.name.startsWith("Option "))) {
-    console.log(`ℹ️ Product ${productPid} has only generic labels, hiding variants`)
-    return { variants: null, totalStock, skipped: false }
-  }
-
+  if (variants.length === 0) return { variants: null, totalStock: 0, skipped: true }
+  if (hasGenericLabels && variants.every(v => v.name.startsWith("Option "))) return { variants: null, totalStock, skipped: false }
   if (totalStock <= 0) totalStock = randomStock()
 
-  console.log(`✅ Product ${productPid} successfully extracted ${variants.length} variants`)
-
-  return {
-    variants: variants.length > 0 ? {
-      options: Array.from(optionNames),
-      items: variants,
-    } : null,
-    totalStock,
-    skipped: false,
-  }
+  return { variants: { options: Array.from(optionNames), items: variants }, totalStock, skipped: false }
 }
 
 // ============================================
@@ -378,15 +295,9 @@ function extractVariants(detail: any, productPid: string) {
 async function saveProduct(product: any, existingProducts: Set<string>, keyword?: string) {
   const pid = product.id || product.pid
   if (!pid) return { result: null, wasExisting: false }
-
-  // SKIP non-UUID products
-  if (!isUUID(String(pid))) {
-    console.log(`⏭️ Skipping non-UUID product: ${pid}`)
-    return { result: null, wasExisting: false }
-  }
+  if (!isUUID(String(pid))) return { result: null, wasExisting: false }
 
   const wasExisting = existingProducts.has(String(pid))
-
   const detail = await fetchProductDetail(String(pid))
   if (!detail) return { result: null, wasExisting: false }
 
@@ -395,7 +306,6 @@ async function saveProduct(product: any, existingProducts: Set<string>, keyword?
 
   const costPrice = sellPrice * 0.7
   let price = applyMarkup(costPrice)
-
   const discount = randomDiscount()
   const compareAtPrice = +(price / (1 - discount / 100)).toFixed(2)
 
@@ -407,8 +317,7 @@ async function saveProduct(product: any, existingProducts: Set<string>, keyword?
   const cjCategory = detail.categoryName || product.threeCategoryName || ""
   
   const category = await classifyProduct(productTitle, productDescription, cjCategory)
-
-  const { variants, totalStock, skipped } = extractVariants(detail, String(pid))
+  const { variants, totalStock, skipped } = await extractVariants(detail, String(pid))
 
   if (skipped) return { result: null, wasExisting: false }
   if (!variants && descriptionMentionsSizes(productDescription)) return { result: null, wasExisting: false }
@@ -423,27 +332,14 @@ async function saveProduct(product: any, existingProducts: Set<string>, keyword?
   if (keyword) tags.push(keyword.toLowerCase())
 
   const data = {
-    externalId: String(pid),
-    title: productTitle.substring(0, 200),
-    description: productDescription.substring(0, 5000),
-    price,
-    costPrice,
-    compareAtPrice,
-    images,
-    category,
-    tags: [...new Set(tags)],
-    rating: +(Math.random() * 0.7 + 4.3).toFixed(1),
-    reviewCount: Math.floor(Math.random() * 450 + 50),
-    source: "cj-dropshipping",
-    isActive: true,
-    stock: totalStock,
-    variants: variants || Prisma.JsonNull,
+    externalId: String(pid), title: productTitle.substring(0, 200), description: productDescription.substring(0, 5000),
+    price, costPrice, compareAtPrice, images, category, tags: [...new Set(tags)],
+    rating: +(Math.random() * 0.7 + 4.3).toFixed(1), reviewCount: Math.floor(Math.random() * 450 + 50),
+    source: "cj-dropshipping", isActive: true, stock: totalStock, variants: variants || Prisma.JsonNull,
   }
 
   const result = await prisma.product.upsert({
-    where: { externalId: String(pid) },
-    update: data,
-    create: data,
+    where: { externalId: String(pid) }, update: data, create: data,
   })
 
   return { result, wasExisting }
@@ -466,26 +362,12 @@ export async function POST(req: NextRequest) {
     const keyword = body.keyword
     const requested = body.count || 10
 
-    console.log(`📦 Ingesting ${requested} UUID products, keyword: ${keyword || "all"}`)
-    console.log(`💾 Cache size: ${productDetailCache.size} products`)
-
-    const existingProducts = await prisma.product.findMany({
-      select: { externalId: true }
-    })
-    const existingIds = new Set(
-      existingProducts
-        .map(p => p.externalId)
-        .filter((id): id is string => id !== null)
-    )
+    const existingProducts = await prisma.product.findMany({ select: { externalId: true } })
+    const existingIds = new Set(existingProducts.map(p => p.externalId).filter((id): id is string => id !== null))
 
     const products = await fetchCJProducts(keyword, requested)
-    console.log(`🎯 Processing ${products.length} UUID products`)
 
-    let created = 0
-    let updated = 0
-    let skipped = 0
-    let apiCalls = 0
-    let cacheHits = 0
+    let created = 0, updated = 0, skipped = 0, apiCalls = 0, cacheHits = 0
     const errors: string[] = []
 
     for (const p of products) {
@@ -505,7 +387,8 @@ export async function POST(req: NextRequest) {
           skipped++
         }
 
-        await sleep(1100)
+        if (process.env.HUGGINGFACE_API_KEY) await sleep(600);
+        else await sleep(200);
       } catch (err: any) {
         errors.push(`${p.id}: ${err.message}`)
       }
@@ -516,41 +399,19 @@ export async function POST(req: NextRequest) {
     await prisma.ingestionLog.create({
       data: {
         source: keyword ? `cj-${keyword}` : "cj-general",
-        productsAdded: created,
-        productsUpdated: updated,
-        status: errors.length > 0 ? "partial" : "success",
+        productsAdded: created, productsUpdated: updated, status: errors.length > 0 ? "partial" : "success",
         errors: errors.length > 0 ? errors.join("\n") : null,
       },
     })
 
-    console.log(`✅ Done: ${created} created, ${updated} updated, ${skipped} skipped`)
-    console.log(`📊 API calls: ${apiCalls}, Cache hits: ${cacheHits}`)
-
     return NextResponse.json({
-      success: true,
-      created,
-      updated,
-      skipped,
-      totalFetched: created + updated,
-      databaseCount: finalCount,
-      apiCallsUsed: apiCalls,
-      cacheHits,
-      errors,
-      time: `${Date.now() - start}ms`,
+      success: true, created, updated, skipped, totalFetched: created + updated,
+      databaseCount: finalCount, apiCallsUsed: apiCalls, cacheHits, errors, time: `${Date.now() - start}ms`,
     })
   } catch (err: any) {
-    console.error("❌ Error:", err)
-
     await prisma.ingestionLog.create({
-      data: {
-        source: "cj-error",
-        productsAdded: 0,
-        productsUpdated: 0,
-        status: "failed",
-        errors: err.message,
-      },
+      data: { source: "cj-error", productsAdded: 0, productsUpdated: 0, status: "failed", errors: err.message },
     }).catch(() => {})
-
     return NextResponse.json({ error: err.message }, { status: 500 })
   } finally {
     await prisma.$disconnect()
