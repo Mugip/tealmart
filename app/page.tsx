@@ -304,9 +304,9 @@ export default async function Home() {
     getStats(),
   ])
 
-  const featuredProducts = shuffleArray(featuredPool).slice(0, 8)
-  const latestProducts = shuffleArray(latestPool).slice(0, 8)
-  const trendingProducts = shuffleArray(trendingPool).slice(0, 8)
+  const featuredProducts = shuffleArray(featuredPool).slice(0, 20)
+  const latestProducts = shuffleArray(latestPool).slice(0, 20)
+  const trendingProducts = shuffleArray(trendingPool).slice(0, 20)
 
   return (
     <div className="bg-slate-50 min-h-screen">
