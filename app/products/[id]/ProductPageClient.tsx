@@ -16,6 +16,7 @@ import ReviewSection from '@/components/products/ReviewSection'
 import SocialProof from '@/components/products/SocialProof'
 import UpsellSection from '@/components/products/UpsellSection'
 import toast from 'react-hot-toast'
+import { getSecureImageUrl } from '@/lib/imageUrl' // ✅ Imported Stealth Proxy
 
 interface Variant {
   id: string; sku: string; name: string; price: number; stock: number; image?: string; options: Record<string, string>;
@@ -43,8 +44,12 @@ export default function ProductPageClient({ initialProduct }: { initialProduct: 
   const allImages = [...productImages, ...variantImages]
 
   useEffect(() => {
+    // ✅ Store the secure proxied URL in history
     recordRecentlyViewed({
-      id: product.id, title: product.title, price: product.price, image: product.images?.[0] || '',
+      id: product.id, 
+      title: product.title, 
+      price: product.price, 
+      image: getSecureImageUrl(product.images?.[0]),
     })
   }, [product])
 
@@ -56,7 +61,7 @@ export default function ProductPageClient({ initialProduct }: { initialProduct: 
 
   const isVideo = (url: string) => url?.match(/\.(mp4|webm|mov)$/i)
 
-  // ✅ FIXED: Sync variants on ANY image change (thumbnails or arrows)
+  // Sync variants on ANY image change (thumbnails or arrows)
   const syncVariantWithImage = (index: number) => {
     setSelectedImage(index)
     const imgUrl = allImages[index]
@@ -91,7 +96,8 @@ export default function ProductPageClient({ initialProduct }: { initialProduct: 
       id: selectedVariant ? `${product.id}-${selectedVariant.id}` : product.id,
       title: selectedVariant ? `${product.title} (${selectedVariant.name})` : product.title,
       price: activePrice,
-      image: activeImage,
+      // ✅ Send secure URL to cart so the cart page/drawer doesn't expose the supplier either
+      image: getSecureImageUrl(activeImage), 
     })
     setAddedToCart(true)
     setTimeout(() => setAddedToCart(false), 2000)
@@ -119,22 +125,23 @@ export default function ProductPageClient({ initialProduct }: { initialProduct: 
           <div className="space-y-4">
             <div className="bg-white rounded-2xl shadow-lg overflow-hidden sticky top-4">
               
-              {/* ✅ FIXED: Mobile tap opens lightbox, Desktop hover zooms image */}
+              {/* Mobile tap opens lightbox, Desktop hover zooms image */}
               <div 
                 className="relative aspect-square group overflow-hidden md:cursor-crosshair cursor-zoom-in"
                 onMouseMove={handleMouseMove}
                 onClick={() => setIsLightboxOpen(true)}
               >
                 {isVideo(activeImage) ? (
-                  <video src={activeImage} controls autoPlay loop muted className="w-full h-full object-cover" />
+                  // ✅ Secure Video
+                  <video src={getSecureImageUrl(activeImage)} controls autoPlay loop muted className="w-full h-full object-cover" />
                 ) : (
                   <div 
-                    // Using Tailwind's md: prefix to ensure the scale effect ONLY happens on desktop!
                     className="absolute inset-0 w-full h-full transition-transform duration-150 ease-out md:group-hover:scale-[2.2]"
                     style={{ transformOrigin: `${zoomPos.x}% ${zoomPos.y}%` }}
                   >
+                    {/* ✅ Secure Main Image */}
                     <Image 
-                      src={activeImage || '/placeholder.png'} 
+                      src={activeImage ? getSecureImageUrl(activeImage) : '/placeholder.png'} 
                       alt={product.title} 
                       fill 
                       priority 
@@ -175,7 +182,8 @@ export default function ProductPageClient({ initialProduct }: { initialProduct: 
                       {isVideo(image) ? (
                         <div className="w-full h-full flex items-center justify-center bg-gray-100"><PlayCircle className="text-gray-400" /></div>
                       ) : (
-                        <Image src={image} alt={`${product.title} - ${index + 1}`} fill className="object-cover" />
+                        // ✅ Secure Thumbnail Image
+                        <Image src={getSecureImageUrl(image)} alt={`${product.title} - ${index + 1}`} fill className="object-cover" />
                       )}
                     </button>
                   ))}
@@ -246,7 +254,8 @@ export default function ProductPageClient({ initialProduct }: { initialProduct: 
                           >
                             {variant.image && (
                               <div className="relative w-full aspect-square mb-2 rounded-lg overflow-hidden">
-                                <Image src={variant.image} alt={variant.name} fill className="object-cover" />
+                                {/* ✅ Secure Variant Image */}
+                                <Image src={getSecureImageUrl(variant.image)} alt={variant.name} fill className="object-cover" />
                               </div>
                             )}
                             <div className="text-xs font-semibold text-gray-900 truncate mb-1" title={variant.name}>{variant.name}</div>
@@ -336,7 +345,7 @@ export default function ProductPageClient({ initialProduct }: { initialProduct: 
         </div>
       </div>
 
-      {/* ✅ NEW: Lightbox Modal for Mobile/Click */}
+      {/* Lightbox Modal for Mobile/Click */}
       {isLightboxOpen && (
         <div className="fixed inset-0 bg-black/95 z-[100] flex items-center justify-center p-4" onClick={() => setIsLightboxOpen(false)}>
           <button onClick={() => setIsLightboxOpen(false)} className="absolute top-4 right-4 bg-white/10 hover:bg-white/20 p-3 rounded-full transition-all z-10">
@@ -344,13 +353,15 @@ export default function ProductPageClient({ initialProduct }: { initialProduct: 
           </button>
           <div className="relative max-w-4xl max-h-[85vh] w-full h-full">
             {isVideo(activeImage) ? (
-               <video src={activeImage} controls autoPlay loop className="w-full h-full object-contain" onClick={e => e.stopPropagation()} />
+               // ✅ Secure Lightbox Video
+               <video src={getSecureImageUrl(activeImage)} controls autoPlay loop className="w-full h-full object-contain" onClick={e => e.stopPropagation()} />
             ) : (
-               <Image src={activeImage || '/placeholder.png'} alt={product.title} fill className="object-contain" onClick={e => e.stopPropagation()} />
+               // ✅ Secure Lightbox Image
+               <Image src={activeImage ? getSecureImageUrl(activeImage) : '/placeholder.png'} alt={product.title} fill className="object-contain" onClick={e => e.stopPropagation()} />
             )}
           </div>
         </div>
       )}
     </div>
   )
-                      }
+                }
