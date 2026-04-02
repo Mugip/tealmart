@@ -7,6 +7,7 @@ import { ChevronLeft, ChevronRight, ArrowRight, Sparkles, ShoppingBag } from 'lu
 import { formatCategoryName, getCategoryIcon } from '@/lib/productClassifier'
 import { useCurrency } from '@/lib/contexts/CurrencyContext' // ✅ Currency Integration
 import Image from 'next/image'
+import { getSecureImageUrl } from '@/lib/imageUrl'
 
 interface Category {
   name: string
@@ -147,13 +148,14 @@ export default function FeaturedCategories({ categories }: FeaturedCategoriesPro
                       <div className="flex items-center gap-4">
                         <div className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-xl overflow-hidden bg-white shadow-sm flex-shrink-0">
                           <Image
-                            src={category.sampleProduct.images[0]}
+                            src={getSecureImageUrl(category.sampleProduct.images[0])}
                             alt={category.sampleProduct.title}
                             fill
                             sizes="80px"
                             className="object-cover group-hover:scale-110 transition-transform duration-700"
                           />
                         </div>
+                        
                         <div className="flex-1 min-w-0">
                           <p className="text-xs font-bold text-gray-800 line-clamp-1 mb-1">
                             {category.sampleProduct.title}
