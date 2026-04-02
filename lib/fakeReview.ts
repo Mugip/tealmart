@@ -38,7 +38,7 @@ export async function isLikelyFakeReview(text: string): Promise<boolean> {
         { role: "user", content: `Review to analyze: "${cleanText}"` }
       ],
       max_tokens: 10,
-      temperature: 0.1, // Low temperature for strict, deterministic output
+      temperature: 0.1, 
       stream: false
     };
 
@@ -47,17 +47,25 @@ export async function isLikelyFakeReview(text: string): Promise<boolean> {
       headers: {
         "Authorization": `Bearer ${HUGGINGFACE_API_KEY}`,
         "Content-Type": "application/json",
-        "x-wait-for-model": "false" // Don't hang the user's browser if the model is sleeping
+        "x-wait-for-model": "false" 
       },
       body: JSON.stringify(payload),
     });
 
-    if (!response.ok) {
-      console.warn("⚠️ AI Review check failed or model loading, allowing review.");
-      return false; 
+    // ✅ FIXED: Check if the response is actually JSON before parsing
+    const contentType = response.headers.get("content-type");
+    if (!contentType || !contentType.includes("application/json")) {
+      console.warn(`⚠️ HF returned HTML instead of JSON for review check. Allowing review.`);
+      return false; // Fail open
     }
 
     const result = await response.json();
+
+    if (!response.ok) {
+      console.warn("⚠️ AI Review check failed, allowing review.");
+      return false; 
+    }
+
     const aiDecision = result.choices?.[0]?.message?.content?.trim().toUpperCase();
 
     // If the AI explicitly says SPAM, reject it.
@@ -72,4 +80,4 @@ export async function isLikelyFakeReview(text: string): Promise<boolean> {
     console.error("❌ AI Review Detection Error:", error);
     return false; // Fail open to avoid blocking real users during server errors
   }
-  }
+}
