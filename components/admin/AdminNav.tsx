@@ -95,7 +95,7 @@ export default function AdminNav({ session }: { session: AdminSession | null }) 
       >
         <Link href="/admin" className="flex items-center gap-2">
           <img src="/logo.svg" alt="TealMart" className="h-7 w-auto" />
-          <span className="font-black text-gray-900">Admin</span>
+          <span className="font-black text-gray-900">TealMart Admin</span>
         </Link>
         <button onClick={handleLogout} className="text-gray-500 hover:text-red-500 p-2 transition-colors">
           <LogOut size={20}/>
