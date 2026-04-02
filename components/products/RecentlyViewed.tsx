@@ -1,11 +1,11 @@
 // components/products/RecentlyViewed.tsx
-
 'use client'
 
 import { useEffect, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { Clock } from 'lucide-react'
+import { getSecureImageUrl } from '@/lib/imageUrl' // ✅ Imported
 
 const KEY = 'tealmart-recently-viewed'
 const MAX = 8
@@ -17,7 +17,6 @@ export interface RecentProduct {
   image: string
 }
 
-/** Call this on any product page to record the view */
 export function recordRecentlyViewed(product: RecentProduct) {
   try {
     const stored: RecentProduct[] = JSON.parse(localStorage.getItem(KEY) || '[]')
@@ -58,8 +57,9 @@ export default function RecentlyViewed({ excludeId }: Props) {
             className="group"
           >
             <div className="relative aspect-square bg-gray-100 rounded-xl overflow-hidden mb-2">
+              {/* ✅ Secured */}
               <Image
-                src={product.image}
+                src={getSecureImageUrl(product.image)}
                 alt={product.title}
                 fill
                 className="object-cover group-hover:scale-105 transition-transform duration-200"
