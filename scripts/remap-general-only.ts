@@ -14,7 +14,7 @@ async function remapGeneralCategories() {
     const products = await prisma.product.findMany({
       where: {
         category: {
-          in: ['General', 'general']
+          in: ['General', 'general', 'Uncategorized', '']
         }
       },
       select: {
@@ -36,25 +36,22 @@ async function remapGeneralCategories() {
     let updated = 0;
     let skipped = 0;
 
-    // 2. Process products one-by-one to respect AI rate limits
     for (let i = 0; i < products.length; i++) {
       const product = products[i]
       
-      // Progress indicator every 10 products
       if (i % 10 === 0 && i !== 0) {
         const health = getClassifierHealth();
         console.log(`⏳ Progress: ${i}/${total} | AI Health: ${health.status}`);
       }
 
-      // Use the AI Classifier
       const newCategory = await classifyProduct(
         product.title,
         product.description,
         product.category 
       )
 
-      // If the AI successfully found a better category
-      if (newCategory !== 'General' && newCategory !== 'general' && newCategory !== product.category) {
+      // ✅ FIXED: Removed the lowercase 'general' check to satisfy TypeScript
+      if (newCategory !== 'General' && newCategory !== product.category) {
         await prisma.product.update({
           where: { id: product.id },
           data: { category: newCategory },
@@ -62,15 +59,13 @@ async function remapGeneralCategories() {
         
         updated++
         console.log(`✨ [FIXED] ${product.title.substring(0, 45)}...`)
-        console.log(`   [General] → [${newCategory}]`)
+        console.log(`   [${product.category}] → [${newCategory}]`)
       } else {
         skipped++
       }
 
-      // 3. Prevent Rate Limiting
-      // Hugging Face free tier needs a small delay between requests
       if (process.env.HUGGINGFACE_API_KEY) {
-        await new Promise(r => setTimeout(r, 300)); // 300ms delay to be perfectly safe
+        await new Promise(r => setTimeout(r, 300));
       }
     }
 
