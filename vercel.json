@@ -9,6 +9,10 @@
     {
       "path": "/api/cron/update-featured",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/migrate-media",
+      "schedule": "*/10 * * * *"
     }
   ]
 }
