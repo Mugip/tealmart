@@ -27,10 +27,13 @@ interface CategoryRule {
 
 /**
  * 1. ADVANCED HEURISTIC ENGINE RULES
- * Combined from your original file and high-priority phrases.
+ * Now highly upgraded to catch generic clothing items natively.
  */
 const RULES: CategoryRule[] = [
-  // ── HIGH PRIORITY PHRASES (Weight: 80) ──
+  // ── HIGH PRIORITY EXACT MATCHES (Weight: 80) ──
+  { category: "Women's Clothing", weight: 80, pattern: /\b(womens?|ladies|dress|skirt|blouse|bra|lingerie|camisole|swimsuit|bikini|gown|sleepwear|lace|satin|romper|jumpsuit|womenswear)\b/gi },
+  { category: "Men's Clothing", weight: 80, pattern: /\b(mens?|male|suit|tuxedo|menswear)\b/gi },
+  
   { category: "Office & Stationery", weight: 80, pattern: /\b(gel pen|fountain pen|ballpoint|ink pen|sticky note|desk organizer|memo pad|pencil case|notebook planner)\b/gi },
   { category: "Health & Beauty", weight: 80, pattern: /\b(nail polish|gel nail|phototherapy pen|nail art|face cream|skin care|essential oil|hair dryer|hair clipper|makeup brush)\b/gi },
   { category: "Automotive", weight: 80, pattern: /\b(car bracket|car mount|car phone|car charger|steering wheel|dash cam|dashcam|car seat|tire pressure|car air freshener|car organizer|car decor)\b/gi },
@@ -38,12 +41,15 @@ const RULES: CategoryRule[] = [
   { category: "Tools & Hardware", weight: 80, pattern: /\b(screwdriver set|electric drill|hand tool kit|impact drill|torque|socket set)\b/gi },
   { category: "Home & Garden", weight: 80, pattern: /\b(bedding set|bed sheet|wall sticker|storage box|storage rack|kitchen cabinet|cake decorating)\b/gi },
   { category: "Consumer Electronics", weight: 80, pattern: /\b(mobile phone holder|laptop stand|smart ring|power bank|smart watch|usb cable|tablet holder|cleaning kit)\b/gi },
-  { category: "Women's Clothing", weight: 80, pattern: /\b(two-piece|two piece|evening dress|crop top|women's clothing|ladies blouse|cheongsam)\b/gi },
   { category: "Bags & Shoes", weight: 80, pattern: /\b(canvas shoes|running shoes|leather shoes|sports shoes|messenger bag|shoulder bag|tote bag|bucket bag|daddy shoes|pea shoes)\b/gi },
 
-  // ── STRONG EXACT MATCHES (Weight: 35) ──
+  // ── STRONG GENERIC MATCHES (Weight: 35) ──
   { category: "Bags & Shoes", weight: 35, pattern: /\b(shoes?|sneakers?|boots?|sandals?|slippers?|backpacks?|handbags?|purse|wallet|luggage)\b/gi },
   { category: "Jewelry & Watches", weight: 35, pattern: /\b(jewelry|jewellery|necklace|bracelet|earrings?|rings?|pendant|watches|wristwatch|silver|gold|diamond|gemstone)\b/gi },
+  
+  // ── GENERIC CLOTHING FALLBACKS (Weight: 20) ──
+  // If it's a generic jacket/tracksuit/pants without "women" in the title, default to Men's.
+  { category: "Men's Clothing", weight: 20, pattern: /\b(shirt|polo|blazer|hoodie|t-shirt|tshirt|trousers?|jeans|jacket|puffer|tracksuit|coat|shorts?|pants?|vest|sweatshirt|sweater)\b/gi },
 
   // ── STANDARD SINGLE WORDS (Weight: 20) ──
   { category: "Pet Supplies", weight: 20, pattern: /\b(pet|pets|dogs?|cats?|puppy|kitten|aquarium|bird cage|leash|harness|litter)\b/gi },
@@ -53,8 +59,6 @@ const RULES: CategoryRule[] = [
   { category: "Tools & Hardware", weight: 20, pattern: /\b(drill|wrench|screwdriver|soldering|multimeter|pliers|toolbox|hardware|caliper|saw|screws|nails)\b/gi },
   { category: "Health & Beauty", weight: 20, pattern: /\b(makeup|cosmetics?|skincare|serum|moisturizer|perfume|mascara|lipstick|nails?|shampoo|trimmer|shaver|acne|beauty|hair|teeth|massager)\b/gi },
   { category: "Sports & Outdoors", weight: 20, pattern: /\b(sports?|outdoors?|fitness|gym|yoga|dumbbell|cycling|bicycle|camping|hiking|fishing|treadmill|swim|tactical|running)\b/gi },
-  { category: "Women's Clothing", weight: 20, pattern: /\b(womens?|ladies|dress|skirt|blouse|bra|lingerie|camisole|leggings?|swimsuit|bikini|gown)\b/gi },
-  { category: "Men's Clothing", weight: 20, pattern: /\b(mens?|male|shirt|polo|suit|blazer|hoodie|t-shirt|tshirt|menswear|trousers?|jeans)\b/gi },
   { category: "Office & Stationery", weight: 20, pattern: /\b(office|stationery|notebooks?|pens?|pencils?|stapler|journal|diary|planners?|ink|paper|folder)\b/gi },
   { category: "Home & Garden", weight: 15, pattern: /\b(home|garden|furniture|sofa|bedding|pillows?|blankets?|rugs?|lamps?|decor|kitchen|utensils?|cookware|mugs?|curtains?|towels?|storage)\b/gi },
   { category: "Food & Grocery", weight: 20, pattern: /\b(food|grocery|snacks?|coffee|tea|chocolate|candy|spice|seasoning)\b/gi },
@@ -68,6 +72,12 @@ let hfConsecutiveFailures = 0;
 const MAX_CONSECUTIVE_FAILURES = 5;
 const MODEL_ID = "meta-llama/Llama-3.1-8B-Instruct";
 const API_URL = "https://api-inference.huggingface.co/v1/chat/completions";
+
+// ✅ NEW: Function to manually revive the AI if it crashed previously
+export function resetAIHealth() {
+  hfEnabled = true;
+  hfConsecutiveFailures = 0;
+}
 
 async function classifyWithLlama(
   title: string,
@@ -181,7 +191,6 @@ export async function classifyProduct(
   return "General";
 }
 
-// ✅ FIXED: Exporting getClassifierHealth for the script
 export function getClassifierHealth() {
   return {
     aiEnabled: hfEnabled,
@@ -212,4 +221,4 @@ export function getCategoryIcon(category: string): string {
   if (lower.includes("office") || lower.includes("stationery") || lower.includes("pen")) return "✒️";
   if (lower.includes("food") || lower.includes("grocery") || lower.includes("snack")) return "🛒";
   return "🛍️";
-}
+           }
