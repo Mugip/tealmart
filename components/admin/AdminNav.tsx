@@ -18,7 +18,7 @@ const ALL_NAV_ITEMS = [
   { href: '/admin/discounts', icon: Tag, label: 'Discounts', id: 'discounts' },
   { href: '/admin/subscribers', icon: Users, label: 'Subscribers', id: 'subscribers' },
   { href: '/admin/pricing', icon: DollarSign, label: 'Pricing Rules', id: 'pricing' },
-  { href: '/admin/disputes', icon: AlertCircle, label: 'Returns', id: 'orders' }
+  { href: '/admin/disputes', icon: AlertCircle, label: 'Returns', id: 'orders' },
   { href: '/admin/logs', icon: Activity, label: 'Ingest Logs', id: 'logs' },
   { href: '/admin/media', icon: ImageIcon, label: 'Media & CDN', id: 'settings' },
   { href: '/admin/analytics', icon: BarChart3, label: 'Analytics', id: 'analytics' },
