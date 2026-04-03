@@ -1,10 +1,12 @@
+// components/products/RecentlyViewed.tsx
 'use client'
 
 import { useEffect, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { Clock, ChevronRight, ArrowRight } from 'lucide-react'
+import { Clock, ChevronRight } from 'lucide-react'
 import { getSecureImageUrl } from '@/lib/imageUrl'
+import { useCurrency } from '@/lib/contexts/CurrencyContext' // ✅ Added Currency Context
 
 const KEY = 'tealmart-recently-viewed'
 const MAX = 12
@@ -32,6 +34,7 @@ interface Props {
 export default function RecentlyViewed({ excludeId }: Props) {
   const [products, setProducts] = useState<RecentProduct[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const { formatPrice } = useCurrency() // ✅ Get dynamic currency formatter
 
   useEffect(() => {
     try {
@@ -44,18 +47,18 @@ export default function RecentlyViewed({ excludeId }: Props) {
   if (!isLoading && !products.length) return null
 
   return (
-    <section className="relative py-12">
+    <section className="relative py-12 border-t border-gray-200 mt-12">
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-3">
-          <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-teal-500/20">
-            <Clock size={20} className="text-teal-400" />
+          <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-tiffany-50">
+            <Clock size={20} className="text-tiffany-600" />
           </div>
           <div>
-            <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+            <h2 className="text-2xl sm:text-3xl font-black text-gray-900 tracking-tight">
               Continue Shopping
             </h2>
-            <p className="text-sm text-gray-400 mt-0.5">Items you were viewing</p>
+            <p className="text-sm text-gray-500 mt-0.5 font-medium">Items you recently viewed</p>
           </div>
         </div>
       </div>
@@ -64,13 +67,10 @@ export default function RecentlyViewed({ excludeId }: Props) {
       {isLoading ? (
         <div className="flex gap-4 overflow-x-auto scrollbar-hide pb-2">
           {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div
-              key={i}
-              className="flex-shrink-0 w-[140px] sm:w-[160px] animate-pulse"
-            >
-              <div className="aspect-square rounded-2xl bg-gray-700 mb-3" />
-              <div className="h-3 bg-gray-700 rounded mb-2" />
-              <div className="h-2.5 bg-gray-700 rounded w-2/3" />
+            <div key={i} className="flex-shrink-0 w-[140px] sm:w-[160px] animate-pulse">
+              <div className="aspect-square rounded-2xl bg-gray-200 mb-3" />
+              <div className="h-3 bg-gray-200 rounded mb-2" />
+              <div className="h-2.5 bg-gray-200 rounded w-2/3" />
             </div>
           ))}
         </div>
@@ -78,24 +78,22 @@ export default function RecentlyViewed({ excludeId }: Props) {
         <>
           {/* Horizontal scroll container */}
           <div className="group relative">
-            {/* Fade gradients */}
-            <div className="absolute left-0 top-0 bottom-0 w-8 z-10 pointer-events-none bg-gradient-to-r from-slate-900 to-transparent" />
-            <div className="absolute right-0 top-0 bottom-0 w-8 z-10 pointer-events-none bg-gradient-to-l from-slate-900 to-transparent" />
-
+            
             {/* Scrollable items */}
-            <div className="overflow-x-auto scrollbar-hide snap-x snap-mandatory">
-              <div className="flex gap-3 sm:gap-4 pb-2 min-w-min">
-                {products.map((product, idx) => (
+            <div className="overflow-x-auto scrollbar-hide snap-x snap-mandatory pb-4">
+              <div className="flex gap-3 sm:gap-4 min-w-min">
+                {products.map((product) => (
                   <Link
                     key={product.id}
                     href={`/products/${product.id}`}
-                    className="snap-center flex-shrink-0 w-[140px] sm:w-[160px] group/item transition-all duration-300 hover:scale-105"
-                    style={{ animationDelay: `${idx * 20}ms` }}
+                    className="snap-center flex-shrink-0 w-[140px] sm:w-[160px] group/item transition-all duration-300"
                   >
                     {/* Card container */}
-                    <div className="relative h-full flex flex-col bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl overflow-hidden border border-gray-700 hover:border-teal-400/50 transition-all duration-300">
+                    <div className="relative h-full flex flex-col bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 hover:border-tiffany-300 hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
+                      
                       {/* Image container */}
-                      <div className="relative aspect-square overflow-hidden bg-gray-950 flex-shrink-0">
+                      <div className="relative aspect-square overflow-hidden bg-gray-50 flex-shrink-0">
+                        {/* ✅ Passes cleanly through our idempotent secure image URL */}
                         <Image
                           src={getSecureImageUrl(product.image)}
                           alt={product.title}
@@ -103,31 +101,20 @@ export default function RecentlyViewed({ excludeId }: Props) {
                           className="object-cover group-hover/item:scale-110 transition-transform duration-500"
                           sizes="(max-width: 768px) 140px, 160px"
                         />
-
-                        {/* Overlay on hover */}
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover/item:opacity-100 transition-opacity duration-300 flex items-end justify-center pb-2">
-                          <button className="px-3 py-1.5 bg-teal-500 hover:bg-teal-400 text-black font-bold text-xs rounded-lg transition-colors duration-200 flex items-center gap-1">
-                            <span>View</span>
-                            <ArrowRight size={12} />
-                          </button>
-                        </div>
                       </div>
 
                       {/* Content section */}
-                      <div className="flex-1 p-3 flex flex-col justify-between">
-                        <p className="text-xs sm:text-sm font-bold text-white line-clamp-2 group-hover/item:text-teal-300 transition-colors duration-200 leading-tight">
+                      <div className="flex-1 p-3 sm:p-4 flex flex-col justify-between">
+                        <p className="text-xs sm:text-sm font-bold text-gray-900 line-clamp-2 group-hover/item:text-tiffany-600 transition-colors duration-200 leading-snug">
                           {product.title}
                         </p>
 
-                        <div className="mt-auto pt-2 border-t border-gray-700">
-                          <p className="text-sm sm:text-base font-black text-teal-400">
-                            ${product.price.toFixed(2)}
+                        <div className="mt-3 pt-2 border-t border-gray-100">
+                          <p className="text-sm sm:text-base font-black text-gray-900">
+                            {formatPrice(product.price)} {/* ✅ Properly formatted currency */}
                           </p>
                         </div>
                       </div>
-
-                      {/* Hover glow effect */}
-                      <div className="absolute inset-0 bg-gradient-to-r from-teal-500/0 via-teal-500/0 to-teal-500/0 group-hover/item:from-teal-500/10 group-hover/item:via-teal-500/5 group-hover/item:to-teal-500/10 transition-all duration-300 pointer-events-none" />
                     </div>
                   </Link>
                 ))}
@@ -137,27 +124,22 @@ export default function RecentlyViewed({ excludeId }: Props) {
                   href="/products"
                   className="snap-center flex-shrink-0 w-[140px] sm:w-[160px] group/cta"
                 >
-                  <div className="h-full flex items-center justify-center rounded-2xl border-2 border-dashed border-gray-600 group-hover/cta:border-teal-400 transition-all duration-300 bg-gray-950/50 group-hover/cta:bg-teal-500/5">
-                    <div className="flex flex-col items-center gap-2 text-center">
-                      <ChevronRight size={20} className="text-gray-500 group-hover/cta:text-teal-400 transition-colors" />
-                      <span className="text-xs font-bold text-gray-400 group-hover/cta:text-teal-300 transition-colors">
-                        View More
+                  <div className="h-full min-h-[220px] flex items-center justify-center rounded-2xl border-2 border-dashed border-gray-300 hover:border-tiffany-400 hover:bg-tiffany-50 transition-all duration-300">
+                    <div className="flex flex-col items-center gap-2 text-center p-4">
+                      <div className="w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center group-hover/cta:scale-110 transition-transform">
+                        <ChevronRight size={20} className="text-tiffany-600" />
+                      </div>
+                      <span className="text-sm font-bold text-gray-600 group-hover/cta:text-tiffany-700 transition-colors">
+                        View All
                       </span>
                     </div>
                   </div>
                 </Link>
               </div>
             </div>
-
-            {/* Mobile hint */}
-            <div className="sm:hidden mt-4 flex items-center justify-center gap-1 text-xs text-gray-500">
-              <div className="w-1 h-1 rounded-full bg-current animate-pulse" />
-              <span>Swipe to explore</span>
-              <div className="w-1 h-1 rounded-full bg-current animate-pulse" style={{ animationDelay: '0.3s' }} />
-            </div>
           </div>
         </>
       )}
     </section>
   )
-}
+          }
