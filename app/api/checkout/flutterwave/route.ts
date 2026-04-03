@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { items, email, shippingAddress, discountAmount, discountCode } = body
+    const { items, email, shippingAddress, discountAmount, discountCode, shippingCost, taxAmount } = body
 
     // =============================
     // VALIDATION
@@ -116,12 +116,13 @@ export async function POST(req: NextRequest) {
     // TOTAL CALCULATION
     // =============================
 
-    const shipping = subtotal >= 50 ? 0 : 9.99
+    const shipping = typeof shippingCost === 'number' ? shippingCost : 9.99;
+    const tax = typeof taxAmount === 'number' ? taxAmount : 0;
     
     let finalDiscountAmount = discountAmount || 0
     if (finalDiscountAmount > subtotal) finalDiscountAmount = subtotal
     
-    const total = subtotal + shipping - finalDiscountAmount
+    const total = subtotal + shipping + tax - finalDiscountAmount
 
     if (total <= 0) {
       return NextResponse.json({ error: "Order total must be greater than 0" }, { status: 400 })
