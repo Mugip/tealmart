@@ -1,170 +1,13 @@
 // app/api/webhooks/stripe/route.ts
 import { NextRequest, NextResponse } from "next/server"
-import { PrismaClient } from "@prisma/client"
+import { prisma } from "@/lib/db"
 import Stripe from "stripe"
-import { getCJToken } from "@/lib/cjToken"
-import countries from "i18n-iso-countries"
 import { sendOrderConfirmationEmail } from '@/lib/email'
+import { pushOrderToCJ } from '@/lib/cj/orders' // ✅ Our new, clean helper
 
-countries.registerLocale(require("i18n-iso-countries/langs/en.json"))
-
-const prisma = new PrismaClient()
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2026-02-25.clover",
 })
-
-const CJ_API_URL = "https://developers.cjdropshipping.com/api2.0/v1"
-
-function getCountryCode(countryName: string): string {
-  if (countryName.length === 2) {
-    return countryName.toUpperCase()
-  }
-  
-  const code = countries.getAlpha2Code(countryName, "en")
-  
-  if (code) {
-    console.log(`✅ Mapped ${countryName} → ${code}`)
-    return code
-  }
-  
-  const variations: Record<string, string> = {
-    "USA": "US",
-    "United States of America": "US",
-    "U.S.A.": "US",
-    "U.S.": "US",
-    "UK": "GB",
-    "United Kingdom of Great Britain and Northern Ireland": "GB",
-    "England": "GB",
-    "Scotland": "GB",
-    "Wales": "GB",
-    "Northern Ireland": "GB",
-  }
-  
-  const variationCode = variations[countryName]
-  if (variationCode) {
-    console.log(`✅ Mapped variation ${countryName} → ${variationCode}`)
-    return variationCode
-  }
-  
-  console.warn(`⚠️ Country code not found for: "${countryName}", defaulting to US`)
-  return "US"
-}
-
-async function forwardOrderToCJ(order: any) {
-  try {
-    const token = await getCJToken()
-
-    const products = order.items.map((item: any) => {
-      const product = item.product
-      let vid = product.externalId
-      let vidSource = "product PID"
-      
-      console.log(`🔍 Processing product:`, {
-        productId: product.id,
-        externalId: product.externalId,
-        title: product.title,
-        hasVariants: !!product.variants,
-      })
-      
-      if (product.variants && typeof product.variants === 'object') {
-        const variantsData = product.variants as any
-        
-        console.log(`📦 Variants data:`, variantsData)
-        
-        if (variantsData.items && Array.isArray(variantsData.items) && variantsData.items.length > 0) {
-          const firstVariant = variantsData.items[0]
-          vid = firstVariant.id
-          vidSource = "variant VID (UUID)"
-          console.log(`✅ Using variant VID (UUID): ${vid} instead of product PID ${product.externalId}`)
-          console.log(`ℹ️ Variant SKU was: ${firstVariant.sku} (NOT used for CJ API)`)
-        } else {
-          console.log(`⚠️ Product has variants object but no items array`)
-        }
-      } else {
-        console.log(`ℹ️ Product has no variants, using product externalId as VID`)
-      }
-      
-      if (!vid) {
-        throw new Error(`Product ${product.id} (${product.title}) has no valid VID`)
-      }
-      
-      return {
-        vid: String(vid),
-        quantity: parseInt(item.quantity),
-      }
-    })
-
-    const countryCode = getCountryCode(order.shippingCountry)
-
-    const payload = {
-      orderNumber: order.orderNumber,
-      shippingZip: order.shippingZip,
-      shippingCountry: order.shippingCountry,
-      shippingCountryCode: countryCode,
-      shippingProvince: order.shippingState,
-      shippingCity: order.shippingCity,
-      shippingPhone: order.shippingPhone || "0000000000",
-      shippingCustomerName: order.shippingName,
-      shippingAddress: order.shippingAddress,
-      remark: `TealMart Order ${order.orderNumber}`,
-      logisticName: "YunExpress",
-      fromCountryCode: "CN",
-      products: products,
-    }
-
-    console.log(`📤 Forwarding to CJ:`, JSON.stringify(payload, null, 2))
-
-    const response = await fetch(`${CJ_API_URL}/shopping/order/createOrderV2`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "CJ-Access-Token": token,
-      },
-      body: JSON.stringify(payload),
-    })
-
-    const data = await response.json()
-    console.log(`📥 CJ Response:`, JSON.stringify(data, null, 2))
-
-    if (data.code === 200 || data.result === true) {
-      console.log(`✅ CJ Order created successfully`)
-
-      // Save CJ order ID (NEW ADDITION)
-      await prisma.order.update({
-        where: { id: order.id },
-        data: {
-          cjOrderId: String(data.data?.orderId || data.data?.cjOrderId),
-        },
-      })
-      
-      
-      await prisma.order.update({
-        where: { id: order.id },
-        data: { status: "PROCESSING" },
-      })
-
-      return { success: true, cjOrderNumber: data.data?.orderNum }
-    } else {
-      console.error(`❌ CJ API error:`, data)
-      
-      await prisma.order.update({
-        where: { id: order.id },
-        data: { status: "PENDING" },
-      })
-
-      return { success: false, error: data.message }
-    }
-  } catch (error: any) {
-    console.error(`❌ Error forwarding to CJ:`, error)
-    
-    await prisma.order.update({
-      where: { id: order.id },
-      data: { status: "PENDING" },
-    })
-
-    return { success: false, error: error.message }
-  }
-}
 
 export async function POST(req: NextRequest) {
   try {
@@ -187,16 +30,13 @@ export async function POST(req: NextRequest) {
 
     if (event.type === "checkout.session.completed") {
       const session = event.data.object as Stripe.Checkout.Session
-
-      console.log(`✅ Payment successful: ${session.id}`)
+      console.log(`✅ Stripe Payment successful: ${session.id}`)
 
       const order = await prisma.order.findFirst({
         where: { paymentId: session.id },
         include: {
           items: {
-            include: {
-              product: true,
-            },
+            include: { product: true },
           },
         },
       })
@@ -206,6 +46,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Order not found" }, { status: 404 })
       }
 
+      // 1. Mark Order as Paid
       await prisma.order.update({
         where: { id: order.id },
         data: { 
@@ -214,18 +55,18 @@ export async function POST(req: NextRequest) {
         },
       })
 
-      console.log(`📦 Processing order ${order.orderNumber} with ${order.items.length} items`)
-
-      // Forward to CJ
-      const result = await forwardOrderToCJ(order)
-
-      if (result.success) {
-        console.log(`✅ Order ${order.orderNumber} forwarded to CJ: ${result.cjOrderNumber}`)
-      } else {
-        console.error(`❌ Failed to forward order ${order.orderNumber}: ${result.error}`)
+      // 2. Automatically Push to CJ Dropshipping
+      try {
+        console.log(`📦 Pushing order ${order.orderNumber} to CJ Dropshipping...`)
+        const cjOrder = await pushOrderToCJ(order.id)
+        console.log(`✅ Order ${order.orderNumber} successfully forwarded to CJ! (CJ ID: ${cjOrder.cjOrderNumber})`)
+      } catch (err: any) {
+        console.error(`❌ Failed to forward order ${order.orderNumber} to CJ:`, err.message)
+        // Note: We don't throw an error here. If CJ fails, we still want to send the customer 
+        // their receipt. You can manually retry failed CJ orders in your Admin Panel later.
       }
 
-      // MOVED HERE: Send order confirmation email
+      // 3. Send Order Confirmation Email to Customer
       try {
         await sendOrderConfirmationEmail({
           to: order.email,
@@ -251,16 +92,15 @@ export async function POST(req: NextRequest) {
             country: order.shippingCountry,
           },
         })
-        console.log(`✅ Order confirmation email sent to ${order.email}`)
+        console.log(`📧 Order confirmation email sent to ${order.email}`)
       } catch (emailError: any) {
-        console.error(`❌ Failed to send email:`, emailError)
-        // Don't fail the whole webhook if email fails
+        console.error(`❌ Failed to send confirmation email:`, emailError.message)
       }
     }
 
     return NextResponse.json({ received: true })
   } catch (error: any) {
-    console.error("❌ Webhook error:", error)
+    console.error("❌ Stripe Webhook error:", error)
     return NextResponse.json({ error: error.message }, { status: 500 })
   } finally {
     await prisma.$disconnect()
