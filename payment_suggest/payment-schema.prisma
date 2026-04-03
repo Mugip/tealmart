@@ -1,0 +1,147 @@
+// prisma/payment.schema.prisma
+/**
+ * Payment System Schema
+ * Add these models to your existing schema.prisma file
+ */
+
+// Payment Transaction Record
+model PaymentTransaction {
+  id                String   @id @default(cuid())
+  orderId           String
+  order             Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  
+  // Payment Details
+  amount            Float    // Amount in original currency
+  currency          String   @default("USD") // USD, UGX, EUR, etc.
+  convertedAmount   Float?   // Amount in store's base currency if converted
+  
+  // Provider Information
+  provider          String   // stripe, paypal, flutterwave, pesapal
+  transactionId     String   @unique
+  status            String   @default("pending") // pending, completed, failed, refunded
+  
+  // Customer Information
+  customerEmail     String
+  customerName      String
+  customerPhone     String?
+  region            String   // global, uganda, east_africa
+  
+  // Payment Method
+  paymentMethod     String   // stripe_card, paypal, mtn_money, airtel_money, etc.
+  last4Digits       String?  // Last 4 digits of card/account (for security)
+  
+  // Timestamps
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  completedAt       DateTime?
+  
+  // Error Handling
+  errorMessage      String?
+  errorCode         String?
+  
+  // Metadata
+  metadata          Json?    // Additional data from provider
+  webhookVerified   Boolean  @default(false)
+  
+  // Relations
+  refunds           Refund[]
+  
+  @@index([orderId])
+  @@index([transactionId])
+  @@index([status])
+  @@index([provider])
+  @@index([createdAt])
+}
+
+// Payment Refund
+model Refund {
+  id                String   @id @default(cuid())
+  transactionId     String
+  transaction       PaymentTransaction @relation(fields: [transactionId], references: [transactionId])
+  
+  amount            Float
+  currency          String
+  reason            String   // customer_request, duplicate, fraud, other
+  status            String   @default("pending") // pending, completed, failed
+  
+  providerRefundId  String?  @unique
+  
+  createdAt         DateTime @default(now())
+  processedAt       DateTime?
+  
+  @@index([transactionId])
+  @@index([status])
+}
+
+// Exchange Rate History (for reporting & auditing)
+model ExchangeRate {
+  id                String   @id @default(cuid())
+  fromCurrency      String
+  toCurrency        String
+  rate              Float
+  timestamp         DateTime @default(now())
+  
+  @@unique([fromCurrency, toCurrency, timestamp])
+  @@index([timestamp])
+}
+
+// Payment Settlement (for accounting)
+model PaymentSettlement {
+  id                String   @id @default(cuid())
+  provider          String
+  period            String   // YYYY-MM
+  
+  totalAmount       Float
+  currency          String
+  totalFees         Float
+  netAmount         Float
+  
+  transactionCount  Int
+  status            String   @default("pending") // pending, settled
+  
+  createdAt         DateTime @default(now())
+  settledAt         DateTime?
+  
+  @@unique([provider, period])
+}
+
+// Update Order model to link to PaymentTransaction
+model Order {
+  id                String   @id @default(cuid())
+  
+  // ... existing fields ...
+  
+  // Payment Information
+  paymentStatus     String   @default("pending") // pending, completed, failed
+  paymentTransaction PaymentTransaction?
+  totalAmount       Float
+  currency          String   @default("USD")
+  
+  // ... rest of existing fields ...
+}
+
+/**
+ * SQL Indexes for Performance
+ * Add these if using raw SQL
+ */
+
+/*
+-- Payment Transaction Indexes
+CREATE INDEX idx_payment_transactions_order_id ON payment_transactions(order_id);
+CREATE INDEX idx_payment_transactions_status ON payment_transactions(status);
+CREATE INDEX idx_payment_transactions_provider ON payment_transactions(provider);
+CREATE INDEX idx_payment_transactions_created_at ON payment_transactions(created_at);
+CREATE INDEX idx_payment_transactions_customer_email ON payment_transactions(customer_email);
+
+-- Refund Indexes
+CREATE INDEX idx_refunds_transaction_id ON refunds(transaction_id);
+CREATE INDEX idx_refunds_status ON refunds(status);
+
+-- Exchange Rate Indexes
+CREATE INDEX idx_exchange_rates_currencies ON exchange_rates(from_currency, to_currency);
+CREATE INDEX idx_exchange_rates_timestamp ON exchange_rates(timestamp DESC);
+
+-- Settlement Indexes
+CREATE INDEX idx_payment_settlements_provider ON payment_settlements(provider);
+CREATE INDEX idx_payment_settlements_period ON payment_settlements(period);
+*/
