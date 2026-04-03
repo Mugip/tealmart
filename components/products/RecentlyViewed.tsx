@@ -121,7 +121,7 @@ export default function RecentlyViewed({ excludeId }: Props) {
 
                 {/* Browse all CTA */}
                 <Link
-                  href="/products"
+                  href="/recently-viewed"
                   className="snap-center flex-shrink-0 w-[140px] sm:w-[160px] group/cta"
                 >
                   <div className="h-full min-h-[220px] flex items-center justify-center rounded-2xl border-2 border-dashed border-gray-300 hover:border-tiffany-400 hover:bg-tiffany-50 transition-all duration-300">
