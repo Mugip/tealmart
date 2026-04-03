@@ -1,3 +1,4 @@
+// app/checkout/page.tsx
 'use client'
 
 import { useState, useMemo, useEffect } from 'react'
@@ -9,88 +10,68 @@ import { Truck, CreditCard, AlertCircle, MapPin, Tag, CheckCircle, ChevronDown, 
 import { Country, State } from 'country-state-city'
 import type { ICountry, IState } from 'country-state-city'
 import toast from 'react-hot-toast'
+import ShippingOptions, { ShippingOption } from '@/components/checkout/ShippingOptions'
+import PaymentSummary from '@/components/checkout/PaymentSummary'
 
 interface SavedAddress {
-  id: string
-  name: string
-  address: string
-  city: string
-  state: string
-  zip: string
-  country: string
-  phone?: string
-  isDefault: boolean
+  id: string; name: string; address: string; city: string; state: string; zip: string; country: string; phone?: string; isDefault: boolean
 }
 
-interface DiscountResult {
-  valid: boolean
-  code: string
-  type: string
-  value: number
-  discountAmount: number
-  message: string
+// Custom hook to debounce rapid ZIP code typing
+function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value)
+  useEffect(() => {
+    const handler = setTimeout(() => setDebouncedValue(value), delay)
+    return () => clearTimeout(handler)
+  }, [value, delay])
+  return debouncedValue
 }
 
 export default function CheckoutPage() {
-  const { items, total } = useCart()
+  const { items, total: subtotal } = useCart()
   const { data: session } = useSession()
   const router = useRouter()
 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-
-  // Payment Method State - Defaulted to flutterwave for African markets
   const [paymentMethod, setPaymentMethod] = useState<'stripe' | 'flutterwave'>('flutterwave')
 
+  // Form State
   const [formData, setFormData] = useState({
-    email: '',
-    name: '',
-    address: '',
-    city: '',
-    state: '',
-    zip: '',
-    country: 'UG', // Default to Uganda based on your location
-    phone: '',
+    email: '', name: '', address: '', city: '', state: '', zip: '', country: 'UG', phone: '',
   })
 
+  // Address Lookups
   const [selectedCountry, setSelectedCountry] = useState<ICountry | null>(null)
   const [states, setStates] = useState<IState[]>([])
-
-  const[savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([])
+  const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([])
   const [showSavedAddresses, setShowSavedAddresses] = useState(false)
   const [saveAddress, setSaveAddress] = useState(false)
 
-  const[discountCode, setDiscountCode] = useState('')
+  // Discounts
+  const [discountCode, setDiscountCode] = useState('')
   const [discountLoading, setDiscountLoading] = useState(false)
-  const [discount, setDiscount] = useState<DiscountResult | null>(null)
+  const [discount, setDiscount] = useState<any>(null)
 
-  const countries = useMemo(
-    () => Country.getAllCountries().sort((a, b) => a.name.localeCompare(b.name)),[]
-  )
+  // ✅ NEW: Dynamic Shipping & Tax States
+  const [shippingOptions, setShippingOptions] = useState<ShippingOption[]>([])
+  const [selectedShipping, setSelectedShipping] = useState<ShippingOption | null>(null)
+  const [isFetchingShipping, setIsFetchingShipping] = useState(false)
+  const [taxAmount, setTaxAmount] = useState(0)
+  const [isFetchingTax, setIsFetchingTax] = useState(false)
 
-  // Pre-fill email from session
+  const countries = useMemo(() => Country.getAllCountries().sort((a, b) => a.name.localeCompare(b.name)), [])
+  
+  // Debounce the ZIP code so we don't spam the CJ API on every keystroke
+  const debouncedZip = useDebounce(formData.zip, 800)
+
+  // Init user data & default country
   useEffect(() => {
-    if (session?.user?.email) {
-      setFormData(prev => ({ ...prev, email: prev.email || session.user!.email! }))
-    }
+    if (session?.user?.email) setFormData(prev => ({ ...prev, email: prev.email || session.user!.email! }))
+    const def = Country.getCountryByCode('UG') || Country.getCountryByCode('US')
+    if (def) { setSelectedCountry(def); setStates(State.getStatesOfCountry(def.isoCode)) }
   }, [session])
 
-  // Load saved addresses
-  useEffect(() => {
-    if (!session?.user?.id) return
-    fetch('/api/addresses')
-      .then(r => r.json())
-      .then(data => {
-        if (Array.isArray(data) && data.length > 0) {
-          setSavedAddresses(data)
-          const def = data.find((a: SavedAddress) => a.isDefault) || data[0]
-          if (def) applyAddress(def)
-        }
-      })
-      .catch(() => {})
-  }, [session?.user?.id])
-
-  // Update states when country changes
   useEffect(() => {
     if (formData.country) {
       const country = Country.getCountryByCode(formData.country)
@@ -105,35 +86,68 @@ export default function CheckoutPage() {
     }
   }, [formData.country])
 
-  // Init default country
+  // ✅ NEW: Fetch Live CJ Shipping Rates
   useEffect(() => {
-    const def = Country.getCountryByCode('UG') || Country.getCountryByCode('US')
-    if (def) {
-      setSelectedCountry(def)
-      setStates(State.getStatesOfCountry(def.isoCode))
+    const fetchShipping = async () => {
+      if (!formData.country || items.length === 0) return
+      
+      setIsFetchingShipping(true)
+      try {
+        const res = await fetch('/api/checkout/shipping-options', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ items, country: formData.country, zip: debouncedZip })
+        })
+        const data = await res.json()
+        if (data.shippingOptions) {
+          setShippingOptions(data.shippingOptions)
+          // Auto-select the cheapest one
+          if (data.shippingOptions.length > 0) {
+            setSelectedShipping(data.shippingOptions[0])
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch shipping rates")
+      } finally {
+        setIsFetchingShipping(false)
+      }
     }
-  },[])
 
-  function applyAddress(addr: SavedAddress) {
-    setFormData(prev => ({
-      ...prev,
-      name: addr.name,
-      address: addr.address,
-      city: addr.city,
-      state: addr.state,
-      zip: addr.zip,
-      country: addr.country,
-      phone: addr.phone || prev.phone,
-    }))
-    setShowSavedAddresses(false)
-  }
+    if (debouncedZip || formData.country) {
+      fetchShipping()
+    }
+  }, [formData.country, debouncedZip, items])
+
+  // ✅ NEW: Fetch Live Taxes
+  useEffect(() => {
+    const fetchTaxes = async () => {
+      if (!formData.country) return
+      setIsFetchingTax(true)
+      try {
+        const res = await fetch('/api/checkout/calculate-tax', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            subtotal, 
+            shipping: selectedShipping?.price || 0, 
+            country: formData.country, 
+            state: formData.state 
+          })
+        })
+        const data = await res.json()
+        if (data.taxAmount !== undefined) setTaxAmount(data.taxAmount)
+      } catch (err) {
+        console.error("Failed to fetch taxes")
+      } finally {
+        setIsFetchingTax(false)
+      }
+    }
+
+    fetchTaxes()
+  }, [formData.country, formData.state, selectedShipping?.price, subtotal])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }))
-  }
-
-  const handleCountryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setFormData(prev => ({ ...prev, country: e.target.value, state: '' }))
   }
 
   const handleApplyDiscount = async () => {
@@ -143,21 +157,13 @@ export default function CheckoutPage() {
       const res = await fetch('/api/checkout/validate-discount', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: discountCode.trim(), subtotal: total }),
+        body: JSON.stringify({ code: discountCode.trim(), subtotal }),
       })
       const data = await res.json()
-      if (!res.ok) {
-        toast.error(data.error || 'Invalid code')
-        setDiscount(null)
-      } else {
-        setDiscount(data)
-        toast.success(data.message)
-      }
-    } catch {
-      toast.error('Failed to apply discount')
-    } finally {
-      setDiscountLoading(false)
-    }
+      if (!res.ok) { toast.error(data.error || 'Invalid code'); setDiscount(null) } 
+      else { setDiscount(data); toast.success(data.message) }
+    } catch { toast.error('Failed to apply discount') } 
+    finally { setDiscountLoading(false) }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -165,100 +171,57 @@ export default function CheckoutPage() {
     setError(null)
     setLoading(true)
 
-    if (
-      !formData.email || !formData.name || !formData.address ||
-      !formData.city || !formData.zip || !formData.phone || !formData.country
-    ) {
-      setError('Please fill in all required fields')
-      setLoading(false)
-      return
+    // Validation
+    if (!formData.email || !formData.name || !formData.address || !formData.city || !formData.zip || !formData.phone || !formData.country) {
+      setError('Please fill in all required fields'); setLoading(false); return
     }
-
     if (states.length > 0 && !formData.state) {
-      setError('Please select a state/province')
-      setLoading(false)
-      return
+      setError('Please select a state/province'); setLoading(false); return
     }
-
-    if (items.length === 0) {
-      setError('Your cart is empty')
-      setLoading(false)
-      return
-    }
-
-    if (saveAddress && session?.user?.id) {
-      fetch('/api/addresses', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...formData, isDefault: savedAddresses.length === 0 }),
-      }).catch(() => {})
+    if (!selectedShipping) {
+      setError('Please select a shipping method'); setLoading(false); return
     }
 
     try {
       const country = Country.getCountryByCode(formData.country)
-      const state = formData.state
-        ? State.getStateByCodeAndCountry(formData.state, formData.country)
-        : null
+      const state = formData.state ? State.getStateByCodeAndCountry(formData.state, formData.country) : null
 
-      // Route to the correct payment API
       const endpoint = paymentMethod === 'stripe' ? '/api/checkout' : '/api/checkout/flutterwave'
 
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          items: items.map(item => ({
-            id: item.id,
-            title: item.title,
-            price: item.price,
-            quantity: item.quantity,
-          })),
+          items,
           email: formData.email,
           shippingAddress: {
-            name: formData.name,
-            address1: formData.address,
-            city: formData.city,
-            state: state?.name || formData.state || '',
-            zip: formData.zip,
-            postalCode: formData.zip,
-            country: country?.name || formData.country,
-            countryCode: formData.country,
-            phone: formData.phone,
+            name: formData.name, address1: formData.address, city: formData.city,
+            state: state?.name || formData.state || '', zip: formData.zip,
+            country: country?.name || formData.country, phone: formData.phone,
           },
           discountCode: discount?.code || null,
           discountAmount: discount?.discountAmount || 0,
-          freeShipping: discount?.type === 'FREE_SHIPPING',
+          // ✅ Passing Dynamic Fees to Backend
+          shippingCost: selectedShipping.price,
+          shippingMethodId: selectedShipping.id,
+          taxAmount: taxAmount
         }),
       })
 
       const data = await response.json()
       if (!response.ok) throw new Error(data.error || 'Checkout failed')
-
-      if (data.url) {
-        window.location.href = data.url
-      } else {
-        throw new Error('No checkout URL received')
-      }
+      if (data.url) window.location.href = data.url
+      else throw new Error('No checkout URL received')
     } catch (err: any) {
       setError(err.message || 'Something went wrong. Please try again.')
       setLoading(false)
     }
   }
 
-  const getFieldLabels = () => ({
-    state:
-      formData.country === 'US' ? 'State' :
-      formData.country === 'CA' ? 'Province' :
-      formData.country === 'GB' ? 'County' :
-      'State / Region',
-    zip:
-      formData.country === 'US' ? 'ZIP Code' :
-      formData.country === 'GB' ? 'Postcode' :
-      formData.country === 'CA' ? 'Postal Code' :
-      'ZIP / Postal Code',
-  })
-
-  const labels = getFieldLabels()
+  // Cost Calculations
+  const shippingCost = discount?.type === 'FREE_SHIPPING' ? 0 : (selectedShipping?.price || 0)
+  const discountAmount = discount?.discountAmount || 0
+  const finalTotal = subtotal + shippingCost + taxAmount - discountAmount
 
   if (items.length === 0) {
     return (
@@ -266,331 +229,114 @@ export default function CheckoutPage() {
         <div className="text-center max-w-md">
           <div className="text-6xl mb-4">🛒</div>
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Your cart is empty</h1>
-          <p className="text-gray-600 mb-6">Add some products before checking out</p>
-          <button onClick={() => router.push('/products')} className="btn-primary px-8 py-3">
-            Browse Products
-          </button>
+          <button onClick={() => router.push('/products')} className="btn-primary mt-4 px-8 py-3">Browse Products</button>
         </div>
       </div>
     )
   }
 
-  const subtotal = total
-  const freeShipping = discount?.type === 'FREE_SHIPPING'
-  const shipping = freeShipping || subtotal >= 50 ? 0 : 9.99
-  const tax = 0 // Using API calculation for production
-  const discountAmount = discount?.discountAmount || 0
-  const finalTotal = subtotal + shipping + tax - discountAmount
-
-  const inputCls =
-    'w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-tiffany-500 focus:border-tiffany-500 outline-none transition-all text-sm'
-  const labelCls = 'block text-sm font-semibold text-gray-700 mb-1.5'
+  const inputCls = "w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-tiffany-500 focus:border-tiffany-500 outline-none transition-all text-sm bg-gray-50/50"
+  const labelCls = "block text-sm font-bold text-gray-700 mb-1.5"
 
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4">
       <div className="max-w-6xl mx-auto">
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">Checkout</h1>
+        <h1 className="text-3xl font-black text-gray-900 mb-8 tracking-tight">Checkout</h1>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-
           {/* ── Left: Form ── */}
-          <div className="lg:col-span-2 space-y-5">
-            <form onSubmit={handleSubmit} className="space-y-5">
+          <div className="lg:col-span-2 space-y-6">
+            <form onSubmit={handleSubmit} className="space-y-6">
 
               {error && (
                 <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3">
-                  <AlertCircle className="text-red-500 flex-shrink-0 mt-0.5" size={20} />
-                  <p className="text-red-800 text-sm">{error}</p>
+                  <AlertCircle className="text-red-600 flex-shrink-0 mt-0.5" size={20} />
+                  <p className="text-red-800 text-sm font-medium">{error}</p>
                 </div>
               )}
 
-              {/* Saved addresses */}
-              {savedAddresses.length > 0 && (
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5">
-                  <button
-                    type="button"
-                    onClick={() => setShowSavedAddresses(!showSavedAddresses)}
-                    className="flex items-center justify-between w-full"
-                  >
-                    <span className="font-bold text-gray-900 flex items-center gap-2">
-                      <MapPin size={18} className="text-tiffany-600" />
-                      Saved Addresses ({savedAddresses.length})
-                    </span>
-                    <ChevronDown
-                      size={16}
-                      className={`text-gray-400 transition-transform ${showSavedAddresses ? 'rotate-180' : ''}`}
-                    />
-                  </button>
-
-                  {showSavedAddresses && (
-                    <div className="mt-4 space-y-3">
-                      {savedAddresses.map(addr => (
-                        <button
-                          key={addr.id}
-                          type="button"
-                          onClick={() => applyAddress(addr)}
-                          className="w-full text-left p-3 border border-gray-200 rounded-xl hover:border-tiffany-400 hover:bg-tiffany-50 transition-all text-sm"
-                        >
-                          <div className="font-semibold text-gray-900">
-                            {addr.name}
-                            {addr.isDefault && (
-                              <span className="text-xs bg-tiffany-100 text-tiffany-700 px-1.5 py-0.5 rounded ml-2">
-                                Default
-                              </span>
-                            )}
-                          </div>
-                          <div className="text-gray-500">
-                            {addr.address}, {addr.city}, {addr.state} {addr.zip}, {addr.country}
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Shipping form */}
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 space-y-4">
-                <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                  <Truck size={20} className="text-tiffany-600" />
-                  Shipping Information
+              {/* Shipping Address */}
+              <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-6 sm:p-8 space-y-5">
+                <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2 mb-2">
+                  <MapPin size={22} className="text-tiffany-600" /> Shipping Address
                 </h2>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <div className="sm:col-span-2">
-                    <label className={labelCls}>
-                      Email <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="email"
-                      name="email"
-                      value={formData.email}
-                      onChange={handleChange}
-                      required
-                      className={inputCls}
-                      placeholder="you@example.com"
-                    />
+                    <label className={labelCls}>Email <span className="text-red-500">*</span></label>
+                    <input type="email" name="email" value={formData.email} onChange={handleChange} required className={inputCls} placeholder="you@example.com" />
                   </div>
-
                   <div>
-                    <label className={labelCls}>
-                      Full Name <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      name="name"
-                      value={formData.name}
-                      onChange={handleChange}
-                      required
-                      className={inputCls}
-                      placeholder="John Doe"
-                    />
+                    <label className={labelCls}>Full Name <span className="text-red-500">*</span></label>
+                    <input type="text" name="name" value={formData.name} onChange={handleChange} required className={inputCls} placeholder="John Doe" />
                   </div>
-
                   <div>
-                    <label className={labelCls}>
-                      Phone <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="tel"
-                      name="phone"
-                      value={formData.phone}
-                      onChange={handleChange}
-                      required
-                      className={inputCls}
-                      placeholder="+256 700 000 000"
-                    />
+                    <label className={labelCls}>Phone <span className="text-red-500">*</span></label>
+                    <input type="tel" name="phone" value={formData.phone} onChange={handleChange} required className={inputCls} placeholder="+256 700 000 000" />
                   </div>
-
                   <div className="sm:col-span-2">
-                    <label className={labelCls}>
-                      Country <span className="text-red-500">*</span>
-                    </label>
-                    <select
-                      name="country"
-                      value={formData.country}
-                      onChange={handleCountryChange}
-                      required
-                      className={inputCls}
-                    >
+                    <label className={labelCls}>Country <span className="text-red-500">*</span></label>
+                    <select name="country" value={formData.country} onChange={(e) => {handleChange(e); setShippingOptions([]); setSelectedShipping(null)}} required className={inputCls}>
                       <option value="">Select a country</option>
-                      {countries.map(c => (
-                        <option key={c.isoCode} value={c.isoCode}>
-                          {c.flag} {c.name}
-                        </option>
-                      ))}
+                      {countries.map(c => <option key={c.isoCode} value={c.isoCode}>{c.flag} {c.name}</option>)}
                     </select>
                   </div>
-
                   <div className="sm:col-span-2">
-                    <label className={labelCls}>
-                      Street Address <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      name="address"
-                      value={formData.address}
-                      onChange={handleChange}
-                      required
-                      className={inputCls}
-                      placeholder="123 Main Street, Apt 4B"
-                    />
+                    <label className={labelCls}>Street Address <span className="text-red-500">*</span></label>
+                    <input type="text" name="address" value={formData.address} onChange={handleChange} required className={inputCls} placeholder="123 Main Street, Apt 4B" />
                   </div>
-
                   <div>
-                    <label className={labelCls}>
-                      City <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      name="city"
-                      value={formData.city}
-                      onChange={handleChange}
-                      required
-                      className={inputCls}
-                      placeholder="Kampala"
-                    />
+                    <label className={labelCls}>City <span className="text-red-500">*</span></label>
+                    <input type="text" name="city" value={formData.city} onChange={handleChange} required className={inputCls} placeholder="Kampala" />
                   </div>
-
                   <div>
-                    <label className={labelCls}>
-                      {labels.state}
-                      {states.length > 0 && <span className="text-red-500"> *</span>}
-                    </label>
+                    <label className={labelCls}>State / Province {states.length > 0 && <span className="text-red-500">*</span>}</label>
                     {states.length > 0 ? (
-                      <select
-                        name="state"
-                        value={formData.state}
-                        onChange={handleChange}
-                        required
-                        className={inputCls}
-                      >
-                        <option value="">Select {labels.state.toLowerCase()}</option>
-                        {states.map(s => (
-                          <option key={s.isoCode} value={s.isoCode}>
-                            {s.name}
-                          </option>
-                        ))}
+                      <select name="state" value={formData.state} onChange={handleChange} required className={inputCls}>
+                        <option value="">Select state/province</option>
+                        {states.map(s => <option key={s.isoCode} value={s.isoCode}>{s.name}</option>)}
                       </select>
                     ) : (
-                      <input
-                        type="text"
-                        name="state"
-                        value={formData.state}
-                        onChange={handleChange}
-                        className={inputCls}
-                        placeholder={labels.state}
-                      />
+                      <input type="text" name="state" value={formData.state} onChange={handleChange} className={inputCls} placeholder="State / Region" />
                     )}
                   </div>
-
-                  <div>
-                    <label className={labelCls}>
-                      {labels.zip} <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      name="zip"
-                      value={formData.zip}
-                      onChange={handleChange}
-                      required
-                      className={inputCls}
-                      placeholder="00000"
-                    />
+                  <div className="sm:col-span-2">
+                    <label className={labelCls}>ZIP / Postal Code <span className="text-red-500">*</span></label>
+                    <input type="text" name="zip" value={formData.zip} onChange={handleChange} required className={inputCls} placeholder="00000" />
                   </div>
                 </div>
-
-                {session?.user?.id && (
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={saveAddress}
-                      onChange={e => setSaveAddress(e.target.checked)}
-                      className="rounded text-tiffany-500 w-4 h-4"
-                    />
-                    <span className="text-sm text-gray-700">Save this address for future orders</span>
-                  </label>
-                )}
               </div>
 
-              {/* Discount code */}
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5">
-                <h3 className="font-bold text-gray-900 flex items-center gap-2 mb-3">
-                  <Tag size={18} className="text-tiffany-600" />
-                  Discount Code
-                </h3>
-
-                {discount ? (
-                  <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-xl p-3">
-                    <div className="flex items-center gap-2">
-                      <CheckCircle size={18} className="text-green-600" />
-                      <div>
-                        <p className="font-semibold text-green-800 text-sm">{discount.code}</p>
-                        <p className="text-xs text-green-600">{discount.message}</p>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => { setDiscount(null); setDiscountCode('') }}
-                      className="text-xs text-red-500 hover:underline"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                ) : (
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={discountCode}
-                      onChange={e => setDiscountCode(e.target.value.toUpperCase())}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault()
-                          handleApplyDiscount()
-                        }
-                      }}
-                      placeholder="Enter code"
-                      className="flex-1 px-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-tiffany-500 focus:border-tiffany-500 outline-none uppercase"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleApplyDiscount}
-                      disabled={!discountCode.trim() || discountLoading}
-                      className="px-4 py-2.5 bg-tiffany-500 hover:bg-tiffany-600 disabled:opacity-50 text-white font-semibold rounded-xl text-sm transition-colors flex items-center gap-1.5"
-                    >
-                      {discountLoading && <Loader2 size={14} className="animate-spin" />}
-                      Apply
-                    </button>
-                  </div>
-                )}
-              </div>
+              {/* ✅ NEW: Dynamic Shipping Options */}
+              <ShippingOptions 
+                options={shippingOptions} 
+                selectedId={selectedShipping?.id || ''} 
+                onSelect={setSelectedShipping} 
+                isLoading={isFetchingShipping} 
+              />
 
               {/* Payment Method Selection */}
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 space-y-4">
-                <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                  <CreditCard size={20} className="text-tiffany-600" />
-                  Payment Method
+              <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-6 sm:p-8 space-y-5">
+                <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2 mb-2">
+                  <CreditCard size={22} className="text-tiffany-600" /> Payment Method
                 </h2>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* Flutterwave (Mobile Money / Local Cards) */}
-                  <label className={`border-2 rounded-xl p-4 cursor-pointer transition-all ${paymentMethod === 'flutterwave' ? 'border-tiffany-500 bg-tiffany-50' : 'border-gray-200 hover:border-gray-300'}`}>
+                  <label className={`border-2 rounded-xl p-5 cursor-pointer transition-all ${paymentMethod === 'flutterwave' ? 'border-tiffany-500 bg-tiffany-50 shadow-md' : 'border-gray-100 bg-gray-50 hover:border-gray-300'}`}>
                     <div className="flex items-center gap-3">
-                      <input type="radio" name="payment" checked={paymentMethod === 'flutterwave'} onChange={() => setPaymentMethod('flutterwave')} className="w-5 h-5 text-tiffany-600" />
+                      <input type="radio" name="payment" checked={paymentMethod === 'flutterwave'} onChange={() => setPaymentMethod('flutterwave')} className="w-5 h-5 text-tiffany-600 focus:ring-tiffany-500" />
                       <div>
                         <p className="font-bold text-gray-900">Mobile Money & Cards</p>
-                        <p className="text-xs text-gray-500">MTN MoMo, Airtel Money, Visa/MC</p>
+                        <p className="text-xs text-gray-500 mt-1">MTN, Airtel, Local Cards</p>
                       </div>
                     </div>
                   </label>
-
-                  {/* Stripe (International Cards) */}
-                  <label className={`border-2 rounded-xl p-4 cursor-pointer transition-all ${paymentMethod === 'stripe' ? 'border-tiffany-500 bg-tiffany-50' : 'border-gray-200 hover:border-gray-300'}`}>
+                  <label className={`border-2 rounded-xl p-5 cursor-pointer transition-all ${paymentMethod === 'stripe' ? 'border-tiffany-500 bg-tiffany-50 shadow-md' : 'border-gray-100 bg-gray-50 hover:border-gray-300'}`}>
                     <div className="flex items-center gap-3">
-                      <input type="radio" name="payment" checked={paymentMethod === 'stripe'} onChange={() => setPaymentMethod('stripe')} className="w-5 h-5 text-tiffany-600" />
+                      <input type="radio" name="payment" checked={paymentMethod === 'stripe'} onChange={() => setPaymentMethod('stripe')} className="w-5 h-5 text-tiffany-600 focus:ring-tiffany-500" />
                       <div>
-                        <p className="font-bold text-gray-900">Credit Card</p>
-                        <p className="text-xs text-gray-500">Powered securely by Stripe</p>
+                        <p className="font-bold text-gray-900">Credit Card (Stripe)</p>
+                        <p className="text-xs text-gray-500 mt-1">Visa, Mastercard, Amex</p>
                       </div>
                     </div>
                   </label>
@@ -599,86 +345,80 @@ export default function CheckoutPage() {
 
               <button
                 type="submit"
-                disabled={loading}
-                className="w-full bg-gradient-to-r from-tiffany-500 to-tiffany-600 hover:from-tiffany-600 hover:to-tiffany-700 text-white py-4 rounded-xl font-bold flex items-center justify-center gap-3 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 text-base"
+                disabled={loading || !selectedShipping || isFetchingShipping || isFetchingTax}
+                className="w-full bg-gray-900 hover:bg-black text-white py-4 sm:py-5 rounded-2xl font-black flex items-center justify-center gap-3 transition-all shadow-xl hover:shadow-2xl disabled:opacity-50 text-lg"
               >
-                {loading ? <Loader2 size={22} className="animate-spin" /> : <CreditCard size={22} />}
-                {loading ? 'Processing…' : `Pay ${finalTotal > 0 ? `$${finalTotal.toFixed(2)}` : ''} Securely`}
+                {loading ? <Loader2 size={24} className="animate-spin" /> : <CreditCard size={24} />}
+                {loading ? 'Processing…' : `Pay $${finalTotal.toFixed(2)} Securely`}
               </button>
-
-              <p className="text-xs text-center text-gray-400">
-                🔒 Secured by Stripe & Flutterwave. We never store your card details.
-              </p>
             </form>
           </div>
 
           {/* ── Right: Order summary ── */}
           <div className="lg:col-span-1">
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 sticky top-4">
-              <h2 className="text-lg font-bold text-gray-900 mb-4">Order Summary</h2>
+            <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-6 sm:p-8 sticky top-24">
+              <h2 className="text-xl font-bold text-gray-900 mb-6">Order Summary</h2>
 
-              <div className="space-y-3 mb-5 max-h-64 overflow-y-auto pr-1">
+              {/* Items */}
+              <div className="space-y-4 mb-6 max-h-72 overflow-y-auto pr-2 custom-scrollbar">
                 {items.map(item => (
-                  <div key={item.id} className="flex gap-3">
-                    <div className="relative w-14 h-14 flex-shrink-0 rounded-lg overflow-hidden bg-gray-100">
-                      <Image
-                        src={item.image}
-                        alt={item.title}
-                        fill
-                        className="object-cover"
-                        sizes="56px"
-                      />
-                      {item.quantity > 1 && (
-                        <div className="absolute -top-1 -right-1 bg-tiffany-500 text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center">
-                          {item.quantity}
-                        </div>
-                      )}
+                  <div key={item.id} className="flex gap-4">
+                    <div className="relative w-16 h-16 flex-shrink-0 rounded-xl overflow-hidden bg-gray-50 border border-gray-100">
+                      <Image src={item.image} alt={item.title} fill className="object-cover" sizes="64px" />
+                      <div className="absolute -top-1 -right-1 bg-gray-900 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center shadow-sm">
+                        {item.quantity}
+                      </div>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900 line-clamp-2">{item.title}</p>
-                      <p className="text-sm text-gray-500">${(item.price * item.quantity).toFixed(2)}</p>
+                    <div className="flex-1 min-w-0 py-1">
+                      <p className="text-sm font-bold text-gray-900 line-clamp-2 leading-snug mb-1">{item.title}</p>
+                      <p className="text-sm text-gray-500 font-medium">${(item.price * item.quantity).toFixed(2)}</p>
                     </div>
                   </div>
                 ))}
               </div>
 
-              <div className="border-t border-gray-100 pt-4 space-y-2 text-sm">
-                <div className="flex justify-between text-gray-600">
-                  <span>Subtotal</span>
-                  <span>${subtotal.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between text-gray-600">
-                  <span>Shipping</span>
-                  <span className={shipping === 0 ? 'text-green-600 font-medium' : ''}>
-                    {shipping === 0 ? 'FREE' : `$${shipping.toFixed(2)}`}
-                  </span>
-                </div>
-                <div className="flex justify-between text-gray-600">
-                  <span>Tax</span>
-                  <span>${tax.toFixed(2)}</span>
-                </div>
-                {discountAmount > 0 && (
-                  <div className="flex justify-between text-green-600 font-medium">
-                    <span>Discount ({discount?.code})</span>
-                    <span>-${discountAmount.toFixed(2)}</span>
+              {/* Discount Code */}
+              <div className="mb-6 pt-6 border-t border-gray-100">
+                {discount ? (
+                  <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-xl p-3">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle size={18} className="text-green-600" />
+                      <div>
+                        <p className="font-bold text-green-800 text-sm uppercase tracking-wider">{discount.code}</p>
+                        <p className="text-xs text-green-600 font-medium">{discount.message}</p>
+                      </div>
+                    </div>
+                    <button onClick={() => { setDiscount(null); setDiscountCode('') }} className="text-xs text-red-500 hover:text-red-700 font-bold">Remove</button>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <input
+                      type="text" value={discountCode} onChange={e => setDiscountCode(e.target.value.toUpperCase())}
+                      placeholder="Promo code"
+                      className="flex-1 px-4 py-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-tiffany-500 outline-none uppercase bg-gray-50"
+                    />
+                    <button
+                      type="button" onClick={handleApplyDiscount} disabled={!discountCode.trim() || discountLoading}
+                      className="px-5 py-3 bg-gray-900 hover:bg-black text-white font-bold rounded-xl text-sm transition-colors disabled:opacity-50"
+                    >
+                      {discountLoading ? <Loader2 size={16} className="animate-spin" /> : 'Apply'}
+                    </button>
                   </div>
                 )}
-                <div className="border-t border-gray-200 pt-2 flex justify-between font-bold text-gray-900 text-base">
-                  <span>Total</span>
-                  <span className="text-tiffany-600">${finalTotal.toFixed(2)}</span>
-                </div>
               </div>
 
-              {subtotal < 50 && !freeShipping && (
-                <div className="mt-4 bg-tiffany-50 border border-tiffany-200 rounded-xl p-3">
-                  <p className="text-xs text-tiffany-800 font-medium">
-                    💡 Add <strong>${(50 - subtotal).toFixed(2)}</strong> more for free shipping!
-                  </p>
-                </div>
-              )}
+              {/* Breakdown */}
+              <PaymentSummary 
+                subtotal={subtotal}
+                shipping={shippingCost}
+                tax={taxAmount}
+                discountAmount={discountAmount}
+                discountCode={discount?.code}
+                total={finalTotal}
+                isCalculating={isFetchingShipping || isFetchingTax}
+              />
             </div>
           </div>
-
         </div>
       </div>
     </div>
