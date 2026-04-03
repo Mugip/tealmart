@@ -35,7 +35,7 @@ export default function ProductCard({ product }: { product: Product }) {
       id: product.id,
       title: product.title,
       price: product.price,
-      image: getSecureImageUrl(product.images[0]), // ✅ Secure Image to Cart
+      image: getSecureImageUrl(product.images[0]),
     })
   }
 
@@ -47,11 +47,10 @@ export default function ProductCard({ product }: { product: Product }) {
   return (
     <Link 
       href={`/products/${product.id}`} 
-      // ✅ FIXED: Changed "group" to "group/card" to isolate hover states
-      className="card group/card relative overflow-hidden bg-white block rounded-2xl shadow-sm border border-gray-100 hover:border-tiffany-300 transition-all"
+      // ✅ FIXED: Added h-full and flex flex-col to force cards to stretch to the tallest item in the row
+      className="card group/card relative overflow-hidden bg-white rounded-2xl shadow-sm border border-gray-100 hover:border-tiffany-300 transition-all h-full flex flex-col"
     >
-      <div className="relative aspect-square overflow-hidden bg-gray-50">
-        {/* ✅ Secure Image */}
+      <div className="relative aspect-square overflow-hidden bg-gray-50 flex-shrink-0">
         <Image
           src={getSecureImageUrl(product.images[0])}
           alt={product.title}
@@ -60,14 +59,12 @@ export default function ProductCard({ product }: { product: Product }) {
           sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
         />
 
-        {/* Discount badge */}
         {discount > 0 && (
           <div className="absolute top-2 left-2 bg-red-500 text-white text-[10px] sm:text-xs font-black px-2 py-1 rounded-md shadow-sm">
             -{discount}%
           </div>
         )}
 
-        {/* Wishlist button */}
         <button
           onClick={handleWishlist}
           className={`absolute top-2 right-2 p-2 rounded-full shadow-md transition-all z-10 ${
@@ -80,8 +77,6 @@ export default function ProductCard({ product }: { product: Product }) {
           <Heart size={16} className={wishlisted ? 'fill-white' : ''} />
         </button>
 
-        {/* Quick add to cart overlay */}
-        {/* ✅ FIXED: Uses group-hover/card so it only slides up when THIS card is touched */}
         <div className="absolute bottom-0 left-0 right-0 translate-y-full group-hover/card:translate-y-0 transition-transform duration-300 z-10">
           <button
             onClick={handleAddToCart}
@@ -93,8 +88,13 @@ export default function ProductCard({ product }: { product: Product }) {
         </div>
       </div>
 
-      <div className="p-3 sm:p-4">
-        <h3 className="font-bold text-gray-900 mb-1.5 line-clamp-2 group-hover/card:text-tiffany-600 transition-colors text-xs sm:text-sm leading-snug">
+      {/* ✅ FIXED: flex-1 ensures this section expands. min-h controls title space */}
+      <div className="p-3 sm:p-4 flex-1 flex flex-col">
+        <h3 
+          className="font-bold text-gray-900 mb-1.5 line-clamp-2 group-hover/card:text-tiffany-600 transition-colors text-xs sm:text-sm leading-snug"
+          // Force it to reserve space for exactly 2 lines (roughly 40px)
+          style={{ minHeight: '2.8em' }}
+        >
           {product.title}
         </h3>
 
@@ -115,7 +115,8 @@ export default function ProductCard({ product }: { product: Product }) {
           </div>
         )}
 
-        <div className="flex items-baseline flex-wrap gap-1.5 mt-auto">
+        {/* ✅ FIXED: mt-auto forces price to stick to the absolute bottom of the card */}
+        <div className="flex items-baseline flex-wrap gap-1.5 mt-auto pt-1">
           <div className="text-sm sm:text-base font-black text-gray-900">
             {formatPrice(product.price)}
           </div>
@@ -128,4 +129,4 @@ export default function ProductCard({ product }: { product: Product }) {
       </div>
     </Link>
   )
-      }
+              }
