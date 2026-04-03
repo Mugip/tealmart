@@ -5,13 +5,14 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
   LayoutDashboard, ShoppingCart, Package, BarChart3,
-  Boxes, Settings, Tag, ExternalLink, Users, DollarSign, Activity, ShieldCheck, LogOut, Image as ImageIcon
+  Boxes, Settings, Tag, ExternalLink, Users, DollarSign, Activity, ShieldCheck, LogOut, Image as ImageIcon, ArrowRightRight
 } from 'lucide-react'
 import type { AdminSession } from '@/lib/adminAuth'
 
 const ALL_NAV_ITEMS = [
   { href: '/admin', icon: LayoutDashboard, label: 'Dashboard', id: 'dashboard', exact: true },
   { href: '/admin/orders', icon: ShoppingCart, label: 'Orders', id: 'orders' },
+  { href: '/admin/cj-orders', icon: ArrowRightRight, label: 'CJ Dropshipping', id: 'orders' }, // ✅ NEW PAGE (Tied to 'orders' permission)
   { href: '/admin/products', icon: Package, label: 'Products', id: 'products' },
   { href: '/admin/inventory', icon: Boxes, label: 'Inventory', id: 'inventory' },
   { href: '/admin/discounts', icon: Tag, label: 'Discounts', id: 'discounts' },
