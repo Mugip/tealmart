@@ -12,7 +12,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { items, email, shippingAddress, discountAmount, discountCode } = body
+    const { items, email, shippingAddress, discountAmount, discountCode, shippingCost, taxAmount } = body
 
     console.log('📦 Checkout request:', { items: items?.length, email, hasAddress: !!shippingAddress })
 
@@ -110,8 +110,10 @@ export async function POST(req: NextRequest) {
     }
 
     // Calculate shipping, tax, and total (Removed 10% hardcoded tax)
-    const shipping = subtotal >= 50 ? 0 : 9.99
-    const tax = 0 
+       // const shipping = subtotal >= 50 ? 0 : 9.99
+      // const tax = 0 
+    const shipping = typeof shippingCost === 'number' ? shippingCost : 9.99;
+    const tax = typeof taxAmount === 'number' ? taxAmount : 0;
     const total = subtotal + shipping + tax - finalDiscountAmount
 
     // Create Stripe checkout session
