@@ -100,6 +100,7 @@ async function getStats() {
   }, 86400)
 }
 
+
 /* ─────────────────────────────────────────
    Reusable Horizontal Scroll Row (Enhanced)
 ───────────────────────────────────────── */
@@ -129,7 +130,7 @@ function HorizontalScrollRow({
   }
 
   return (
-    <section className={`relative overflow-hidden py-16 transition-colors duration-500 ${
+    <section className={`relative overflow-hidden py-12 sm:py-16 transition-colors duration-500 ${
       dark ? 'bg-slate-900' : 'bg-white'
     }`}>
       {/* Gradient accent */}
@@ -137,18 +138,19 @@ function HorizontalScrollRow({
 
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
-        <div className="flex items-start justify-between mb-10 gap-4">
+        <div className="flex items-start justify-between mb-8 sm:mb-10 gap-4">
           <div className="flex-1">
-            <div className="flex items-center gap-3 mb-2">
+            <div className="flex items-center gap-2 sm:gap-3 mb-1 sm:mb-2">
               {icon}
-              <h2 className={`text-3xl sm:text-4xl font-black tracking-tight ${
+              <h2 className={`text-2xl sm:text-4xl font-black tracking-tight ${
                 dark ? 'text-white' : 'text-gray-900'
               }`}>
                 {title}
               </h2>
             </div>
-            <p className={`text-sm sm:text-base font-medium ${
-              dark ? 'text-gray-400' : 'text-gray-600'
+            <p className={`text-xs sm:text-base font-medium ${
+              // ✅ FIXED: Changed text-gray-400 to text-slate-300 so it's bright and readable on dark mode
+              dark ? 'text-slate-300' : 'text-gray-600'
             }`}>
               {subtitle}
             </p>
@@ -167,7 +169,8 @@ function HorizontalScrollRow({
         </div>
 
         {/* Scroll container */}
-        <div className="group relative">
+        {/* ✅ FIXED: Removed "group" from this relative container so it stops triggering all cards */}
+        <div className="relative">
           <div className={`absolute left-0 top-0 bottom-0 w-8 z-10 pointer-events-none transition-opacity ${
             dark 
               ? 'bg-gradient-to-r from-slate-900 to-transparent' 
@@ -180,12 +183,12 @@ function HorizontalScrollRow({
               : 'bg-gradient-to-l from-white to-transparent'
           }`} />
 
-          <div className="overflow-x-auto scrollbar-hide snap-x snap-mandatory">
-            <div className="flex gap-4 pb-2 min-w-min">
+          <div className="overflow-x-auto scrollbar-hide snap-x snap-mandatory pb-4">
+            <div className="flex gap-3 sm:gap-4 min-w-min">
               {products.map((product) => (
                 <div
                   key={product.id}
-                  className="snap-center flex-shrink-0 w-[160px] transition-all duration-300"
+                  className="snap-center flex-shrink-0 w-[150px] sm:w-[180px] transition-all duration-300"
                 >
                   <ProductCard product={product} />
                 </div>
@@ -194,15 +197,17 @@ function HorizontalScrollRow({
               {/* CTA Card */}
               <Link
                 href={link}
-                className={`snap-center flex-shrink-0 w-[160px] h-full flex items-center justify-center rounded-2xl border-2 transition-all duration-300 group/cta font-bold text-center p-4 ${
+                className={`snap-center flex-shrink-0 w-[150px] sm:w-[180px] h-auto min-h-[240px] flex items-center justify-center rounded-2xl border-2 transition-all duration-300 group/cta font-bold text-center p-4 ${
                   dark
-                    ? 'border-white/10 text-white hover:border-white/30 hover:bg-white/5'
-                    : 'border-gray-200 text-gray-900 hover:border-gray-300 hover:bg-gray-50'
+                    ? 'border-white/10 text-white hover:border-teal-400 hover:bg-teal-500/5'
+                    : 'border-gray-200 text-gray-900 hover:border-teal-500 hover:bg-teal-50'
                 }`}
               >
-                <div className="flex flex-col items-center gap-2">
+                <div className="flex flex-col items-center gap-3">
+                  <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-transform group-hover/cta:scale-110 ${dark ? 'bg-white/10' : 'bg-gray-100'}`}>
+                    <ChevronRight size={24} className={dark ? 'text-teal-400' : 'text-teal-600'} />
+                  </div>
                   <span className="text-sm">{cta}</span>
-                  <ChevronRight size={18} className="transition-transform group-hover/cta:translate-x-1" />
                 </div>
               </Link>
             </div>
@@ -210,10 +215,10 @@ function HorizontalScrollRow({
         </div>
 
         {/* Mobile scroll hint */}
-        <div className="sm:hidden mt-4 flex items-center justify-center gap-1 text-xs text-gray-400">
-          <div className="w-1 h-1 rounded-full bg-current animate-pulse" />
-          <span>Scroll to explore</span>
-          <div className="w-1 h-1 rounded-full bg-current animate-pulse" style={{ animationDelay: '0.3s' }} />
+        <div className="sm:hidden mt-2 flex items-center justify-center gap-1.5 text-xs font-medium text-gray-500">
+          <div className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" />
+          <span>Swipe to explore</span>
+          <div className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" style={{ animationDelay: '0.3s' }} />
         </div>
       </div>
     </section>
