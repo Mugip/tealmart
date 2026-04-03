@@ -8,7 +8,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import {
   ArrowLeft, Package, Truck, CheckCircle, Clock, XCircle,
-  MapPin, CreditCard, RefreshCw, ShoppingCart, Loader2
+  MapPin, CreditCard, RefreshCw, ShoppingCart, Loader2, AlertCircle, Camera, Upload, Send
 } from 'lucide-react'
 import { useCart } from '@/lib/contexts/CartContext'
 import toast from 'react-hot-toast'
@@ -47,6 +47,39 @@ interface Order {
   cjOrderId?: string
   items: OrderItem[]
 }
+
+const [showDisputeModal, setShowDisputeModal] = useState(false)
+const [disputeReason, setDisputeReason] = useState('')
+const [disputeDesc, setDisputeDesc] = useState('')
+const [disputeSubmitting, setDisputeSubmitting] = useState(false)
+
+const handleDisputeSubmit = async (e: React.FormEvent) => {
+  e.preventDefault()
+  if (!disputeReason || !disputeDesc) return toast.error('Please fill in all fields')
+  
+  setDisputeSubmitting(true)
+  try {
+    const res = await fetch(`/api/orders/${order.orderNumber}/dispute`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason: disputeReason, description: disputeDesc, images: [] }) // Note: Image handling requires a base64 converter helper, omitted here for simplicity, users can email photos if needed
+    })
+    
+    const data = await res.json()
+    if (res.ok) {
+      toast.success(data.message)
+      setShowDisputeModal(false)
+    } else {
+      toast.error(data.error)
+    }
+  } catch {
+    toast.error('Failed to submit request')
+  } finally {
+    setDisputeSubmitting(false)
+  }
+}
+
+
 
 const STATUS_META: Record<string, { label: string; icon: React.ReactNode; color: string; bg: string }> = {
   PENDING:    { label: 'Payment Pending',  icon: <Clock size={18} />,        color: 'text-yellow-700', bg: 'bg-yellow-50 border-yellow-200' },
@@ -167,6 +200,16 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
             </div>
           </div>
         </div>
+
+        {/* Only show return button if order is shipped/delivered and not cancelled */}
+              {!isCancelled && (order.status === 'SHIPPED' || order.status === 'DELIVERED') && (
+                <button
+                  onClick={() => setShowDisputeModal(true)}
+                  className="flex items-center gap-1.5 text-sm font-semibold text-red-500 hover:text-red-700 hover:bg-red-50 px-3 py-1.5 rounded-xl transition-all"
+                >
+                  <AlertCircle size={14} /> Request Return
+                </button>
+              )}
 
         {/* ✅ NEW: Live CJ Tracking Timeline Integration */}
         {!isCancelled && (
@@ -320,6 +363,62 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
           </p>
         </div>
       </div>
+
+      {/* Dispute/Return Modal */}
+      {showDisputeModal && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setShowDisputeModal(false)}>
+          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-6 sm:p-8 animate-in slide-in-from-bottom-4" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-start mb-6">
+              <div>
+                <h3 className="text-2xl font-bold text-gray-900">Request Return</h3>
+                <p className="text-sm text-gray-500 mt-1">Order #{order.orderNumber}</p>
+              </div>
+              <button onClick={() => setShowDisputeModal(false)} className="p-2 bg-gray-100 hover:bg-gray-200 rounded-full text-gray-500 transition-colors">
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleDisputeSubmit} className="space-y-5">
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Reason for Return <span className="text-red-500">*</span></label>
+                <select 
+                  required value={disputeReason} onChange={e => setDisputeReason(e.target.value)}
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-tiffany-500 outline-none text-sm font-medium"
+                >
+                  <option value="">Select a reason...</option>
+                  <option value="Damaged Product">Item arrived damaged or broken</option>
+                  <option value="Wrong Item">Received the wrong item/color/size</option>
+                  <option value="Not Received">Package marked delivered but not received</option>
+                  <option value="Quality Issue">Poor quality or defective</option>
+                  <option value="Changed Mind">Changed my mind / No longer needed</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Details <span className="text-red-500">*</span></label>
+                <textarea 
+                  required value={disputeDesc} onChange={e => setDisputeDesc(e.target.value)}
+                  rows={4} placeholder="Please explain the issue in detail..."
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-tiffany-500 outline-none text-sm"
+                />
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-800">
+                <strong>Next Steps:</strong> Once submitted, our team will review your request and email you a prepaid return shipping label if applicable.
+              </div>
+
+              <button 
+                type="submit" disabled={disputeSubmitting}
+                className="w-full py-4 bg-gray-900 text-white font-bold rounded-xl hover:bg-black transition-colors shadow-lg disabled:opacity-50 flex justify-center items-center gap-2"
+              >
+                {disputeSubmitting ? <Loader2 className="animate-spin" size={18} /> : <Send size={18} />}
+                {disputeSubmitting ? 'Submitting Request...' : 'Submit Return Request'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+      
     </div>
   )
         }
