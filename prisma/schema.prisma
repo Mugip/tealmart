@@ -392,3 +392,28 @@ model Staff {
 
   @@index([email])
 }
+
+// ============================================
+// DISPUTES & RETURNS
+// ============================================
+
+model Dispute {
+  id            String   @id @default(cuid())
+  orderId       String   // References Order.id
+  cjOrderId     String?  // References CJOrder.cjOrderId
+  orderNumber   String
+  userEmail     String
+  reason        String   // e.g., 'Damaged', 'Wrong Item', 'Not Received'
+  description   String   @db.Text
+  images        String[] // Array of R2 image URLs for proof
+  status        String   @default("PENDING") // PENDING, UNDER_REVIEW, APPROVED, REJECTED, RESOLVED
+  cjDisputeId   String?  // CJ's internal dispute ticket ID
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  order         Order    @relation(fields: [orderId], references: [id])
+  
+  @@index([orderNumber])
+  @@index([userEmail])
+  @@index([status])
+}
