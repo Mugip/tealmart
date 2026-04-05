@@ -1,4 +1,4 @@
-// components/admin/SalesChart.tsx - FULLY FIXED
+// components/admin/SalesChart.tsx
 'use client'
 
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
@@ -45,9 +45,9 @@ export default function SalesChart({ data }: Props) {
         </div>
       </div>
 
-      {/* Chart */}
-      <div className="h-80">
-        <ResponsiveContainer width="100%" height="100%">
+      {/* ✅ FIXED: Added min-h-0 to force correct height calculation */}
+      <div className="h-80 w-full min-h-0">
+        <ResponsiveContainer width="100%" height="100%" minHeight={0} minWidth={0}>
           {chartType === 'line' ? (
             <LineChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
