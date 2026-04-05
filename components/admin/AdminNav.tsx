@@ -7,15 +7,15 @@ import { useState, useEffect } from 'react'
 import {
   LayoutDashboard, ShoppingCart, Package, BarChart3,
   Boxes, Settings, Tag, ExternalLink, Users, DollarSign, Activity, ShieldCheck, LogOut,
-  Image as ImageIcon, ArrowRightRight, AlertCircle, Bell // ✅ ALL IMPORTS FIXED
+  Image as ImageIcon, Globe, AlertCircle, Bell // ✅ CHANGED: ArrowRightRight to Globe
 } from 'lucide-react'
 import type { AdminSession } from '@/lib/adminAuth'
 
 const ALL_NAV_ITEMS = [
   { href: '/admin', icon: LayoutDashboard, label: 'Dashboard', id: 'dashboard', exact: true },
   { href: '/admin/orders', icon: ShoppingCart, label: 'Orders', id: 'orders' },
-  { href: '/admin/cj-orders', icon: ArrowRightRight, label: 'CJ Dropshipping', id: 'orders' },
-  { href: '/admin/disputes', icon: AlertCircle, label: 'Returns', id: 'orders' },
+  { href: '/admin/cj-orders', icon: Globe, label: 'CJ Dropshipping', id: 'orders' }, // ✅ FIXED ICON
+  { href: '/admin/disputes', icon: AlertCircle, label: 'Returns', id: 'orders' }, 
   { href: '/admin/products', icon: Package, label: 'Products', id: 'products' },
   { href: '/admin/inventory', icon: Boxes, label: 'Inventory', id: 'inventory' },
   { href: '/admin/discounts', icon: Tag, label: 'Discounts', id: 'discounts' },
@@ -28,13 +28,14 @@ const ALL_NAV_ITEMS = [
   { href: '/admin/settings', icon: Settings, label: 'Settings', id: 'settings' },
 ]
 
+// ... (KEEP THE REST OF THE FILE EXACTLY THE SAME)
+
 export default function AdminNav({ session }: { session: AdminSession | null }) {
   const pathname = usePathname()
   const router = useRouter()
   const [notifications, setNotifications] = useState<any[]>([])
   const [showBellMenu, setShowBellMenu] = useState(false)
 
-  // ✅ Fetch Notifications periodically
   useEffect(() => {
     const fetchNotifs = () => {
       fetch('/api/admin/notifications')
@@ -43,7 +44,7 @@ export default function AdminNav({ session }: { session: AdminSession | null }) 
         .catch(() => {})
     }
     fetchNotifs()
-    const interval = setInterval(fetchNotifs, 60000) // check every minute
+    const interval = setInterval(fetchNotifs, 60000) 
     return () => clearInterval(interval)
   }, [])
 
@@ -160,4 +161,4 @@ export default function AdminNav({ session }: { session: AdminSession | null }) 
       </div>
     </>
   )
-}
+        }
