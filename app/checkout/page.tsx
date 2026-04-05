@@ -91,6 +91,7 @@ export default function CheckoutPage() {
     setError(null)
   }
 
+
   // --- STEP 1: SUBMIT INFO & FETCH RATES ---
   const handleInfoSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -112,7 +113,18 @@ export default function CheckoutPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ items, country: formData.country, zip: formData.zip })
       })
-      const shipData = await shipRes.json()
+      
+      // ✨ SAFE PARSE: Catch 404s/500s before they crash the app
+      const shipText = await shipRes.text()
+      let shipData;
+      try {
+        shipData = JSON.parse(shipText)
+      } catch (parseErr) {
+        console.error("Non-JSON Response received:", shipText)
+        throw new Error(`Shipping API is unreachable (Status: ${shipRes.status})`)
+      }
+
+      if (!shipRes.ok) throw new Error(shipData.error || 'Failed to fetch shipping rates')
       
       if (shipData.shippingOptions?.length > 0) {
         setShippingOptions(shipData.shippingOptions)
@@ -127,20 +139,26 @@ export default function CheckoutPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ subtotal, shipping: shipData.shippingOptions[0]?.price || 0, country: formData.country, state: formData.state })
       })
-      const taxData = await taxRes.json()
-      if (taxData.taxAmount !== undefined) setTaxAmount(taxData.taxAmount)
+      
+      const taxText = await taxRes.text()
+      try {
+        const taxData = JSON.parse(taxText)
+        if (taxData.taxAmount !== undefined) setTaxAmount(taxData.taxAmount)
+      } catch (e) {
+        console.warn("Failed to parse tax data, defaulting to 0")
+      }
 
       // Move to Step 2 only after fetching succeeds
       setStep(2)
 
     } catch (err: any) {
+      console.error("[INFO_SUBMIT_ERROR]", err)
       setError(err.message || 'Failed to calculate shipping rates.')
       toast.error(err.message || 'Shipping calculation failed.')
     } finally {
       setIsFetchingShipping(false)
     }
   }
-
   // --- STEP 2: SUBMIT SHIPPING ---
   const handleShippingSubmit = (e: React.FormEvent) => {
     e.preventDefault()
