@@ -7,14 +7,14 @@ import { useState, useEffect } from 'react'
 import {
   LayoutDashboard, ShoppingCart, Package, BarChart3,
   Boxes, Settings, Tag, ExternalLink, Users, DollarSign, Activity, ShieldCheck, LogOut,
-  Image as ImageIcon, Globe, AlertCircle, Bell // ✅ CHANGED: ArrowRightRight to Globe
+  Image as ImageIcon, Globe, AlertCircle, Bell
 } from 'lucide-react'
 import type { AdminSession } from '@/lib/adminAuth'
 
 const ALL_NAV_ITEMS = [
   { href: '/admin', icon: LayoutDashboard, label: 'Dashboard', id: 'dashboard', exact: true },
   { href: '/admin/orders', icon: ShoppingCart, label: 'Orders', id: 'orders' },
-  { href: '/admin/cj-orders', icon: Globe, label: 'CJ Dropshipping', id: 'orders' }, // ✅ FIXED ICON
+  { href: '/admin/cj-orders', icon: Globe, label: 'CJ Dropshipping', id: 'orders' },
   { href: '/admin/disputes', icon: AlertCircle, label: 'Returns', id: 'orders' }, 
   { href: '/admin/products', icon: Package, label: 'Products', id: 'products' },
   { href: '/admin/inventory', icon: Boxes, label: 'Inventory', id: 'inventory' },
@@ -28,25 +28,60 @@ const ALL_NAV_ITEMS = [
   { href: '/admin/settings', icon: Settings, label: 'Settings', id: 'settings' },
 ]
 
-// ... (KEEP THE REST OF THE FILE EXACTLY THE SAME)
-
 export default function AdminNav({ session }: { session: AdminSession | null }) {
   const pathname = usePathname()
   const router = useRouter()
   const [notifications, setNotifications] = useState<any[]>([])
   const [showBellMenu, setShowBellMenu] = useState(false)
+  const [hasUnread, setHasUnread] = useState(false) // ✅ NEW: Track unread state
 
   useEffect(() => {
     const fetchNotifs = () => {
       fetch('/api/admin/notifications')
         .then(res => res.json())
-        .then(data => { if (data.items) setNotifications(data.items) })
+        .then(data => { 
+          if (data.items) {
+            setNotifications(data.items)
+            
+            // ✅ Smart Unread Logic
+            try {
+              const savedCounts = JSON.parse(localStorage.getItem('admin_notifs_seen') || '{}')
+              let isNew = false
+              
+              // Compare current counts to saved counts
+              data.items.forEach((item: any) => {
+                if (item.count > (savedCounts[item.id] || 0)) {
+                  isNew = true // Only trigger if the count went UP
+                }
+              })
+              
+              if (isNew) setHasUnread(true)
+            } catch (e) {}
+          } 
+        })
         .catch(() => {})
     }
+    
     fetchNotifs()
     const interval = setInterval(fetchNotifs, 60000) 
     return () => clearInterval(interval)
   }, [])
+
+  // ✅ Clear red dot when clicking the bell
+  const handleBellClick = () => {
+    setShowBellMenu(!showBellMenu)
+    
+    if (!showBellMenu) { // Opening the menu
+      setHasUnread(false)
+      
+      // Save current counts to localStorage so we know they've been seen
+      try {
+        const currentCounts: Record<string, number> = {}
+        notifications.forEach(n => { currentCounts[n.id] = n.count })
+        localStorage.setItem('admin_notifs_seen', JSON.stringify(currentCounts))
+      } catch (e) {}
+    }
+  }
 
   const isActive = (href: string, exact = false) =>
     exact ? pathname === href : pathname.startsWith(href)
@@ -65,11 +100,11 @@ export default function AdminNav({ session }: { session: AdminSession | null }) 
   const NotificationBell = () => (
     <div className="relative">
       <button 
-        onClick={() => setShowBellMenu(!showBellMenu)}
+        onClick={handleBellClick} // ✅ Fixed click handler
         className="p-2 text-gray-500 hover:text-tiffany-600 transition-colors relative"
       >
         <Bell size={20} />
-        {notifications.length > 0 && (
+        {hasUnread && ( // ✅ Uses hasUnread state instead of array length
           <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white animate-pulse" />
         )}
       </button>
@@ -161,4 +196,4 @@ export default function AdminNav({ session }: { session: AdminSession | null }) 
       </div>
     </>
   )
-        }
+          }
