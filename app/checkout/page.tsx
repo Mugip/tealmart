@@ -8,40 +8,29 @@ import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { 
   CreditCard, AlertCircle, MapPin, CheckCircle, 
-  ChevronRight, Loader2, ChevronLeft 
+  ChevronRight, Loader2, ChevronLeft, Bug
 } from 'lucide-react'
 import { Country, State } from 'country-state-city'
 import type { ICountry, IState } from 'country-state-city'
 import toast from 'react-hot-toast'
 import { getSecureImageUrl } from '@/lib/imageUrl'
 
-// Imported Components
 import ShippingOptions, { ShippingOption } from '@/components/checkout/ShippingOptions'
 import PaymentSummary from '@/components/checkout/PaymentSummary'
-
-// Debounce helper
-function useDebounce<T>(value: T, delay: number): T {
-  const [debouncedValue, setDebouncedValue] = useState<T>(value)
-  useEffect(() => {
-    const handler = setTimeout(() => setDebouncedValue(value), delay)
-    return () => clearTimeout(handler)
-  }, [value, delay])
-  return debouncedValue
-}
 
 export default function CheckoutPage() {
   const { items, total: subtotal } = useCart()
   const { data: session } = useSession()
   const router = useRouter()
 
+  // --- STATE ---
   const [mounted, setMounted] = useState(false)
   const [step, setStep] = useState<1 | 2 | 3>(1)
-  
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const [formData, setFormData] = useState({
-    email: '', name: '', address: '', city: '', state: '', zip: '', country: 'UG', phone: '',
+    email: '', name: '', address: '', city: '', state: '', zip: '', country: 'US', phone: '',
   })
   
   const [selectedCountry, setSelectedCountry] = useState<ICountry | null>(null)
@@ -52,39 +41,31 @@ export default function CheckoutPage() {
   const [isFetchingShipping, setIsFetchingShipping] = useState(false)
   const [taxAmount, setTaxAmount] = useState(0)
 
-  const [paymentMethod, setPaymentMethod] = useState<'stripe' | 'flutterwave'>('flutterwave')
+  const [paymentMethod, setPaymentMethod] = useState<'stripe' | 'flutterwave'>('stripe')
 
   const [discountCode, setDiscountCode] = useState('')
   const [discountLoading, setDiscountLoading] = useState(false)
   const [discount, setDiscount] = useState<any>(null)
 
+  const [showDebug, setShowDebug] = useState(false) // On-screen debug toggle
+
   const countries = useMemo(() => Country.getAllCountries().sort((a, b) => a.name.localeCompare(b.name)), [])
-  const debouncedZip = useDebounce(formData.zip, 800)
 
-  // 🐛 DEBUG: Log Initial Render State
-  console.log('🟣 [CheckoutPage] RENDER', { 
-    mounted, 
-    step, 
-    cartItemsCount: items.length, 
-    subtotal,
-    isServer: typeof window === 'undefined'
-  });
-
+  // --- HYDRATION SAFEGUARD ---
   useEffect(() => { 
-    console.log('🟣 [CheckoutPage] MOUNTED on Client');
     setMounted(true) 
   }, [])
 
+  // --- PREFILL DATA ---
   useEffect(() => {
     if (session?.user?.email) {
-      console.log('🟣 [CheckoutPage] Session loaded, populating defaults');
       setFormData(prev => ({ 
         ...prev, 
         email: prev.email || session.user!.email!, 
         name: prev.name || session.user!.name || '' 
       }))
     }
-    const def = Country.getCountryByCode('UG') || Country.getCountryByCode('US')
+    const def = Country.getCountryByCode('US')
     if (def) { 
       setSelectedCountry(def); 
       setStates(State.getStatesOfCountry(def.isoCode)) 
@@ -93,7 +74,6 @@ export default function CheckoutPage() {
 
   useEffect(() => {
     if (formData.country) {
-      console.log('🟣 [CheckoutPage] Country changed:', formData.country);
       const country = Country.getCountryByCode(formData.country)
       setSelectedCountry(country || null)
       if (country) {
@@ -106,77 +86,69 @@ export default function CheckoutPage() {
     }
   }, [formData.country])
 
-  // Fetch Shipping
-  useEffect(() => {
-    const fetchShipping = async () => {
-      if (!formData.country || items.length === 0) return
-      console.log('🟣 [CheckoutPage] Fetching Shipping for Zip:', debouncedZip, 'Country:', formData.country);
-      setIsFetchingShipping(true)
-      try {
-        const res = await fetch('/api/checkout/shipping-options', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ items, country: formData.country, zip: debouncedZip })
-        })
-        const data = await res.json()
-        if (data.shippingOptions?.length > 0) {
-          setShippingOptions(data.shippingOptions)
-          setSelectedShipping(data.shippingOptions[0]) 
-        }
-      } catch (err: any) {
-        console.error('🟣 [CheckoutPage] Fetch shipping error:', err)
-      } finally {
-        setIsFetchingShipping(false)
-      }
-    }
-    if (debouncedZip || formData.country) fetchShipping()
-  }, [formData.country, debouncedZip, items])
-
-  // Fetch Taxes
-  useEffect(() => {
-    const fetchTaxes = async () => {
-      if (!formData.country) return
-      console.log('🟣 [CheckoutPage] Fetching Taxes');
-      try {
-        const res = await fetch('/api/checkout/calculate-tax', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ subtotal, shipping: selectedShipping?.price || 0, country: formData.country, state: formData.state })
-        })
-        const data = await res.json()
-        if (data.taxAmount !== undefined) setTaxAmount(data.taxAmount)
-      } catch (err: any) {
-        console.error('🟣 [CheckoutPage] Fetch tax error:', err)
-      }
-    }
-    fetchTaxes()
-  }, [formData.country, formData.state, selectedShipping?.price, subtotal])
-
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }))
     setError(null)
   }
 
-  const handleInfoSubmit = (e: React.FormEvent) => {
+  // --- STEP 1: SUBMIT INFO & FETCH RATES ---
+  const handleInfoSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    
     if (!formData.email || !formData.name || !formData.address || !formData.city || !formData.zip || !formData.phone || !formData.country) {
       return setError('Please fill in all required fields.')
     }
     if (states.length > 0 && !formData.state) {
       return setError('Please select a state/province.')
     }
-    if (shippingOptions.length === 0) {
-      return setError('No shipping options available for this destination. Please check your ZIP code.')
+
+    setIsFetchingShipping(true)
+    setError(null)
+
+    try {
+      // 1. Fetch Shipping Options based on Address
+      const shipRes = await fetch('/api/checkout/shipping-options', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items, country: formData.country, zip: formData.zip })
+      })
+      const shipData = await shipRes.json()
+      
+      if (shipData.shippingOptions?.length > 0) {
+        setShippingOptions(shipData.shippingOptions)
+        setSelectedShipping(shipData.shippingOptions[0]) 
+      } else {
+        throw new Error('No shipping options available for this destination.')
+      }
+
+      // 2. Fetch Taxes based on Address
+      const taxRes = await fetch('/api/checkout/calculate-tax', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subtotal, shipping: shipData.shippingOptions[0]?.price || 0, country: formData.country, state: formData.state })
+      })
+      const taxData = await taxRes.json()
+      if (taxData.taxAmount !== undefined) setTaxAmount(taxData.taxAmount)
+
+      // Move to Step 2 only after fetching succeeds
+      setStep(2)
+
+    } catch (err: any) {
+      setError(err.message || 'Failed to calculate shipping rates.')
+      toast.error(err.message || 'Shipping calculation failed.')
+    } finally {
+      setIsFetchingShipping(false)
     }
-    setStep(2) 
   }
 
+  // --- STEP 2: SUBMIT SHIPPING ---
   const handleShippingSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!selectedShipping) return setError('Please select a shipping method.')
     setStep(3)
   }
 
+  // --- STEP 3: SUBMIT PAYMENT ---
   const handlePaymentSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
@@ -212,7 +184,6 @@ export default function CheckoutPage() {
       window.location.href = data.url
 
     } catch (err: any) {
-      console.error('[CHECKOUT SUBMIT ERROR]', err)
       setError(err.message || 'Payment initiation failed.')
       toast.error(err.message || 'Payment initiation failed.')
       setLoading(false)
@@ -232,7 +203,6 @@ export default function CheckoutPage() {
       if (!res.ok) { toast.error(data.error || 'Invalid code'); setDiscount(null) } 
       else { setDiscount(data); toast.success(data.message) }
     } catch (err: any) { 
-      console.error('[DISCOUNT ERROR]', err)
       toast.error('Failed to apply discount') 
     } finally { setDiscountLoading(false) }
   }
@@ -242,14 +212,14 @@ export default function CheckoutPage() {
   const discountAmount = discount?.discountAmount || 0
   const finalTotal = subtotal + (step > 1 ? shippingCost : 0) + (step > 1 ? taxAmount : 0) - discountAmount
 
-  // 🚨 TO PREVENT HYDRATION ERRORS: Return an identical empty/loading shell if not mounted
+  // --- HYDRATION / EMPTY CART CHECK ---
   if (!mounted) {
-    console.log('🟣 [CheckoutPage] PRE-HYDRATION - Rendering null/skeleton to avoid mismatch');
     return (
-      <div className="min-h-screen bg-gray-50 py-8 px-4 flex justify-center">
-        <Loader2 size={32} className="animate-spin text-tiffany-600 mt-20" />
+      <div className="min-h-screen bg-gray-50 py-12 px-4 flex flex-col items-center justify-center">
+        <Loader2 size={40} className="animate-spin text-tiffany-600 mb-4" />
+        <p className="text-gray-500 font-medium">Preparing secure checkout...</p>
       </div>
-    );
+    )
   }
 
   if (items.length === 0) {
@@ -271,7 +241,26 @@ export default function CheckoutPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4">
-      <div className="max-w-6xl mx-auto">
+      <div className="max-w-6xl mx-auto relative">
+        
+        {/* ON-SCREEN DEBUGGER */}
+        <button onClick={() => setShowDebug(!showDebug)} className="absolute top-0 right-0 p-2 bg-gray-200 text-gray-600 rounded-full hover:bg-gray-300 z-50">
+          <Bug size={16} />
+        </button>
+        {showDebug && (
+          <div className="mb-6 p-4 bg-black text-green-400 font-mono text-xs rounded-xl overflow-auto max-h-64 shadow-2xl">
+            <p className="text-white mb-2 font-bold uppercase border-b border-gray-700 pb-2">Checkout State Debugger</p>
+            <p>Step: {step}</p>
+            <p>Subtotal: ${subtotal}</p>
+            <p>Country Selected: {formData.country}</p>
+            <p>Shipping Options Loaded: {shippingOptions.length}</p>
+            <p>Selected Shipping ID: {selectedShipping?.id || 'None'}</p>
+            <p>Fetching Rates?: {isFetchingShipping ? 'Yes' : 'No'}</p>
+            <p>Tax Calculated: ${taxAmount}</p>
+            <p>Final Total: ${finalTotal}</p>
+          </div>
+        )}
+
         <div className="flex items-center gap-2 text-sm mb-8 font-medium">
           <button onClick={() => setStep(1)} className={`${step >= 1 ? 'text-tiffany-600 font-bold' : 'text-gray-400'}`}>Information</button>
           <ChevronRight size={14} className="text-gray-300" />
@@ -296,6 +285,7 @@ export default function CheckoutPage() {
                 <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2 mb-2">
                   <MapPin size={22} className="text-tiffany-600" /> Contact & Shipping
                 </h2>
+                <p className="text-sm text-gray-500 mb-4">Enter your details. Shipping options and taxes will be calculated in the next step.</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <div className="sm:col-span-2">
                     <label className={labelCls}>Email <span className="text-red-500">*</span></label>
@@ -311,7 +301,7 @@ export default function CheckoutPage() {
                   </div>
                   <div className="sm:col-span-2">
                     <label className={labelCls}>Country <span className="text-red-500">*</span></label>
-                    <select name="country" value={formData.country} onChange={(e) => {handleChange(e); setShippingOptions([]); setSelectedShipping(null)}} required className={inputCls}>
+                    <select name="country" value={formData.country} onChange={handleChange} required className={inputCls}>
                       <option value="">Select a country</option>
                       {countries.map(c => <option key={c.isoCode} value={c.isoCode}>{c.flag} {c.name}</option>)}
                     </select>
@@ -343,7 +333,7 @@ export default function CheckoutPage() {
                 <div className="pt-4 flex justify-end">
                   <button type="submit" disabled={isFetchingShipping} className="bg-gray-900 hover:bg-black text-white px-8 py-4 rounded-xl font-bold transition-all shadow-md flex items-center gap-2 disabled:opacity-50">
                     {isFetchingShipping ? <Loader2 className="animate-spin" size={18} /> : null}
-                    Continue to Shipping <ChevronRight size={18} />
+                    {isFetchingShipping ? 'Calculating Rates...' : 'Continue to Shipping'} <ChevronRight size={18} />
                   </button>
                 </div>
               </form>
@@ -488,14 +478,15 @@ export default function CheckoutPage() {
                 )}
               </div>
 
+              {/* Step passed down to control how summary displays text */}
               <PaymentSummary 
+                step={step}
                 subtotal={subtotal}
-                shipping={step > 1 ? shippingCost : 0} 
-                tax={step > 1 ? taxAmount : 0} 
+                shipping={shippingCost} 
+                tax={taxAmount} 
                 discountAmount={discountAmount}
                 discountCode={discount?.code}
-                total={step > 1 ? finalTotal : subtotal - discountAmount} 
-                isCalculating={isFetchingShipping || isFetchingTax} // Add `isFetchingTax` if you add state for it
+                total={finalTotal} 
               />
             </div>
           </div>
