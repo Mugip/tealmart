@@ -8,12 +8,13 @@ import Image from 'next/image'
 import Link from 'next/link'
 import {
   ArrowLeft, Package, Truck, CheckCircle, Clock, XCircle,
-  MapPin, CreditCard, RefreshCw, ShoppingCart, Loader2, AlertCircle, Camera, Upload, Send
+  MapPin, CreditCard, RefreshCw, ShoppingCart, Loader2,
+  AlertCircle, Send, X
 } from 'lucide-react'
 import { useCart } from '@/lib/contexts/CartContext'
 import toast from 'react-hot-toast'
-import TrackingTimeline from '@/components/orders/TrackingTimeline' // ✅ NEW: The Tracking Component
-import { getSecureImageUrl } from '@/lib/imageUrl' // ✅ Secure Image Proxy
+import TrackingTimeline from '@/components/orders/TrackingTimeline'
+import { getSecureImageUrl } from '@/lib/imageUrl'
 
 interface OrderItem {
   id: string
@@ -48,39 +49,6 @@ interface Order {
   items: OrderItem[]
 }
 
-const [showDisputeModal, setShowDisputeModal] = useState(false)
-const [disputeReason, setDisputeReason] = useState('')
-const [disputeDesc, setDisputeDesc] = useState('')
-const [disputeSubmitting, setDisputeSubmitting] = useState(false)
-
-const handleDisputeSubmit = async (e: React.FormEvent) => {
-  e.preventDefault()
-  if (!disputeReason || !disputeDesc) return toast.error('Please fill in all fields')
-  
-  setDisputeSubmitting(true)
-  try {
-    const res = await fetch(`/api/orders/${order.orderNumber}/dispute`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ reason: disputeReason, description: disputeDesc, images: [] }) // Note: Image handling requires a base64 converter helper, omitted here for simplicity, users can email photos if needed
-    })
-    
-    const data = await res.json()
-    if (res.ok) {
-      toast.success(data.message)
-      setShowDisputeModal(false)
-    } else {
-      toast.error(data.error)
-    }
-  } catch {
-    toast.error('Failed to submit request')
-  } finally {
-    setDisputeSubmitting(false)
-  }
-}
-
-
-
 const STATUS_META: Record<string, { label: string; icon: React.ReactNode; color: string; bg: string }> = {
   PENDING:    { label: 'Payment Pending',  icon: <Clock size={18} />,        color: 'text-yellow-700', bg: 'bg-yellow-50 border-yellow-200' },
   PROCESSING: { label: 'Being Prepared',   icon: <Package size={18} />,      color: 'text-blue-700',   bg: 'bg-blue-50 border-blue-200' },
@@ -97,9 +65,15 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
   const [order, setOrder] = useState<Order | null>(null)
   const [loading, setLoading] = useState(true)
   
-  // ✅ NEW: Tracking State
+  // Tracking State
   const [trackingData, setTrackingData] = useState<any>(null)
   const [trackingLoading, setTrackingLoading] = useState(false)
+
+  // Dispute/Return State
+  const [showDisputeModal, setShowDisputeModal] = useState(false)
+  const [disputeReason, setDisputeReason] = useState('')
+  const [disputeDesc, setDisputeDesc] = useState('')
+  const [disputeSubmitting, setDisputeSubmitting] = useState(false)
 
   useEffect(() => {
     if (status === 'unauthenticated') router.push('/auth/signin')
@@ -108,22 +82,18 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
   useEffect(() => {
     if (!session?.user?.email) return
     
-    // Fetch Order Details
     fetch(`/api/orders/customer/${params.id}`)
       .then(r => r.json())
       .then(data => { 
         setOrder(data); 
         setLoading(false);
 
-        // ✅ NEW: If the order is Shipped/Delivered, fetch the live CJ Tracking data
         if (data && (data.status === 'SHIPPED' || data.status === 'DELIVERED')) {
           setTrackingLoading(true)
           fetch(`/api/orders/${params.id}/tracking`)
             .then(res => res.json())
-            .then(trackData => {
-              setTrackingData(trackData)
-            })
-            .catch(() => console.error("Failed to fetch tracking events"))
+            .then(trackData => { setTrackingData(trackData) })
+            .catch(() => {})
             .finally(() => setTrackingLoading(false))
         }
       })
@@ -142,6 +112,32 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
     })
     toast.success(`${order.items.length} item${order.items.length !== 1 ? 's' : ''} added to cart!`)
     router.push('/cart')
+  }
+
+  const handleDisputeSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!disputeReason || !disputeDesc) return toast.error('Please fill in all fields')
+    
+    setDisputeSubmitting(true)
+    try {
+      const res = await fetch(`/api/orders/${order!.orderNumber}/dispute`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: disputeReason, description: disputeDesc, images: [] }) 
+      })
+      
+      const data = await res.json()
+      if (res.ok) {
+        toast.success(data.message)
+        setShowDisputeModal(false)
+      } else {
+        toast.error(data.error)
+      }
+    } catch {
+      toast.error('Failed to submit request')
+    } finally {
+      setDisputeSubmitting(false)
+    }
   }
 
   if (loading) {
@@ -173,7 +169,6 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-3xl mx-auto px-4">
 
-        {/* Back Link */}
         <Link href="/account/orders" className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-tiffany-600 mb-6 transition-colors">
           <ArrowLeft size={16} /> Back to Orders
         </Link>
@@ -187,7 +182,7 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
                 Placed {new Date(order.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
               </p>
             </div>
-            <div className="flex gap-3 items-center">
+            <div className="flex flex-wrap gap-3 items-center">
               <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold border ${meta.bg} ${meta.color}`}>
                 {meta.icon} {meta.label}
               </span>
@@ -197,21 +192,21 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
               >
                 <ShoppingCart size={14} /> Reorder
               </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Only show return button if order is shipped/delivered and not cancelled */}
+              
+              {/* ✅ Return Button */}
               {!isCancelled && (order.status === 'SHIPPED' || order.status === 'DELIVERED') && (
                 <button
                   onClick={() => setShowDisputeModal(true)}
-                  className="flex items-center gap-1.5 text-sm font-semibold text-red-500 hover:text-red-700 hover:bg-red-50 px-3 py-1.5 rounded-xl transition-all"
+                  className="flex items-center gap-1.5 text-sm font-semibold text-red-500 hover:text-red-700 hover:bg-red-50 px-3 py-1.5 rounded-xl transition-all border border-transparent hover:border-red-200"
                 >
                   <AlertCircle size={14} /> Request Return
                 </button>
               )}
+            </div>
+          </div>
+        </div>
 
-        {/* ✅ NEW: Live CJ Tracking Timeline Integration */}
+        {/* Live Tracking */}
         {!isCancelled && (
           <div className="mb-5">
             {(order.status === 'SHIPPED' || order.status === 'DELIVERED') ? (
@@ -221,14 +216,12 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
                   <p className="text-sm text-gray-500 font-medium">Fetching live tracking events...</p>
                 </div>
               ) : trackingData && trackingData.events?.length > 0 ? (
-                // Beautiful Timeline
                 <TrackingTimeline 
                   events={trackingData.events} 
                   carrier={trackingData.carrier || order.trackingCarrier} 
                   trackingNumber={trackingData.trackingNumber || order.trackingNumber} 
                 />
               ) : (
-                // Fallback if CJ hasn't posted events yet
                 <div className="bg-white rounded-2xl border border-gray-100 p-8 text-center">
                   <Truck size={40} className="mx-auto text-purple-300 mb-3" />
                   <h3 className="font-bold text-gray-900 text-lg mb-1">Your order is on the way!</h3>
@@ -243,7 +236,6 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
                 </div>
               )
             ) : (
-              // Order is still PENDING or PROCESSING
               <div className="bg-white rounded-2xl border border-gray-100 p-8 text-center">
                 <Package size={40} className="mx-auto text-blue-300 mb-3" />
                 <h3 className="font-bold text-gray-900 text-lg mb-1">We're preparing your order</h3>
@@ -288,7 +280,6 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
             ))}
           </div>
 
-          {/* Totals */}
           <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 space-y-2">
             <div className="flex justify-between text-sm text-gray-600">
               <span>Subtotal</span><span>${order.subtotal.toFixed(2)}</span>
@@ -314,7 +305,7 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
           </div>
         </div>
 
-        {/* Shipping + Payment Info */}
+        {/* Shipping & Payment Info */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-5">
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
             <div className="flex items-center gap-2 mb-3">
@@ -352,19 +343,9 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
             </div>
           </div>
         </div>
-
-        {/* Need help CTA */}
-        <div className="bg-tiffany-50 border border-tiffany-200 rounded-2xl p-5 text-center">
-          <p className="text-sm text-tiffany-800 font-medium">
-            Need help with this order?{' '}
-            <Link href="/contact" className="font-bold underline hover:text-tiffany-900">
-              Contact Support
-            </Link>
-          </p>
-        </div>
       </div>
 
-      {/* Dispute/Return Modal */}
+      {/* ✅ Dispute/Return Modal */}
       {showDisputeModal && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setShowDisputeModal(false)}>
           <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-6 sm:p-8 animate-in slide-in-from-bottom-4" onClick={e => e.stopPropagation()}>
@@ -418,7 +399,6 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
           </div>
         </div>
       )}
-      
     </div>
   )
-        }
+              }
