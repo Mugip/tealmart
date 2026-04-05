@@ -1,37 +1,24 @@
 // components/checkout/PaymentSummary.tsx
 'use client'
 
-import { useEffect } from 'react'
-import { Loader2 } from 'lucide-react'
-
 interface Props {
+  step: number
   subtotal: number
   shipping: number
   tax: number
   discountAmount: number
   discountCode: string | null
   total: number
-  isCalculating: boolean
 }
 
 export default function PaymentSummary({ 
-  subtotal, shipping, tax, discountAmount, discountCode, total, isCalculating 
+  step, subtotal, shipping, tax, discountAmount, discountCode, total 
 }: Props) {
   
-  // 🐛 DEBUG: Log when this component receives new props
-  useEffect(() => {
-    console.log('🟢 [PaymentSummary] RENDER / PROP UPDATE', { 
-      subtotal, 
-      shipping, 
-      tax, 
-      total, 
-      isCalculating 
-    });
-  }, [subtotal, shipping, tax, total, isCalculating])
+  // If we are on step 1, shipping and tax are not finalized
+  const isStep1 = step === 1;
 
-  // Pulled outside main component function purely for best practice, though it shouldn't cause hydration errors if inside
   const ValueDisplay = ({ value, isFree = false, isNegative = false }: { value: number, isFree?: boolean, isNegative?: boolean }) => {
-    if (isCalculating) return <Loader2 size={14} className="animate-spin text-gray-400" />
     if (isFree && value === 0) return <span className="text-green-600 font-bold">FREE</span>
     return (
       <span className={isNegative ? "text-green-600 font-bold" : "text-gray-900 font-medium"}>
@@ -49,12 +36,20 @@ export default function PaymentSummary({
       
       <div className="flex justify-between text-gray-600 items-center h-6">
         <span>Shipping</span>
-        <ValueDisplay value={shipping} isFree={true} />
+        {isStep1 ? (
+          <span className="text-gray-400 text-xs italic">Calculated at next step</span>
+        ) : (
+          <ValueDisplay value={shipping} isFree={true} />
+        )}
       </div>
       
       <div className="flex justify-between text-gray-600 items-center h-6">
         <span>Estimated Tax</span>
-        <ValueDisplay value={tax} />
+        {isStep1 ? (
+          <span className="text-gray-400 text-xs italic">Calculated at next step</span>
+        ) : (
+          <ValueDisplay value={tax} />
+        )}
       </div>
 
       {discountAmount > 0 && (
@@ -66,10 +61,10 @@ export default function PaymentSummary({
       
       <div className="border-t border-gray-200 pt-3 mt-2 flex justify-between font-black text-gray-900 text-base sm:text-lg items-center h-8">
         <span>Total</span>
-        {isCalculating ? (
-           <Loader2 size={18} className="animate-spin text-tiffany-600" />
+        {isStep1 ? (
+          <span className="text-gray-500 text-sm font-medium">Pending...</span>
         ) : (
-           <span className="text-tiffany-600">${total.toFixed(2)}</span>
+          <span className="text-tiffany-600">${total.toFixed(2)}</span>
         )}
       </div>
     </div>
