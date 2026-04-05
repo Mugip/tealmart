@@ -1,6 +1,7 @@
 // components/checkout/PaymentSummary.tsx
 'use client'
 
+import { useEffect } from 'react'
 import { Loader2 } from 'lucide-react'
 
 interface Props {
@@ -17,6 +18,18 @@ export default function PaymentSummary({
   subtotal, shipping, tax, discountAmount, discountCode, total, isCalculating 
 }: Props) {
   
+  // 🐛 DEBUG: Log when this component receives new props
+  useEffect(() => {
+    console.log('🟢 [PaymentSummary] RENDER / PROP UPDATE', { 
+      subtotal, 
+      shipping, 
+      tax, 
+      total, 
+      isCalculating 
+    });
+  }, [subtotal, shipping, tax, total, isCalculating])
+
+  // Pulled outside main component function purely for best practice, though it shouldn't cause hydration errors if inside
   const ValueDisplay = ({ value, isFree = false, isNegative = false }: { value: number, isFree?: boolean, isNegative?: boolean }) => {
     if (isCalculating) return <Loader2 size={14} className="animate-spin text-gray-400" />
     if (isFree && value === 0) return <span className="text-green-600 font-bold">FREE</span>
