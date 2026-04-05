@@ -1,7 +1,6 @@
 // components/checkout/ShippingOptions.tsx
 'use client'
 
-import { useEffect } from 'react'
 import { Truck, CheckCircle } from 'lucide-react'
 
 export interface ShippingOption {
@@ -22,16 +21,6 @@ interface Props {
 }
 
 export default function ShippingOptions({ options, selectedId, onSelect, isLoading }: Props) {
-  
-  // 🐛 DEBUG: Log when this component receives new props
-  useEffect(() => {
-    console.log('🔵 [ShippingOptions] RENDER / PROP UPDATE', { 
-      optionsCount: options.length, 
-      selectedId, 
-      isLoading 
-    });
-  }, [options, selectedId, isLoading])
-
   if (isLoading) {
     return (
       <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-6 space-y-4 animate-pulse">
@@ -50,6 +39,7 @@ export default function ShippingOptions({ options, selectedId, onSelect, isLoadi
       <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2 mb-2">
         <Truck size={22} className="text-tiffany-600" /> Shipping Method
       </h2>
+      <p className="text-sm text-gray-500 mb-4">Please select your preferred shipping speed.</p>
       <div className="space-y-3">
         {options.map((option) => {
           const isSelected = selectedId === option.id
