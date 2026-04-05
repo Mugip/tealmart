@@ -7,18 +7,41 @@ import { getAdminSession } from '@/lib/adminAuth'
 export const dynamic = 'force-dynamic'
 
 export async function GET() {
-  const token = cookies().get('admin-auth')?.value
-  const session = token ? await getAdminSession(token) : null
-  
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
   try {
-    // Check for things requiring Admin attention
-    const [pendingDisputes, pendingOrders, failedIngestions] = await Promise.all([
-      prisma.dispute.count({ where: { status: 'PENDING' } }),
-      prisma.order.count({ where: { status: 'PENDING', paymentStatus: 'completed' } }),
-      prisma.ingestionLog.count({ where: { status: 'failed' }, take: 1 })
-    ])
+    console.log('[NOTIFICATIONS] API called. Verifying session...');
+    
+    const token = cookies().get('admin-auth')?.value
+    const session = token ? await getAdminSession(token) : null
+    
+    if (!session) {
+      console.warn('[NOTIFICATIONS] Unauthorized access attempt.');
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    console.log(`[NOTIFICATIONS] Session valid for ${session.email}. Fetching data...`);
+
+    // 1. Fetch data with safe fallbacks in case tables are missing/empty
+    const pendingDisputes = await prisma.dispute.count({ 
+      where: { status: 'PENDING' } 
+    }).catch(err => {
+      console.error('[NOTIFICATIONS] Error fetching disputes:', err.message);
+      return 0; // Fallback to 0 if table fails
+    });
+
+    const pendingOrders = await prisma.order.count({ 
+      where: { status: 'PENDING', paymentStatus: 'completed' } 
+    }).catch(err => {
+      console.error('[NOTIFICATIONS] Error fetching orders:', err.message);
+      return 0; // Fallback
+    });
+
+    const failedIngestions = await prisma.ingestionLog.count({ 
+      where: { status: 'failed' }, 
+      take: 1 
+    }).catch(err => {
+      console.error('[NOTIFICATIONS] Error fetching logs:', err.message);
+      return 0; // Fallback
+    });
 
     const notifications = []
 
@@ -49,11 +72,20 @@ export async function GET() {
       })
     }
 
+    console.log(`[NOTIFICATIONS] Successfully returning ${notifications.length} alerts.`);
+
     return NextResponse.json({
       count: notifications.length,
       items: notifications
     })
-  } catch (error) {
-    return NextResponse.json({ error: 'Failed to fetch notifications' }, { status: 500 })
+
+  } catch (error: any) {
+    // 🚨 This will finally print the exact crash reason to your Vercel logs!
+    console.error('[CRITICAL_NOTIFICATIONS_ERROR]', error.message, error.stack)
+    
+    return NextResponse.json({ 
+      error: 'Failed to fetch notifications',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined 
+    }, { status: 500 })
   }
 }
