@@ -110,6 +110,8 @@ model Order {
   items OrderItem[]
   disputes Dispute[]
 
+  cjOrder CJOrder?
+
 
   @@index([orderNumber])
   @@index([email])
@@ -418,4 +420,66 @@ model Dispute {
   @@index([orderNumber])
   @@index([userEmail])
   @@index([status])
+}
+
+// ============================================
+// CJ DROPSHIPPING AUTOMATION
+// ============================================
+
+model CJOrder {
+  id                String   @id @default(cuid())
+  orderId           String   @unique 
+  cjOrderNumber     String   @unique 
+  cjOrderId         String?  
+  
+  // Products
+  products          Json     
+  
+  // Shipping
+  shippingMethod    String   
+  shippingCost      Float    
+  shippingCharged   Float    
+  
+  // Payment
+  paymentIntentId   String?  
+  totalPaid         Float    
+  cjPaymentAmount   Float    
+  platformFee       Float    
+  profit            Float    
+  
+  // Tracking
+  trackingNumber    String?
+  trackingUrl       String?
+  carrier           String?
+  
+  // Status
+  status            String   @default("PENDING") 
+  cjStatus          String?  
+  
+  // Metadata
+  shippingAddress   Json     
+  remark            String?
+  disputeId         String?
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  order             Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([cjOrderNumber])
+  @@index([status])
+}
+
+model CJWebhookLog {
+  id          String   @id @default(cuid())
+  type        String   
+  event       String   
+  payload     Json
+  processed   Boolean  @default(false)
+  error       String?
+  createdAt   DateTime @default(now())
+  
+  @@index([type, event])
+  @@index([processed])
 }
