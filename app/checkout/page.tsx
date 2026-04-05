@@ -7,7 +7,7 @@ import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { 
-  Truck, CreditCard, AlertCircle, MapPin, CheckCircle, 
+  CreditCard, AlertCircle, MapPin, CheckCircle, 
   ChevronRight, Loader2, ChevronLeft 
 } from 'lucide-react'
 import { Country, State } from 'country-state-city'
@@ -15,92 +15,19 @@ import type { ICountry, IState } from 'country-state-city'
 import toast from 'react-hot-toast'
 import { getSecureImageUrl } from '@/lib/imageUrl'
 
-// ==========================================
-// 1. LOCAL COMPONENTS (Prevents Import Crashes)
-// ==========================================
+// ✅ Clean Imports
+import ShippingOptions, { ShippingOption } from '@/components/checkout/ShippingOptions'
+import PaymentSummary from '@/components/checkout/PaymentSummary'
 
-interface ShippingOption {
-  id: string; displayName: string; tier: string; icon: string; 
-  price: number; estimatedDays: string; description: string;
+// Debounce helper
+function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value)
+  useEffect(() => {
+    const handler = setTimeout(() => setDebouncedValue(value), delay)
+    return () => clearTimeout(handler)
+  }, [value, delay])
+  return debouncedValue
 }
-
-function ShippingOptionsList({ options, selectedId, onSelect, isLoading }: { options: ShippingOption[], selectedId: string, onSelect: (o: ShippingOption) => void, isLoading: boolean }) {
-  if (isLoading) {
-    return (
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 space-y-4 animate-pulse">
-        <div className="h-6 bg-gray-200 rounded w-1/3 mb-4" />
-        {[1, 2].map(i => <div key={i} className="h-20 bg-gray-100 rounded-xl border-2 border-gray-100" />)}
-      </div>
-    )
-  }
-  if (options.length === 0) return null;
-
-  return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 space-y-4 animate-in fade-in">
-      <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-        <Truck size={20} className="text-tiffany-600" /> Shipping Method
-      </h2>
-      <div className="space-y-3">
-        {options.map((option) => {
-          const isSelected = selectedId === option.id
-          return (
-            <label key={option.id} className={`relative flex items-center justify-between p-4 rounded-xl border-2 cursor-pointer transition-all duration-200 ${isSelected ? 'border-tiffany-500 bg-tiffany-50 shadow-sm' : 'border-gray-200 hover:border-tiffany-300 hover:bg-gray-50'}`}>
-              <div className="flex items-center gap-3">
-                <input type="radio" name="shipping_method" value={option.id} checked={isSelected} onChange={() => onSelect(option)} className="w-4 h-4 text-tiffany-600 border-gray-300 focus:ring-tiffany-500 mt-0.5" />
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-base">{option.icon}</span>
-                    <p className="font-bold text-gray-900 text-sm">{option.displayName}</p>
-                  </div>
-                  <p className="text-xs text-gray-500 mt-0.5">{option.description}</p>
-                </div>
-              </div>
-              <div className="text-right">
-                <p className="font-black text-gray-900 text-sm">{option.price === 0 ? 'FREE' : `$${option.price.toFixed(2)}`}</p>
-                {isSelected && <CheckCircle size={16} className="text-tiffany-600 absolute -top-2 -right-2 bg-white rounded-full" />}
-              </div>
-            </label>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
-
-function PaymentSummaryBox({ subtotal, shipping, tax, discountAmount, discountCode, total, isCalculating }: any) {
-  const ValueDisplay = ({ value, isFree = false, isNegative = false }: any) => {
-    if (isCalculating) return <Loader2 size={14} className="animate-spin text-gray-400" />
-    if (isFree && value === 0) return <span className="text-green-600 font-bold">FREE</span>
-    return <span className={isNegative ? "text-green-600 font-bold" : "text-gray-900 font-medium"}>{isNegative ? '-' : ''}${value.toFixed(2)}</span>
-  }
-
-  return (
-    <div className="border-t border-gray-100 pt-4 space-y-2 text-sm">
-      <div className="flex justify-between text-gray-600 items-center h-6">
-        <span>Subtotal</span><ValueDisplay value={subtotal} />
-      </div>
-      <div className="flex justify-between text-gray-600 items-center h-6">
-        <span>Shipping</span><ValueDisplay value={shipping} isFree={true} />
-      </div>
-      <div className="flex justify-between text-gray-600 items-center h-6">
-        <span>Estimated Tax</span><ValueDisplay value={tax} />
-      </div>
-      {discountAmount > 0 && (
-        <div className="flex justify-between text-green-600 font-medium items-center h-6">
-          <span>Discount ({discountCode})</span><ValueDisplay value={discountAmount} isNegative={true} />
-        </div>
-      )}
-      <div className="border-t border-gray-200 pt-3 mt-2 flex justify-between font-black text-gray-900 text-base sm:text-lg items-center h-8">
-        <span>Total</span>
-        {isCalculating ? <Loader2 size={18} className="animate-spin text-tiffany-600" /> : <span className="text-tiffany-600">${total.toFixed(2)}</span>}
-      </div>
-    </div>
-  )
-}
-
-// ==========================================
-// 2. MAIN CHECKOUT PAGE
-// ==========================================
 
 export default function CheckoutPage() {
   const { items, total: subtotal } = useCart()
@@ -132,11 +59,10 @@ export default function CheckoutPage() {
   const [discount, setDiscount] = useState<any>(null)
 
   const countries = useMemo(() => Country.getAllCountries().sort((a, b) => a.name.localeCompare(b.name)), [])
+  const debouncedZip = useDebounce(formData.zip, 800)
 
-  // Mount check prevents hydration errors
   useEffect(() => { setMounted(true) }, [])
 
-  // Init Data
   useEffect(() => {
     if (session?.user?.email) {
       setFormData(prev => ({ ...prev, email: prev.email || session.user!.email!, name: prev.name || session.user!.name || '' }))
@@ -145,7 +71,6 @@ export default function CheckoutPage() {
     if (def) { setSelectedCountry(def); setStates(State.getStatesOfCountry(def.isoCode)) }
   }, [session])
 
-  // Update States on Country Change
   useEffect(() => {
     if (formData.country) {
       const country = Country.getCountryByCode(formData.country)
@@ -160,79 +85,75 @@ export default function CheckoutPage() {
     }
   }, [formData.country])
 
+  // Fetch Shipping
+  useEffect(() => {
+    const fetchShipping = async () => {
+      if (!formData.country || items.length === 0) return
+      setIsFetchingShipping(true)
+      try {
+        const res = await fetch('/api/checkout/shipping-options', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ items, country: formData.country, zip: debouncedZip })
+        })
+        const data = await res.json()
+        if (data.shippingOptions?.length > 0) {
+          setShippingOptions(data.shippingOptions)
+          setSelectedShipping(data.shippingOptions[0]) 
+        }
+      } catch (err: any) {
+        console.error('[CHECKOUT] Fetch shipping error:', err)
+      } finally {
+        setIsFetchingShipping(false)
+      }
+    }
+    if (debouncedZip || formData.country) fetchShipping()
+  }, [formData.country, debouncedZip, items])
+
+  // Fetch Taxes
+  useEffect(() => {
+    const fetchTaxes = async () => {
+      if (!formData.country) return
+      try {
+        const res = await fetch('/api/checkout/calculate-tax', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ subtotal, shipping: selectedShipping?.price || 0, country: formData.country, state: formData.state })
+        })
+        const data = await res.json()
+        if (data.taxAmount !== undefined) setTaxAmount(data.taxAmount)
+      } catch (err: any) {
+        console.error('[CHECKOUT] Fetch tax error:', err)
+      }
+    }
+    fetchTaxes()
+  }, [formData.country, formData.state, selectedShipping?.price, subtotal])
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }))
     setError(null)
   }
 
-  // ── MOVE TO STEP 2: FETCH SHIPPING ──
-  const handleInfoSubmit = async (e: React.FormEvent) => {
+  const handleInfoSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    setError(null)
-
     if (!formData.email || !formData.name || !formData.address || !formData.city || !formData.zip || !formData.phone || !formData.country) {
-      setError('Please fill in all required fields.')
-      return
+      return setError('Please fill in all required fields.')
     }
     if (states.length > 0 && !formData.state) {
-      setError('Please select a state/province.')
-      return
+      return setError('Please select a state/province.')
     }
-
+    if (shippingOptions.length === 0) {
+      return setError('No shipping options available for this destination. Please check your ZIP code.')
+    }
     setStep(2) 
-    setIsFetchingShipping(true)
-    
-    try {
-      console.log('[CHECKOUT] Fetching shipping rates for:', { country: formData.country, zip: formData.zip })
-      
-      const shipRes = await fetch('/api/checkout/shipping-options', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ items, country: formData.country, zip: formData.zip })
-      })
-      
-      const shipData = await shipRes.json()
-      
-      if (!shipRes.ok) throw new Error(shipData.error || 'Failed to fetch shipping rates.')
-
-      if (shipData.shippingOptions?.length > 0) {
-        setShippingOptions(shipData.shippingOptions)
-        setSelectedShipping(shipData.shippingOptions[0]) 
-      } else {
-        throw new Error('No shipping options available for this destination.')
-      }
-
-      console.log('[CHECKOUT] Fetching taxes...')
-      const taxRes = await fetch('/api/checkout/calculate-tax', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          subtotal, shipping: shipData.shippingOptions[0]?.price || 0, country: formData.country, state: formData.state 
-        })
-      })
-      
-      const taxData = await taxRes.json()
-      if (taxData.taxAmount !== undefined) setTaxAmount(taxData.taxAmount)
-
-    } catch (err: any) {
-      console.error('[CHECKOUT ERROR]', err)
-      setError(err.message)
-      toast.error(err.message)
-      setStep(1) // Kick back to step 1
-    } finally {
-      setIsFetchingShipping(false)
-    }
   }
 
-  // ── MOVE TO STEP 3: PAYMENT ──
   const handleShippingSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!selectedShipping) return setError('Please select a shipping method.')
-    setError(null)
     setStep(3)
   }
 
-  // ── SUBMIT ORDER ──
   const handlePaymentSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
@@ -241,12 +162,10 @@ export default function CheckoutPage() {
     try {
       const country = Country.getCountryByCode(formData.country)
       const state = formData.state ? State.getStateByCodeAndCountry(formData.state, formData.country) : null
-
       const endpoint = paymentMethod === 'stripe' ? '/api/checkout' : '/api/checkout/flutterwave'
 
       const payload = {
-        items,
-        email: formData.email,
+        items, email: formData.email,
         shippingAddress: {
           name: formData.name, address1: formData.address, city: formData.city,
           state: state?.name || formData.state || '', zip: formData.zip,
@@ -259,8 +178,6 @@ export default function CheckoutPage() {
         taxAmount: taxAmount
       }
 
-      console.log(`[CHECKOUT] Sending to ${endpoint}:`, payload)
-
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -268,13 +185,11 @@ export default function CheckoutPage() {
       })
 
       const data = await response.json()
-      
       if (!response.ok) throw new Error(data.error || 'Payment gateway rejected the request.')
-
       window.location.href = data.url
 
     } catch (err: any) {
-      console.error('[CHECKOUT ERROR]', err)
+      console.error('[CHECKOUT SUBMIT ERROR]', err)
       setError(err.message || 'Payment initiation failed.')
       toast.error(err.message || 'Payment initiation failed.')
       setLoading(false)
@@ -293,8 +208,10 @@ export default function CheckoutPage() {
       const data = await res.json()
       if (!res.ok) { toast.error(data.error || 'Invalid code'); setDiscount(null) } 
       else { setDiscount(data); toast.success(data.message) }
-    } catch { toast.error('Failed to apply discount') } 
-    finally { setDiscountLoading(false) }
+    } catch (err: any) { 
+      console.error('[DISCOUNT ERROR]', err)
+      toast.error('Failed to apply discount') 
+    } finally { setDiscountLoading(false) }
   }
 
   // Cost Calculations
@@ -302,7 +219,6 @@ export default function CheckoutPage() {
   const discountAmount = discount?.discountAmount || 0
   const finalTotal = subtotal + (step > 1 ? shippingCost : 0) + (step > 1 ? taxAmount : 0) - discountAmount
 
-  // Early returns
   if (!mounted) return null
   if (items.length === 0) {
     return (
@@ -316,7 +232,7 @@ export default function CheckoutPage() {
     )
   }
 
-  const inputCls = "w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-tiffany-500 focus:border-tiffany-500 outline-none transition-all text-sm bg-gray-50/50"
+  const inputCls = "w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-tiffany-500 outline-none transition-all text-sm bg-gray-50/50"
   const labelCls = "block text-sm font-bold text-gray-700 mb-1.5"
   const stateLabel = formData.country === 'US' ? 'State' : formData.country === 'CA' ? 'Province' : formData.country === 'GB' ? 'County' : 'State / Region'
   const zipLabel = formData.country === 'US' ? 'ZIP Code' : formData.country === 'GB' ? 'Postcode' : formData.country === 'CA' ? 'Postal Code' : 'ZIP / Postal Code'
@@ -351,15 +267,15 @@ export default function CheckoutPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <div className="sm:col-span-2">
                     <label className={labelCls}>Email <span className="text-red-500">*</span></label>
-                    <input type="email" name="email" value={formData.email} onChange={handleChange} required className={inputCls} placeholder="you@example.com" />
+                    <input type="email" name="email" value={formData.email} onChange={handleChange} required className={inputCls} />
                   </div>
                   <div>
                     <label className={labelCls}>Full Name <span className="text-red-500">*</span></label>
-                    <input type="text" name="name" value={formData.name} onChange={handleChange} required className={inputCls} placeholder="John Doe" />
+                    <input type="text" name="name" value={formData.name} onChange={handleChange} required className={inputCls} />
                   </div>
                   <div>
                     <label className={labelCls}>Phone <span className="text-red-500">*</span></label>
-                    <input type="tel" name="phone" value={formData.phone} onChange={handleChange} required className={inputCls} placeholder="+1 555 000 0000" />
+                    <input type="tel" name="phone" value={formData.phone} onChange={handleChange} required className={inputCls} />
                   </div>
                   <div className="sm:col-span-2">
                     <label className={labelCls}>Country <span className="text-red-500">*</span></label>
@@ -370,11 +286,11 @@ export default function CheckoutPage() {
                   </div>
                   <div className="sm:col-span-2">
                     <label className={labelCls}>Street Address <span className="text-red-500">*</span></label>
-                    <input type="text" name="address" value={formData.address} onChange={handleChange} required className={inputCls} placeholder="123 Main Street, Apt 4B" />
+                    <input type="text" name="address" value={formData.address} onChange={handleChange} required className={inputCls} />
                   </div>
                   <div>
                     <label className={labelCls}>City <span className="text-red-500">*</span></label>
-                    <input type="text" name="city" value={formData.city} onChange={handleChange} required className={inputCls} placeholder="City" />
+                    <input type="text" name="city" value={formData.city} onChange={handleChange} required className={inputCls} />
                   </div>
                   <div>
                     <label className={labelCls}>{stateLabel} {states.length > 0 && <span className="text-red-500">*</span>}</label>
@@ -384,16 +300,17 @@ export default function CheckoutPage() {
                         {states.map(s => <option key={s.isoCode} value={s.isoCode}>{s.name}</option>)}
                       </select>
                     ) : (
-                      <input type="text" name="state" value={formData.state} onChange={handleChange} className={inputCls} placeholder={stateLabel} />
+                      <input type="text" name="state" value={formData.state} onChange={handleChange} className={inputCls} />
                     )}
                   </div>
                   <div className="sm:col-span-2">
                     <label className={labelCls}>{zipLabel} <span className="text-red-500">*</span></label>
-                    <input type="text" name="zip" value={formData.zip} onChange={handleChange} required className={inputCls} placeholder="ZIP/Postal Code" />
+                    <input type="text" name="zip" value={formData.zip} onChange={handleChange} required className={inputCls} />
                   </div>
                 </div>
                 <div className="pt-4 flex justify-end">
-                  <button type="submit" className="bg-gray-900 hover:bg-black text-white px-8 py-4 rounded-xl font-bold transition-all shadow-md flex items-center gap-2">
+                  <button type="submit" disabled={isFetchingShipping} className="bg-gray-900 hover:bg-black text-white px-8 py-4 rounded-xl font-bold transition-all shadow-md flex items-center gap-2 disabled:opacity-50">
+                    {isFetchingShipping ? <Loader2 className="animate-spin" size={18} /> : null}
                     Continue to Shipping <ChevronRight size={18} />
                   </button>
                 </div>
@@ -402,87 +319,92 @@ export default function CheckoutPage() {
 
             {/* STEP 2 */}
             {step === 2 && (
-              <form onSubmit={handleShippingSubmit} className="bg-white rounded-3xl shadow-sm border border-gray-100 p-6 sm:p-8 space-y-5 animate-in slide-in-from-right-4">
-                <div className="border border-gray-200 rounded-xl divide-y divide-gray-200 mb-6 text-sm">
-                  <div className="flex justify-between p-4">
-                    <span className="text-gray-500 w-24">Contact</span>
-                    <span className="flex-1 font-medium">{formData.email}</span>
-                    <button type="button" onClick={() => setStep(1)} className="text-tiffany-600 font-bold hover:underline">Change</button>
+              <form onSubmit={handleShippingSubmit} className="space-y-6 animate-in slide-in-from-right-4">
+                <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-6 sm:p-8">
+                  <div className="border border-gray-200 rounded-xl divide-y divide-gray-200 mb-6 text-sm">
+                    <div className="flex justify-between p-4">
+                      <span className="text-gray-500 w-24">Contact</span>
+                      <span className="flex-1 font-medium">{formData.email}</span>
+                      <button type="button" onClick={() => setStep(1)} className="text-tiffany-600 font-bold hover:underline">Change</button>
+                    </div>
+                    <div className="flex justify-between p-4">
+                      <span className="text-gray-500 w-24">Ship to</span>
+                      <span className="flex-1 font-medium">{formData.address}, {formData.city}, {formData.zip}, {formData.country}</span>
+                      <button type="button" onClick={() => setStep(1)} className="text-tiffany-600 font-bold hover:underline">Change</button>
+                    </div>
                   </div>
-                  <div className="flex justify-between p-4">
-                    <span className="text-gray-500 w-24">Ship to</span>
-                    <span className="flex-1 font-medium">{formData.address}, {formData.city}, {formData.zip}, {formData.country}</span>
-                    <button type="button" onClick={() => setStep(1)} className="text-tiffany-600 font-bold hover:underline">Change</button>
+
+                  <ShippingOptions options={shippingOptions} selectedId={selectedShipping?.id || ''} onSelect={setSelectedShipping} isLoading={isFetchingShipping} />
+
+                  <div className="pt-6 flex items-center justify-between">
+                    <button type="button" onClick={() => setStep(1)} className="text-tiffany-600 font-bold hover:text-tiffany-700 flex items-center gap-1 text-sm">
+                      <ChevronLeft size={16} /> Return to information
+                    </button>
+                    <button type="submit" disabled={!selectedShipping} className="bg-gray-900 hover:bg-black text-white px-8 py-4 rounded-xl font-bold transition-all shadow-md disabled:opacity-50 flex items-center gap-2">
+                      Continue to Payment <ChevronRight size={18} />
+                    </button>
                   </div>
-                </div>
-
-                <ShippingOptionsList options={shippingOptions} selectedId={selectedShipping?.id || ''} onSelect={setSelectedShipping} isLoading={isFetchingShipping} />
-
-                <div className="pt-6 flex items-center justify-between">
-                  <button type="button" onClick={() => setStep(1)} className="text-tiffany-600 font-bold hover:text-tiffany-700 flex items-center gap-1 text-sm">
-                    <ChevronLeft size={16} /> Return to info
-                  </button>
-                  <button type="submit" disabled={isFetchingShipping || !selectedShipping} className="bg-gray-900 hover:bg-black text-white px-8 py-4 rounded-xl font-bold transition-all shadow-md disabled:opacity-50 flex items-center gap-2">
-                    Continue to Payment <ChevronRight size={18} />
-                  </button>
                 </div>
               </form>
             )}
 
             {/* STEP 3 */}
             {step === 3 && (
-              <form onSubmit={handlePaymentSubmit} className="bg-white rounded-3xl shadow-sm border border-gray-100 p-6 sm:p-8 space-y-5 animate-in slide-in-from-right-4">
-                <div className="border border-gray-200 rounded-xl divide-y divide-gray-200 mb-6 text-sm">
-                  <div className="flex justify-between p-4">
-                    <span className="text-gray-500 w-24">Contact</span>
-                    <span className="flex-1 font-medium">{formData.email}</span>
-                    <button type="button" onClick={() => setStep(1)} className="text-tiffany-600 font-bold hover:underline">Change</button>
-                  </div>
-                  <div className="flex justify-between p-4">
-                    <span className="text-gray-500 w-24">Ship to</span>
-                    <span className="flex-1 font-medium">{formData.address}, {formData.city}, {formData.zip}</span>
-                    <button type="button" onClick={() => setStep(1)} className="text-tiffany-600 font-bold hover:underline">Change</button>
-                  </div>
-                  <div className="flex justify-between p-4">
-                    <span className="text-gray-500 w-24">Method</span>
-                    <span className="flex-1 font-medium">{selectedShipping?.displayName} · ${selectedShipping?.price.toFixed(2)}</span>
-                    <button type="button" onClick={() => setStep(2)} className="text-tiffany-600 font-bold hover:underline">Change</button>
-                  </div>
-                </div>
-
-                <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2 mb-2">
-                  <CreditCard size={22} className="text-tiffany-600" /> Payment Method
-                </h2>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <label className={`border-2 rounded-xl p-5 cursor-pointer transition-all ${paymentMethod === 'flutterwave' ? 'border-tiffany-500 bg-tiffany-50 shadow-md' : 'border-gray-100 bg-gray-50 hover:border-gray-300'}`}>
-                    <div className="flex items-center gap-3">
-                      <input type="radio" name="payment" checked={paymentMethod === 'flutterwave'} onChange={() => setPaymentMethod('flutterwave')} className="w-5 h-5 text-tiffany-600" />
-                      <div>
-                        <p className="font-bold text-gray-900">Mobile Money & Cards</p>
-                        <p className="text-xs text-gray-500 mt-1">MTN, Airtel, Local Cards</p>
-                      </div>
+              <form onSubmit={handlePaymentSubmit} className="space-y-6 animate-in slide-in-from-right-4">
+                <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-6 sm:p-8">
+                  <div className="border border-gray-200 rounded-xl divide-y divide-gray-200 mb-6 text-sm">
+                    <div className="flex justify-between p-4">
+                      <span className="text-gray-500 w-24">Contact</span>
+                      <span className="flex-1 font-medium">{formData.email}</span>
+                      <button type="button" onClick={() => setStep(1)} className="text-tiffany-600 font-bold hover:underline">Change</button>
                     </div>
-                  </label>
-                  <label className={`border-2 rounded-xl p-5 cursor-pointer transition-all ${paymentMethod === 'stripe' ? 'border-tiffany-500 bg-tiffany-50 shadow-md' : 'border-gray-100 bg-gray-50 hover:border-gray-300'}`}>
-                    <div className="flex items-center gap-3">
-                      <input type="radio" name="payment" checked={paymentMethod === 'stripe'} onChange={() => setPaymentMethod('stripe')} className="w-5 h-5 text-tiffany-600" />
-                      <div>
-                        <p className="font-bold text-gray-900">Credit Card</p>
-                        <p className="text-xs text-gray-500 mt-1">Stripe Secure</p>
-                      </div>
+                    <div className="flex justify-between p-4">
+                      <span className="text-gray-500 w-24">Ship to</span>
+                      <span className="flex-1 font-medium">{formData.address}, {formData.city}, {formData.zip}</span>
+                      <button type="button" onClick={() => setStep(1)} className="text-tiffany-600 font-bold hover:underline">Change</button>
                     </div>
-                  </label>
-                </div>
+                    <div className="flex justify-between p-4">
+                      <span className="text-gray-500 w-24">Method</span>
+                      <span className="flex-1 font-medium">{selectedShipping?.displayName} · ${selectedShipping?.price.toFixed(2)}</span>
+                      <button type="button" onClick={() => setStep(2)} className="text-tiffany-600 font-bold hover:underline">Change</button>
+                    </div>
+                  </div>
 
-                <div className="pt-6 flex items-center justify-between">
-                  <button type="button" onClick={() => setStep(2)} className="text-tiffany-600 font-bold hover:text-tiffany-700 flex items-center gap-1 text-sm">
-                    <ChevronLeft size={16} /> Return to shipping
-                  </button>
-                  <button type="submit" disabled={loading} className="bg-gradient-to-r from-tiffany-500 to-tiffany-600 text-white px-8 py-4 rounded-xl font-black flex items-center justify-center gap-3 shadow-lg disabled:opacity-50 text-base sm:text-lg">
-                    {loading ? <Loader2 size={24} className="animate-spin" /> : <CreditCard size={24} />}
-                    {loading ? 'Processing…' : `Pay $${finalTotal.toFixed(2)}`}
-                  </button>
+                  <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2 mb-2">
+                    <CreditCard size={22} className="text-tiffany-600" /> Payment Method
+                  </h2>
+                  <p className="text-xs text-gray-500 mb-4">All transactions are secure and encrypted.</p>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <label className={`border-2 rounded-xl p-5 cursor-pointer transition-all ${paymentMethod === 'flutterwave' ? 'border-tiffany-500 bg-tiffany-50 shadow-md' : 'border-gray-100 bg-gray-50 hover:border-gray-300'}`}>
+                      <div className="flex items-center gap-3">
+                        <input type="radio" name="payment" checked={paymentMethod === 'flutterwave'} onChange={() => setPaymentMethod('flutterwave')} className="w-5 h-5 text-tiffany-600" />
+                        <div>
+                          <p className="font-bold text-gray-900">Mobile Money & Cards</p>
+                          <p className="text-xs text-gray-500 mt-1">MTN, Airtel, Local Cards</p>
+                        </div>
+                      </div>
+                    </label>
+                    <label className={`border-2 rounded-xl p-5 cursor-pointer transition-all ${paymentMethod === 'stripe' ? 'border-tiffany-500 bg-tiffany-50 shadow-md' : 'border-gray-100 bg-gray-50 hover:border-gray-300'}`}>
+                      <div className="flex items-center gap-3">
+                        <input type="radio" name="payment" checked={paymentMethod === 'stripe'} onChange={() => setPaymentMethod('stripe')} className="w-5 h-5 text-tiffany-600" />
+                        <div>
+                          <p className="font-bold text-gray-900">Credit Card (Stripe)</p>
+                          <p className="text-xs text-gray-500 mt-1">Visa, Mastercard, Amex</p>
+                        </div>
+                      </div>
+                    </label>
+                  </div>
+
+                  <div className="pt-6 flex items-center justify-between">
+                    <button type="button" onClick={() => setStep(2)} className="text-tiffany-600 font-bold hover:text-tiffany-700 flex items-center gap-1 text-sm">
+                      <ChevronLeft size={16} /> Return to shipping
+                    </button>
+                    <button type="submit" disabled={loading} className="bg-gradient-to-r from-tiffany-500 to-tiffany-600 hover:from-tiffany-600 hover:to-tiffany-700 text-white px-8 py-4 rounded-xl font-black flex items-center justify-center gap-3 shadow-lg hover:shadow-xl disabled:opacity-50 text-base sm:text-lg">
+                      {loading ? <Loader2 size={24} className="animate-spin" /> : <CreditCard size={24} />}
+                      {loading ? 'Processing…' : `Pay $${finalTotal.toFixed(2)}`}
+                    </button>
+                  </div>
                 </div>
               </form>
             )}
@@ -493,34 +415,36 @@ export default function CheckoutPage() {
             <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-6 sm:p-8 sticky top-24">
               <h2 className="text-lg font-bold text-gray-900 mb-4">Order Summary</h2>
 
+              {/* Items */}
               <div className="space-y-4 mb-6 max-h-72 overflow-y-auto pr-2 custom-scrollbar">
                 {items.map(item => (
                   <div key={item.id} className="flex gap-4">
                     <div className="relative w-16 h-16 flex-shrink-0 rounded-xl overflow-hidden bg-gray-50 border border-gray-100">
                       <Image src={getSecureImageUrl(item.image)} alt={item.title} fill className="object-cover" sizes="64px" />
-                      <div className="absolute -top-1 -right-1 bg-gray-900 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">
+                      <div className="absolute -top-1 -right-1 bg-gray-500/90 backdrop-blur text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center shadow-sm">
                         {item.quantity}
                       </div>
                     </div>
                     <div className="flex-1 min-w-0 py-1">
-                      <p className="text-sm font-bold text-gray-900 line-clamp-2">{item.title}</p>
+                      <p className="text-sm font-bold text-gray-900 line-clamp-2 leading-snug mb-1">{item.title}</p>
                       <p className="text-sm text-gray-500 font-medium">${(item.price * item.quantity).toFixed(2)}</p>
                     </div>
                   </div>
                 ))}
               </div>
 
+              {/* Discount Code */}
               <div className="mb-6 pt-6 border-t border-gray-100">
                 {discount ? (
                   <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-xl p-3">
                     <div className="flex items-center gap-2">
                       <CheckCircle size={18} className="text-green-600" />
                       <div>
-                        <p className="font-bold text-green-800 text-sm uppercase">{discount.code}</p>
+                        <p className="font-bold text-green-800 text-sm uppercase tracking-wider">{discount.code}</p>
                         <p className="text-xs text-green-600 font-medium">{discount.message}</p>
                       </div>
                     </div>
-                    <button onClick={() => { setDiscount(null); setDiscountCode('') }} className="text-xs text-red-500 font-bold">Remove</button>
+                    <button onClick={() => { setDiscount(null); setDiscountCode('') }} className="text-xs text-red-500 hover:text-red-700 font-bold">Remove</button>
                   </div>
                 ) : (
                   <div className="flex gap-2">
