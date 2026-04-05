@@ -15,7 +15,6 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // 1. Fetch data with safe fallbacks in case tables are missing/empty
     const pendingDisputes = await prisma.dispute.count({ 
       where: { status: 'PENDING' } 
     }).catch(err => {
@@ -23,7 +22,6 @@ export async function GET() {
       return 0;
     });
 
-    // ✅ FIXED: Changed to use paidAt instead of the non-existent paymentStatus field
     const pendingOrders = await prisma.order.count({ 
       where: { 
         status: 'PENDING', 
@@ -47,32 +45,32 @@ export async function GET() {
     if (pendingDisputes > 0) {
       notifications.push({
         id: 'disputes',
+        count: pendingDisputes, // ✅ Added raw count for frontend logic
         message: `${pendingDisputes} new return request(s) need review.`,
         link: '/admin/disputes',
-        color: 'red'
       })
     }
 
     if (pendingOrders > 0) {
       notifications.push({
         id: 'orders',
+        count: pendingOrders, // ✅ Added raw count
         message: `${pendingOrders} paid order(s) waiting for fulfillment.`,
         link: '/admin/orders',
-        color: 'tiffany'
       })
     }
 
     if (failedIngestions > 0) {
       notifications.push({
         id: 'logs',
+        count: failedIngestions, // ✅ Added raw count
         message: `An ingestion or webhook sync recently failed.`,
         link: '/admin/logs',
-        color: 'orange'
       })
     }
 
     return NextResponse.json({
-      count: notifications.length,
+      total: notifications.length,
       items: notifications
     })
 
