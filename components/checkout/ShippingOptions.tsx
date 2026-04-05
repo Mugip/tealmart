@@ -9,7 +9,8 @@ export interface ShippingOption {
   tier: string
   icon: string
   price: number
-  estimatedDays: string
+  taxesFee?: number // ✅ Added
+  estimatedDays: string // ✅ We will now use this
   description: string
 }
 
@@ -57,14 +58,18 @@ export default function ShippingOptions({ options, selectedId, onSelect, isLoadi
                   value={option.id} 
                   checked={isSelected} 
                   onChange={() => onSelect(option)} 
-                  className="w-4 h-4 text-tiffany-600 border-gray-300 focus:ring-tiffany-500 mt-0.5" 
+                  className="w-4 h-4 text-tiffany-600 border-gray-300 focus:ring-tiffany-500 mt-0.5 flex-shrink-0" 
                 />
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="text-base">{option.icon}</span>
                     <p className="font-bold text-gray-900 text-sm">{option.displayName}</p>
                   </div>
-                  <p className="text-xs text-gray-500 mt-0.5">{option.description}</p>
+                  {/* ✅ Show Delivery Days Clearly */}
+                  <p className="text-xs font-bold text-tiffany-700 mt-1 bg-tiffany-50 inline-block px-2 py-0.5 rounded">
+                    Est. Delivery: {option.estimatedDays}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">{option.description}</p>
                 </div>
               </div>
               <div className="text-right">
