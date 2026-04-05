@@ -15,7 +15,7 @@ import type { ICountry, IState } from 'country-state-city'
 import toast from 'react-hot-toast'
 import { getSecureImageUrl } from '@/lib/imageUrl'
 
-// ✅ Clean Imports
+// Imported Components
 import ShippingOptions, { ShippingOption } from '@/components/checkout/ShippingOptions'
 import PaymentSummary from '@/components/checkout/PaymentSummary'
 
@@ -61,18 +61,39 @@ export default function CheckoutPage() {
   const countries = useMemo(() => Country.getAllCountries().sort((a, b) => a.name.localeCompare(b.name)), [])
   const debouncedZip = useDebounce(formData.zip, 800)
 
-  useEffect(() => { setMounted(true) }, [])
+  // 🐛 DEBUG: Log Initial Render State
+  console.log('🟣 [CheckoutPage] RENDER', { 
+    mounted, 
+    step, 
+    cartItemsCount: items.length, 
+    subtotal,
+    isServer: typeof window === 'undefined'
+  });
+
+  useEffect(() => { 
+    console.log('🟣 [CheckoutPage] MOUNTED on Client');
+    setMounted(true) 
+  }, [])
 
   useEffect(() => {
     if (session?.user?.email) {
-      setFormData(prev => ({ ...prev, email: prev.email || session.user!.email!, name: prev.name || session.user!.name || '' }))
+      console.log('🟣 [CheckoutPage] Session loaded, populating defaults');
+      setFormData(prev => ({ 
+        ...prev, 
+        email: prev.email || session.user!.email!, 
+        name: prev.name || session.user!.name || '' 
+      }))
     }
     const def = Country.getCountryByCode('UG') || Country.getCountryByCode('US')
-    if (def) { setSelectedCountry(def); setStates(State.getStatesOfCountry(def.isoCode)) }
+    if (def) { 
+      setSelectedCountry(def); 
+      setStates(State.getStatesOfCountry(def.isoCode)) 
+    }
   }, [session])
 
   useEffect(() => {
     if (formData.country) {
+      console.log('🟣 [CheckoutPage] Country changed:', formData.country);
       const country = Country.getCountryByCode(formData.country)
       setSelectedCountry(country || null)
       if (country) {
@@ -89,6 +110,7 @@ export default function CheckoutPage() {
   useEffect(() => {
     const fetchShipping = async () => {
       if (!formData.country || items.length === 0) return
+      console.log('🟣 [CheckoutPage] Fetching Shipping for Zip:', debouncedZip, 'Country:', formData.country);
       setIsFetchingShipping(true)
       try {
         const res = await fetch('/api/checkout/shipping-options', {
@@ -102,7 +124,7 @@ export default function CheckoutPage() {
           setSelectedShipping(data.shippingOptions[0]) 
         }
       } catch (err: any) {
-        console.error('[CHECKOUT] Fetch shipping error:', err)
+        console.error('🟣 [CheckoutPage] Fetch shipping error:', err)
       } finally {
         setIsFetchingShipping(false)
       }
@@ -114,6 +136,7 @@ export default function CheckoutPage() {
   useEffect(() => {
     const fetchTaxes = async () => {
       if (!formData.country) return
+      console.log('🟣 [CheckoutPage] Fetching Taxes');
       try {
         const res = await fetch('/api/checkout/calculate-tax', {
           method: 'POST',
@@ -123,7 +146,7 @@ export default function CheckoutPage() {
         const data = await res.json()
         if (data.taxAmount !== undefined) setTaxAmount(data.taxAmount)
       } catch (err: any) {
-        console.error('[CHECKOUT] Fetch tax error:', err)
+        console.error('🟣 [CheckoutPage] Fetch tax error:', err)
       }
     }
     fetchTaxes()
@@ -219,7 +242,16 @@ export default function CheckoutPage() {
   const discountAmount = discount?.discountAmount || 0
   const finalTotal = subtotal + (step > 1 ? shippingCost : 0) + (step > 1 ? taxAmount : 0) - discountAmount
 
-  if (!mounted) return null
+  // 🚨 TO PREVENT HYDRATION ERRORS: Return an identical empty/loading shell if not mounted
+  if (!mounted) {
+    console.log('🟣 [CheckoutPage] PRE-HYDRATION - Rendering null/skeleton to avoid mismatch');
+    return (
+      <div className="min-h-screen bg-gray-50 py-8 px-4 flex justify-center">
+        <Loader2 size={32} className="animate-spin text-tiffany-600 mt-20" />
+      </div>
+    );
+  }
+
   if (items.length === 0) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
@@ -463,7 +495,7 @@ export default function CheckoutPage() {
                 discountAmount={discountAmount}
                 discountCode={discount?.code}
                 total={step > 1 ? finalTotal : subtotal - discountAmount} 
-                isCalculating={isFetchingShipping || isFetchingTax}
+                isCalculating={isFetchingShipping || isFetchingTax} // Add `isFetchingTax` if you add state for it
               />
             </div>
           </div>
